@@ -1,0 +1,29 @@
+## set path
+export FINDNFRPATH=<FINDNFR INSTALLATION PATH>
+export PATH=$PATH:$FINDNFRPATH/bin
+export PERL5LIB=$PERL5LIB:$FINDNFRPATH/share/perl/
+
+## execute findNFR
+## test data available at http://servers.binf.ku.dk/pare/download/test_run/
+findNFR -i data/h3k4me1_helas3_Rep1.bam,data/h3k4me1_helas3_Rep2.bam -k input.bed -o results -m hg19 -p &> findNFR.log
+
+## dependent programs:
+1. macs2 (>= v2.1.0)
+2. samtools (>= v1.2)
+3. bedtools (>= v2.23.0)
+4. featureCounts
+5. bedGraphToBigWig
+
+## dependent R packages
+1. ggplot2
+2. gridExtra
+3. DESeq
+4. optparse
+5. randomForest
+6. e1071
+
+## dependent perl packages
+1. Tie::IxHash
+2. Getopt::Long
+3. Statistics::Basic
+
