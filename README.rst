@@ -98,7 +98,7 @@ Usage
 
     findNFR is called with the following parameters
 
-    pare -i <BAM file(s)> -k <BED file> [OPTIONS]
+    findNFR -i <BAM file(s)> -k <BED file> [OPTIONS]
 
 Example
 =======
