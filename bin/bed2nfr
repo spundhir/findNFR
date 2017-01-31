@@ -151,10 +151,12 @@ while read LINE; do
     else
         echo $COOR | perl -ane '@t=split(/[\:\-]+/, $_); print "$t[0]\t-1\t-1\t'$COOR'\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\n";'
     fi 
-
-    ## remove temporary files
-    rm $REGIONFILE".tmp$SUFFIX"
-    rm $REGIONFILE".bg$SUFFIX"
 done < $REGIONFILE
+
+## remove temporary files
+rm $REGIONFILE".tmp$SUFFIX"
+if [ -f "$REGIONFILE.bg$SUFFIX" ]; then
+    rm $REGIONFILE".bg$SUFFIX"
+fi
 
 exit

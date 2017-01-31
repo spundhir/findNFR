@@ -103,12 +103,12 @@ foreach(@data) {
         $NFR{$F[3]}{'count'}=1;
         $NFR{$F[3]}{'score'}=$F[4];
         $NFR{$F[3]}{'significant'}=$F[14];
-    } elsif($F[14] > $NFR{$F[3]}{'significant'}) {
+    } elsif($F[4]!~/NA/ && $F[14] > $NFR{$F[3]}{'significant'}) {
         $NFR{$F[3]}{'info'}=$_;
         $NFR{$F[3]}{'count'}++;
         $NFR{$F[3]}{'score'}=$F[4];
         $NFR{$F[3]}{'significant'}=$F[14];
-    } elsif($F[14] >= $NFR{$F[3]}{'significant'} && $F[4] > $NFR{$F[3]}{'score'}) {
+    } elsif($F[4]!~/NA/ && $F[14] >= $NFR{$F[3]}{'significant'} && $F[4] > $NFR{$F[3]}{'score'}) {
         $NFR{$F[3]}{'info'}=$_;
         $NFR{$F[3]}{'count'}++;
         $NFR{$F[3]}{'score'}=$F[4];
