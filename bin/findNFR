@@ -135,8 +135,9 @@ if [ ! -d "$OUTDIR/rep0" ]; then
         mkdir $OUTDIR/rep$i
     done
     mkdir $OUTDIR/logs/
+    mkdir $OUTDIR/fitDistr/
     mkdir $OUTDIR/$RANDOMDIR
-    mkdir $OUTDIR/bam_files/
+    mkdir $OUTDIR/bw_files/
 fi
 echo "done"
 
@@ -166,10 +167,10 @@ echo done
 echo -n "Copy and rename input BAM files (`date`).. "
 BAMFILEs=""
 for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
-    if [ ! -f "$OUTDIR/bam_files/histone_Rep$i.bam" ]; then
-        scp ${BAMFILEa[$i]} $OUTDIR/bam_files/histone_Rep$i.bam
+    if [ ! -f "$OUTDIR/bw_files/histone_Rep$i.bam" ]; then
+        scp ${BAMFILEa[$i]} $OUTDIR/bw_files/histone_Rep$i.bam
     fi
-    BAMFILEs="$BAMFILEs,$OUTDIR/bam_files/histone_Rep$i.bam"
+    BAMFILEs="$BAMFILEs,$OUTDIR/bw_files/histone_Rep$i.bam"
 done
 BAMFILEs=$(echo $BAMFILEs | perl -ane '$_=~s/^\,//g; print $_;')
 oIFS=$IFS
@@ -330,7 +331,7 @@ if [ -z "$PARALLEL" ]; then
     for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
         ID=$(echo ${BAMFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
         NFRFILEs="$NFRFILEs,$OUTDIR/rep$i/$ID.nfr"
-        bed2nfr -i $PEAKREGION -b ${BAMFILEa[$i]} -z ${SIZEFACTORa[$i]} -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -n $MINNFRLENGTH -v $MAXNFRLENGTH -q ${EXTENDa[$i]} -y $GENOME > $OUTDIR/rep$i/$ID.nfr
+        bed2nfr -i $PEAKREGION -b ${BAMFILEa[$i]} -o $OUTDIR/fitDistr -z ${SIZEFACTORa[$i]} -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -n $MINNFRLENGTH -v $MAXNFRLENGTH -q ${EXTENDa[$i]} -y $GENOME > $OUTDIR/rep$i/$ID.nfr
     done
     echo "done"
     NFRFILEs=$(echo $NFRFILEs | perl -ane '$_=~s/^\,//g; print $_;')
@@ -356,7 +357,7 @@ else
     echo -n "Predict nucleosome free regions (NFR) (`date`).. "
     for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
         ID=$(echo ${BAMFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
-        ls $OUTDIR/parallel/x* | parallel --no-notice -j $PARALLEL 'bed2nfr -i {} -b '${BAMFILEa[$i]}' -z '${SIZEFACTORa[$i]}' -c '$MINCLUSTERHEIGHT' -e '$MINBLOCKHEIGHT' -x '$DISTANCE' -s '$SCALE' -g '$BLOCKHEIGHT' -n '$MINNFRLENGTH' -v '$MAXNFRLENGTH' -q '${EXTENDa[$i]}' -y '$GENOME' -f {/.} > '$OUTDIR'/rep'$i'/'$ID'.nfr{/.}'
+        ls $OUTDIR/parallel/x* | parallel --no-notice -j $PARALLEL 'bed2nfr -i {} -b '${BAMFILEa[$i]}' -o '$OUTDIR'/fitDistr -z '${SIZEFACTORa[$i]}' -c '$MINCLUSTERHEIGHT' -e '$MINBLOCKHEIGHT' -x '$DISTANCE' -s '$SCALE' -g '$BLOCKHEIGHT' -n '$MINNFRLENGTH' -v '$MAXNFRLENGTH' -q '${EXTENDa[$i]}' -y '$GENOME' -f {/.} > '$OUTDIR'/rep'$i'/'$ID'.nfr{/.}'
     done
     echo "done"
 
@@ -472,7 +473,7 @@ echo -n "Convert input bam to bigWig format to visualize in UCSC browser (`date`
 for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
     ID=$(echo ${BAMFILEa[$i]} | perl -ane '$_=~s/\.bam.*//g; print $_;');
     if [ ! -s "$ID.bw" ]; then
-        bam2bwForChIP -i ${BAMFILEa[$i]} -c $GENOME_FILE -e ${EXTENDa[$i]} &
+        bam2bwForChIP -i ${BAMFILEa[$i]} -e ${EXTENDa[$i]} -g $GENOME &
     else
         echo -n "($ID.bw already exists..) "
     fi
@@ -480,7 +481,8 @@ done
 wait
 
 echo -n "Delete copied input BAM files (`date`).. "
-rm -r $OUTDIR/bam_files/
+rm $OUTDIR/bw_files/*.bam
+rm $OUTDIR/bw_files/*.bam.bai
 echo "done"
 
 echo "All done. Bye"

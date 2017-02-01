@@ -1,6 +1,24 @@
 #!/bin/bash
 #PBS -l nodes=1:ppn=4
 
+<<"copyright_info"
+coor2reads: given a coordinate, extract reads from one or more bam files
+Copyright (C) 2015  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
 GENOME="mm9"
 
 #### usage ####
@@ -9,7 +27,7 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: coor2reads -c <coor> -b <file(s)"
+	echo "Usage: coor2reads -c <coor> -b <file(s)>"
 	echo "Options:"
 	echo " -c <coor>   [genomic coordinate like 'chr:start-end' format]"
     echo " -b <file>   [input mapped reads in BAM format]"
@@ -46,12 +64,13 @@ if [ ! "$COOR" -o ! "$INPUTBAMFILES" -o "$HELP" ]; then
 fi
 
 ## populating files based on input genome
-if [ "$GENOME" == "mm9" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
-elif [ "$GENOME" == "hg19" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
-else
-    echo "Presently the program only support analysis for mm9 or hg19"
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    echo
+    echo "computation for $GENOME is not feasible yet"
+    echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
     echo
     usage
 fi
@@ -99,22 +118,22 @@ if [ ! -z "$INPUTSIZEFACTORS" ]; then
     fi
 
     if [ -z "$REMOVE_DUPLICATE" ]; then
-        for(( i=0; i<$BAMFILES_COUNT; i++ )); do samtools view -b ${BAMFILES[$i]} $COOR | bedtools bamtobed -i - | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r ${EXTENDS[$i]} | perl -ane '$F[4]=sprintf("%0.2f", 1/'${SIZEFACTORS[$i]}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n";'; done | sortBed -i stdin
+        for(( i=0; i<$BAMFILES_COUNT; i++ )); do samtools view -b ${BAMFILES[$i]} $COOR | bedtools bamtobed -i - | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r ${EXTENDS[$i]} | perl -ane '$F[4]=sprintf("%0.2f", 1/'${SIZEFACTORS[$i]}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n";'; done | sort -k 1n,1 -k 2n,2 -k 3n,3
     else
-        for(( i=0; i<$BAMFILES_COUNT; i++ )); do samtools view -b ${BAMFILES[$i]} $COOR | bedtools bamtobed -i - | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r ${EXTENDS[$i]} | perl -ane '$F[4]=sprintf("%0.2f", 1/'${SIZEFACTORS[$i]}'); print "$F[0]\t$F[1]\t$F[2]\tTAG\t$F[4]\t$F[5]\n";' | sortBed -i stdin | uniq; done | sortBed -i stdin
+        for(( i=0; i<$BAMFILES_COUNT; i++ )); do samtools view -b ${BAMFILES[$i]} $COOR | bedtools bamtobed -i - | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r ${EXTENDS[$i]} | perl -ane '$F[4]=sprintf("%0.2f", 1/'${SIZEFACTORS[$i]}'); print "$F[0]\t$F[1]\t$F[2]\tTAG\t$F[4]\t$F[5]\n";' | sort -k 1,1 -k 2n,2 -k 3n,3 | uniq; done | sort -k 1n,1 -k 2n,2 -k 3n,3
     fi
 else
     if [ -z "$REMOVE_DUPLICATE" ]; then
         for(( i=0; i<$BAMFILES_COUNT; i++ )); do
             MAPPEDREADS=`samtools idxstats ${BAMFILES[$i]} | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
             samtools view -b ${BAMFILES[$i]} $COOR | bedtools bamtobed -i - | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r ${EXTENDS[$i]} | perl -ane '$F[4]=sprintf("%0.6f", ((1*1000000)/'${MAPPEDREADS}')); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n";';
-        done | sortBed -i stdin
+        done | sort -k 1n,1 -k 2n,2 -k 3n,3
     else
         for(( i=0; i<$BAMFILES_COUNT; i++ )); do
             MAPPEDREADS=`samtools idxstats ${BAMFILES[$i]} | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
-            #MAPPEDTAGS=`bedtools bamtobed -i ${BAMFILES[$i]} | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r ${EXTENDS[$i]} | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\tTAG\t1\t$F[5]\n";' | sortBed -i stdin | uniq | wc -l`;
-            samtools view -b ${BAMFILES[$i]} $COOR | bedtools bamtobed -i - | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r ${EXTENDS[$i]} | perl -ane '$F[4]=sprintf("%0.6f", ((1*1000000)/'${MAPPEDREADS}')); print "$F[0]\t$F[1]\t$F[2]\tTAG\t$F[4]\t$F[5]\n";' | sortBed -i stdin | uniq;
-        done | sortBed -i stdin
+            #MAPPEDTAGS=`bedtools bamtobed -i ${BAMFILES[$i]} | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r ${EXTENDS[$i]} | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\tTAG\t1\t$F[5]\n";' | sort -k 1,1 -k 2n,2 -k 3n,3 | uniq | wc -l`;
+            samtools view -b ${BAMFILES[$i]} $COOR | bedtools bamtobed -i - | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r ${EXTENDS[$i]} | perl -ane '$F[4]=sprintf("%0.6f", ((1*1000000)/'${MAPPEDREADS}')); print "$F[0]\t$F[1]\t$F[2]\tTAG\t$F[4]\t$F[5]\n";' | sort -k 1,1 -k 2n,2 -k 3n,3 | uniq;
+        done | sort -k 1n,1 -k 2n,2 -k 3n,3
     fi
 fi
 exit

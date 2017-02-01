@@ -1,7 +1,6 @@
 #!/bin/bash
 #PBS -l nodes=1:ppn=4
 
-OUTDIR="optimizeThreshold"
 PVALUE=0.05
 DISTRIBUTION="pois"
 MINCLUSTERHEIGHT=2
@@ -20,8 +19,8 @@ usage() {
 	echo "Usage: reads2peaks -i <file> -o <dir>"
 	echo "Options:"
 	echo " -i <file>   [input file containing mapped reads in BED format (can be stdin)]"
+    echo " -o <dir>    [output directory to keep fitDistr.R results]"
     echo "[OPTIONS]"
-    echo " -o <dir>    [output directory (default: optimizeThreshold)]"
     echo " -p <float>  [pvalue for read enrichment (default: 0.05)]"
     echo " -d <string> [distribution to use for data fit (pois or nbinom) (default: pois)]"
     echo " -c <int>    [minimum number of read in the block group (default: 2)]"
@@ -75,13 +74,13 @@ fi
 
 ## define block groups
 #echo "blockbuster.x -minClusterHeight $MINCLUSTERHEIGHT -minBlockHeight $MINBLOCKHEIGHT -distance $DISTANCE -scale $SCALE -blockHeight $BLOCKHEIGHT -print 1 $INPUTBEDFILE | perl -ane 'if(\$_=~/^>/) { \$id=\"\$F[1]:\$F[2]-\$F[3]\"; } else { print \"\$F[5]\\t\$F[1]\\t\$F[2]\\t\$F[3]\\t\$id\\n\"; }'"; exit;
-blockbuster.x -minClusterHeight $MINCLUSTERHEIGHT -minBlockHeight $MINBLOCKHEIGHT -distance $DISTANCE -scale $SCALE -blockHeight $BLOCKHEIGHT -print 1 $INPUTBEDFILE | perl -ane 'if($_=~/^>/) { $id="$F[1]:$F[2]-$F[3]"; } else { print "$F[5]\t$F[1]\t$F[2]\t$F[3]\t$id\n"; }' | $FINDNFRPATH/share/R/fitDistr.R -i stdin -o $OUTDIR -d $DISTRIBUTION 2>&1 >/dev/null
+blockbuster.x -minClusterHeight $MINCLUSTERHEIGHT -minBlockHeight $MINBLOCKHEIGHT -distance $DISTANCE -scale $SCALE -blockHeight $BLOCKHEIGHT -print 1 $INPUTBEDFILE | perl -ane 'if($_=~/^>/) { $id="$F[1]:$F[2]-$F[3]"; } else { print "$F[5]\t$F[1]\t$F[2]\t$F[3]\t$id\n"; }' | $FINDNFRPATH/share/R/fitDistr.R -i stdin -o $OUTDIR/P_VALUE_TABLE -d $DISTRIBUTION 2>&1 >/dev/null
 
 ## filter out significant block groups
 if [ ! -z "$ALL" ]; then
-    cat $OUTDIR/table | perl -ane '$sig="N"; if($F[5]<'$PVALUE') { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t+\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS
+    cat $OUTDIR/P_VALUE_TABLE | perl -ane '$sig="N"; if($F[5]<'$PVALUE') { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t+\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS
 else
-    cat $OUTDIR/table | perl -ane '$sig="N"; if($F[5]<'$PVALUE') { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t+\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS | perl -ane 'if($F[6]=~/Y/) { print $_; }'
+    cat $OUTDIR/P_VALUE_TABLE | perl -ane '$sig="N"; if($F[5]<'$PVALUE') { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t+\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS | perl -ane 'if($F[6]=~/Y/) { print $_; }'
 fi
 
 exit
