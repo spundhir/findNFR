@@ -149,9 +149,9 @@ while read LINE; do
 
         ## determine NFRs, if total number of peaks >=2
         if [ "$COUNT_SIG" -ge 2 ]; then
-            cat $REGIONFILE".bg$SUFFIX" | perl -ane 'if($F[6]=~/Y/) { print $_; }' | peaks2NFR.pl -i stdin -b $BAMFILE -z $SIZEFACTOR -n $MINNFRLENGTH -v $MAXNFRLENGTH -e $EXTEND -y $GENOME | perl -ane '$F[3]="'$COOR'"; $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\tSIG_PEAKS\n";' 
+            cat $REGIONFILE".bg$SUFFIX" | perl -ane 'if($F[6]=~/Y/) { print $_; }' | peaks2NFR.pl -i stdin -b $BAMFILE -z $SIZEFACTOR -n $MINNFRLENGTH -v $MAXNFRLENGTH -e $EXTEND -y $GENOME -f $SUFFIX | perl -ane '$F[3]="'$COOR'"; $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\tSIG_PEAKS\n";' 
         elif [ "$COUNT" -ge 2 ]; then
-            cat $REGIONFILE".bg$SUFFIX" | peaks2NFR.pl -i stdin -b $BAMFILE -z $SIZEFACTOR -n $MINNFRLENGTH -v $MAXNFRLENGTH -e $EXTEND -y $GENOME | perl -ane '$F[3]="'$COOR'"; $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\tNONSIG_PEAKS\n";' 
+            cat $REGIONFILE".bg$SUFFIX" | peaks2NFR.pl -i stdin -b $BAMFILE -z $SIZEFACTOR -n $MINNFRLENGTH -v $MAXNFRLENGTH -e $EXTEND -y $GENOME -f $SUFFIX | perl -ane '$F[3]="'$COOR'"; $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\tNONSIG_PEAKS\n";' 
         else
             echo $COOR | perl -ane '@t=split(/[\:\-]+/, $_); print "$t[0]\t-1\t-1\t'$COOR'\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\n";'
         fi
