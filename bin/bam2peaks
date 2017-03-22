@@ -1,0 +1,451 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+bam2peaks: predict long stretches of regions enriched for a given histone mark
+Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+VERSION="0.01"
+OUTDIR="peaks";
+RANDOMDIR="peaks_random";
+DISTANCE=70
+SCALE="0.6"
+MINCLUSTERHEIGHT=2
+MINBLOCKHEIGHT=2
+BLOCKHEIGHT="abs"
+PVALUE="0.05"
+GENOME="mm9"
+MERGEDISTANCE=0
+DISTRIBUTION="nbinom"
+
+#### usage ####
+usage() {
+	echo Program: "bam2peaks (predict long stretches of regions enriched for a given histone mark)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: $VERSION
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bam2peaks -i <file(s)> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [mapped read file(s) in BAM format]"
+    echo "             [if multiple, please separate them by a comma]"
+    echo "[NOTE]"
+    echo "             [all the required input files should be provided as ABSOLUTE path]"
+    echo "[OPTIONS]"
+    echo " -o <dir>    [output directory to store results (default: peaks)"
+    echo " -r <dir>    [output directory to store results for control sample (default: peaks_random)"
+    echo " -m <string> [genome (default: mm9)]"
+    echo " -p <int>    [number of processors to use (run in parallel)]"
+    echo " -c <int>    [minimum number of read in the block group (default: 2)]"
+    echo " -e <int>    [minimum number of read in the block (default: 2)]"
+    echo " -x <int>    [maximum distance between the blocks (default: 70)]"
+    echo " -s <float>  [scale to define blocks (default: 0.6)]"
+    echo " -g <int>    [block height (abs or rel) (default: abs)]"
+    echo " -t <float>  [FDR at which to consider a peak as significant (default: 0.05)]"
+    echo " -l <file>   [mapped reads in BAM format (control)]"
+    echo "             [if multiple, please separate them by a comma]"
+    echo " -v <int>    [merge peaks separated by input distance (default: 0)]"
+    echo " -d <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:o:r:m:p:c:e:x:s:g:t:l:v:d:h ARG; do
+	case "$ARG" in
+		i) BAMFILEs=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        r) RANDOMDIR=$OPTARG;;
+        m) GENOME=$OPTARG;;
+        p) PARALLEL=$OPTARG;;
+        c) MINCLUSTERHEIGHT=$OPTARG;;
+        e) MINBLOCKHEIGHT=$OPTARG;;
+        x) DISTANCE=$OPTARG;;
+        s) SCALE=$OPTARG;;
+        g) BLOCKHEIGHT=$OPTARG;;
+        t) PVALUE=$OPTARG;;
+        l) CONTROLFILEs=$OPTARG;;
+        v) MERGEDISTANCE=$OPTARG;;
+        d) DISTRIBUTION=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+echo
+if [ "$HELP" ]; then
+    usage
+fi
+
+echo
+echo -n "Check, if all required parameters and files are provided (`date`).. "
+## usage, if necessary file and directories are given/exist
+if [ -z "$BAMFILEs" ]; then
+    echo
+    echo "Error: one or more required paramter values not provided"
+    echo
+	usage
+fi
+echo "done"
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+echo -n "Determine number of input bam files (`date`).. "
+oIFS=$IFS
+IFS=","
+BAMFILEa=($BAMFILEs)
+IFS=$oIFS
+echo "done"
+
+echo -n "Create directory structure (`date`).. "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+
+if [ ! -d "$OUTDIR/rep0" ]; then
+    for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
+        mkdir $OUTDIR/rep$i
+    done
+    mkdir $OUTDIR/logs/
+    mkdir $OUTDIR/fitDistr/
+    mkdir $OUTDIR/$RANDOMDIR
+    mkdir $OUTDIR/bw_files/
+fi
+echo "done"
+
+echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    echo
+    echo "computation for $GENOME is not available yet"
+    echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    echo
+    usage
+fi
+
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_MACS2="mm"
+elif [ "$GENOME" == "mm10" ]; then
+    GENOME_MACS2="mm"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_MACS2="hs"
+elif [ "$GENOME" == "hg38" ]; then
+    GENOME_MACS2="hs"
+fi
+echo done
+
+echo -n "Copy and rename input BAM files (`date`).. "
+BAMFILEs=""
+for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
+    if [ ! -f "$OUTDIR/bw_files/histone_Rep$i.bam" ]; then
+        scp ${BAMFILEa[$i]} $OUTDIR/bw_files/histone_Rep$i.bam
+    fi
+    BAMFILEs="$BAMFILEs,$OUTDIR/bw_files/histone_Rep$i.bam"
+done
+BAMFILEs=$(echo $BAMFILEs | perl -ane '$_=~s/^\,//g; print $_;')
+oIFS=$IFS
+IFS=","
+BAMFILEa=($BAMFILEs)
+IFS=$oIFS
+echo "done"
+
+echo -n "Determine number of bases by which to extend the 3' end of reads (`date`).. "
+if [ ! -s "$OUTDIR/extendReads" ]; then
+    if [ ! -z "$GENOME_MACS2" ]; then
+        for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
+            macs2 predictd -i ${BAMFILEa[$i]} -g $GENOME_MACS2 --outdir $OUTDIR/logs/ 2>$OUTDIR/logs/predictd.rep$i &
+        done
+    else
+        for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
+            macs2 predictd -i ${BAMFILEa[$i]} --outdir $OUTDIR/logs/ 2>$OUTDIR/logs/predictd.rep$i &
+        done
+    fi
+
+    wait
+
+    EXTENDs=""
+    for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
+        FRAGMENTLENGTH=$(cat $OUTDIR/logs/predictd.rep$i | grep "predicted fragment length" | perl -ane 'print $F[scalar(@F)-2];')
+        EXTENDs="$EXTENDs,$(echo $FRAGMENTLENGTH | perl -ane 'printf("%0.0f", $_/2);')"
+    done
+    EXTENDs=$(echo $EXTENDs | perl -ane '$_=~s/^\,//g; print $_;')
+
+    IFS=","
+    EXTENDa=($EXTENDs)
+    IFS=$oIFS
+
+    echo $EXTENDs > $OUTDIR/extendReads
+else
+    echo -n "initialize extend parameters ($OUTDIR/extendReads exists).. "
+    EXTENDs=$(head -n 1 $OUTDIR/extendReads)
+    IFS=","
+    EXTENDa=($EXTENDs)
+    IFS=$oIFS
+fi
+echo "done"
+
+## check, if extension parameter is computed properly
+if [ ! -s "$OUTDIR/extendReads" ]; then
+    echo
+    echo "Error: Extension parameter is not computed properly.";
+    echo
+    exit 1
+fi
+
+<<"COMMENT"
+COMMENT
+## index bam files and estimate size factors
+echo -n "Create index of input BAM files (`date`).. "
+for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
+    if [ ! -e "${BAMFILEa[$i]}.bai" ]; then
+        samtools index ${BAMFILEa[$i]}
+    fi
+done
+echo "done"
+
+echo -n "Compute size factor for each replicate (`date`).. "
+if [ ${#BAMFILEa[@]} -gt 1 ]; then
+    if [ ! -e "$OUTDIR/sizeFactor" ]; then
+        estimateSizeFactor.pl -o b -b $BAMFILEs -x $PEAKREGION -r $OUTDIR/sizeFactorCount -e $EXTENDs -g $GENOME -p $FINDNFRPATH/share/R/
+        estimateSizeFactor.pl -o c -r $OUTDIR/sizeFactorCount -p $FINDNFRPATH/share/R/ > $OUTDIR/sizeFactor
+    fi
+else
+    touch $OUTDIR/sizeFactorCount
+    perl -e 'print "'${BAMFILEa[0]}'\t1\n";' > $OUTDIR/sizeFactor
+fi
+echo "done"
+
+## check, if size factor is computed properly
+if [ ! -s $OUTDIR/sizeFactor ]; then
+    echo
+    echo "Error: Size factor is not computed properly.";
+    echo
+    exit 1
+fi
+
+echo -n "Retrieve size factors to normalize the expression of reads... "
+SIZEFACTORa=($(cut -f 2 $OUTDIR/sizeFactor));
+SIZEFACTORs=$(printf ",%s" "${SIZEFACTORa[@]}");
+SIZEFACTORs=$(echo $SIZEFACTORs | perl -ane '$_=~s/^\,//g; print $_;')
+echo "#size factors: $SIZEFACTORs" >> $OUTDIR/PARAMETERS
+echo "done"
+
+## convert input bam file into bed
+echo -n "Convert input bam file into bed (`date`).. "
+BEDFILEs=""
+for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
+    ID=`echo ${BAMFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;'`;
+
+    if [ ! -s "$OUTDIR/$ID.bed" ]; then
+        bam2bedForChIP -i ${BAMFILEa[$i]} -o $OUTDIR/$ID.bed -s ${SIZEFACTORa[$i]} -d -e -g $GENOME
+    else
+        echo -n "($OUTDIR/$ID.bed already exists).. "
+    fi
+    BEDFILEs="$BEDFILEs,$OUTDIR/$ID.bed"
+done
+wait_for_jobs_to_finish "convert input bam file into bed"
+
+BEDFILEs=$(echo $BEDFILEs | perl -ane '$_=~s/^\,//g; print $_;')
+
+IFS=","
+BEDFILEa=($BEDFILEs)
+IFS=$oIFS
+echo "done"
+
+## check, if BED files are created properly
+echo -n "Check, if BED files are created properly.. (`date`)... "
+for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
+    if [ ! -s "${BEDFILEa[$i]}" ]; then
+        echo
+        echo "Error: bed file ${BEDFILEa[$i]} not created properly"
+        exit 1
+    else
+        NCOL=$(awk -F'\t' '{print NF;}' ${BEDFILEa[$i]} | uniq | wc -l)
+        if [ "$NCOL" -gt 1 ]; then
+            echo
+            echo "Error: bed file ${BEDFILEa[$i]} not created properly"
+            exit 1
+        fi
+    fi
+done
+echo "done"
+<<"COMMENT"
+COMMENT
+
+## print chosen parameters to file
+DATE=`date`
+echo "#timestamp: $DATE
+#version: $VERSION
+#input BAM file(s): $BAMFILEs
+#output directory: $OUTDIR
+#output directory for randomly shuffled peaks: $OUTDIR/$RANDOMDIR
+#minimum reads in block group: $MINCLUSTERHEIGHT
+#minimum reads in block: $MINBLOCKHEIGHT
+#minimum distance between the blocks: $DISTANCE
+#scale to define blocks: $SCALE
+#block height: $BLOCKHEIGHT
+#FDR at which to select significant peaks: $PVALUE
+#reference genome: $GENOME
+#extend 3' end of reads: $EXTENDs
+#merge peaks separated by input distance: $MERGEDISTANCE
+#distribution to use for data fit: $DISTRIBUTION" > $OUTDIR/PARAMETERS
+
+<<"COMMENT"
+COMMENT
+## input parameters are ready. start peak analysis
+if [ -z "$PARALLEL" ]; then
+    echo -n "Predict peaks for each replicate (`date`).. "
+    PEAKFILEs=""
+    for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
+        ID=$(echo ${BEDFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
+        PEAKFILEs="$PEAKFILEs,$OUTDIR/rep$i/$ID.peaks"
+        reads2peaks -i ${BEDFILEa[$i]} -o $OUTDIR/fitDistr -p $PVALUE -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/rep$i/$ID.peaks
+    done
+    echo "done"
+    PEAKFILEs=$(echo $PEAKFILEs | perl -ane '$_=~s/^\,//g; print $_;')
+
+    IFS=","
+    PEAKFILEa=($PEAKFILEs)
+    IFS=$oIFS
+    echo -n "Determine common peaks between replicates (`date`).. "
+    ID=`echo $BEDFILEs | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
+    multiIntersectBed.sh -i $PEAKFILEs | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$ID.All.peaks
+    echo "done"
+else
+    echo -n "Split summit file(s) into multiple smaller files (`date`).. "
+    if [ ! -d "$OUTDIR/parallel" ]; then
+        mkdir $OUTDIR/parallel
+        for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
+            mkdir $OUTDIR/parallel/rep$i
+            indexBed.sh -i ${BEDFILEa[$i]} -o $OUTDIR/parallel/rep$i -x x
+        done
+        mkdir $OUTDIR/common/
+    fi
+    echo "done"
+
+    echo -n "Predict peaks for each replicate (`date`).. "
+    for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
+        ID=$(echo ${BEDFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
+        ls $OUTDIR/parallel/rep$i/x* | parallel --no-notice -j $PARALLEL 'reads2peaks -i {} -o '$OUTDIR'/fitDistr/{/.} -c '$MINCLUSTERHEIGHT' -e '$MINBLOCKHEIGHT' -x '$DISTANCE' -s '$SCALE' -g '$BLOCKHEIGHT' -d '$DISTRIBUTION' -w '$MERGEDISTANCE' > '$OUTDIR'/rep'$i'/'$ID'.peaks{/.}'
+    done
+    echo "done"
+
+    echo -n "Determine common peaks between replicates (`date`).. "
+    ID=`echo $BEDFILEs | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
+    for xfile in $(ls $OUTDIR/parallel/rep0/x*); do
+        ID_xfile=$(echo $xfile | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;');
+        peakFILEs=""
+        for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
+            ID=`echo ${BAMFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;'`;
+            peakFILEs="$peakFILEs,$OUTDIR//rep$i/$ID.peaks$ID_xfile"
+        done
+        peakFILEs=$(echo $peakFILEs | perl -ane '$_=~s/^\,//g; print $_;')
+        echo $peakFILEs
+        echo $ID_xfile
+    done | parallel --no-notice -j $PARALLEL -N 2 'multiIntersectBed.sh -i {1} | sort -k 1,1 -k 2n,2 -k 3n,3 > '$OUTDIR'/common/'$ID'.All.peaks{2}'
+    echo "done"
+
+    echo -n "Concatenate all result files into one file (`date`).. "
+    zless $OUTDIR/common/$ID.All.peaksx* | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$ID.All.peaks
+    echo "done"
+fi
+
+echo -n "Check if peak file is created properly (`date`).. "
+if [ ! -s "$OUTDIR/$ID.All.peaks" ]; then
+    echo
+    echo "Error: file $OUTDIR/$ID.All.peaks not created properly"
+    exit 1
+fi
+echo "done"
+
+## peak analysis using control samples (associate p-values)
+echo -n "Peak analysis using control samples (`date`).. "
+if [ ! -z "$CONTROLFILEs" ]; then
+    ID=`echo $CONTROLFILEs | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
+
+    echo -n "Determine number of input control files (`date`).. "
+    oIFS=$IFS
+    IFS=","
+    CONTROLFILEa=($CONTROLFILEs)
+    IFS=$oIFS
+    echo "done"
+
+    echo -n "Create index of input control files (`date`).. "
+    for(( i=0; i<${#CONTROLFILEa[@]}; i++ )); do
+        if [ ! -e "${CONTROLFILEa[$i]}.bai" ]; then
+            samtools index ${CONTROLFILEa[$i]}
+        fi
+    done
+    echo "done"
+
+    ## convert input control file into bed
+    echo -n "Convert input control file into bed (`date`).. "
+    CONTROLBEDFILEs=""
+    for(( i=0; i<${#CONTROLFILEa[@]}; i++ )); do
+        ID=`echo ${CONTROLFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;'`;
+
+        if [ ! -s "$OUTDIR/$ID.bed" ]; then
+            bam2bedForChIP -i ${CONTROLFILEa[$i]} -o $OUTDIR/$ID.bed -d -e -g $GENOME
+        else
+            echo -n "($OUTDIR/$ID.bed already exists).. "
+        fi
+        CONTROLBEDFILEs="$CONTROLBEDFILEs,$OUTDIR/$ID.bed"
+    done
+    wait_for_jobs_to_finish "convert input control file into bed"
+
+    CONTROLBEDFILEx=$(echo $CONTROLBEDFILEs | perl -ane '$_=~s/^\,//g; print $_;' | perl -ane '$_=~s/\,/ /g; print $_;')
+
+    cat $CONTROLBEDFILEx | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$RANDOMDIR/$ID.bed
+
+    echo -n "Predict peaks for control replicate (`date`).. "
+    reads2peaks -i $OUTDIR/$RANDOMDIR/$ID.bed -o $OUTDIR/$RANDOMDIR/fitDistr -p $PVALUE -d $DISTRIBUTION -w $MERGEDISTANCE> $OUTDIR/$RANDOMDIR/$ID.All.peaks
+    echo "done"
+fi
+
+if [ -s "$OUTDIR/$RANDOMDIR/$ID.All.peaks.random" ]; then
+    intersectBed -a $OUTDIR/$ID.All.peaks -b $OUTDIR/$RANDOMDIR/$ID.All.peaks -v > $OUTDIR/$ID.All.peaks.sig
+fi
+echo "done"
+
+echo -n "Convert input bam to bigWig format to visualize in UCSC browser (`date`).. "
+for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
+    ID=$(echo ${BAMFILEa[$i]} | perl -ane '$_=~s/\.bam.*//g; print $_;');
+    if [ ! -s "$ID.bw" ]; then
+        bam2bwForChIP -i ${BAMFILEa[$i]} -e ${EXTENDa[$i]} -g $GENOME &
+    else
+        echo -n "($ID.bw already exists..) "
+    fi
+done
+wait
+
+echo -n "Delete copied input BAM files (`date`).. "
+rm $OUTDIR/bw_files/*.bam
+rm $OUTDIR/bw_files/*.bam.bai
+echo "done"
+
+echo "All done. Bye"

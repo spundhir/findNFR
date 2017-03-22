@@ -21,7 +21,6 @@ copyright_info
 
 GENOME="mm9"
 SIZEFACTOR=1
-EXTENDREAD=0
 
 #### usage ####
 usage() {
@@ -29,14 +28,13 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: bam2bedForChIP -i <file> -o <file(s)>"
+	echo "Usage: bam2bedForChIP -i <file>"
 	echo "Options:"
 	echo " -i <file>   [input bam file]"
-    echo " -o <file>   [output bed file]"
     echo "[OPTIONS]"
     echo " -s <float>  [normalize expression by input size factor]"
     echo " -d          [remove duplicate reads]"
-    echo " -e <int>    [extend 3' end of reads by input number of bases (useful for ChIP-seq data)]"
+    echo " -e          [extend 3' end of reads (useful for ChIP-seq data)]"
     echo " -g <string> [genome (default: mm9)]"
 	echo " -h          [help]"
 	echo
@@ -44,20 +42,19 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:s:de:g:h ARG; do
+while getopts i:s:deg:h ARG; do
 	case "$ARG" in
 		i) BAMFILE=$OPTARG;;
-        o) BEDFILE=$OPTARG;;
         s) SIZEFACTOR=$OPTARG;; 
         d) REMOVE_DUPLICATE=1;;
-        e) EXTENDREAD=$OPTARG;;
+        e) EXTEND=1;;
         g) GENOME=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ ! -f "$BAMFILE" -o ! "$BEDFILE" -o "$HELP" ]; then
+if [ ! -f "$BAMFILE" -o "$HELP" ]; then
 	usage
 fi
 
@@ -73,9 +70,32 @@ if [ ! -f "$GENOME_FILE" ]; then
     usage
 fi
 
+## index bam files and estimate size factors
+if [ ! -e "$BAMFILE.bai" ]; then
+    samtools index ${BAMFILEa[$i]}
+fi
+
+## determine read extension parameter, if required
+if [ ! -z "$EXTEND" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    macs2 predictd -i $BAMFILE -g $GENOME_MACS2 &>$TMP
+    EXTEND_VALUE=$(cat $TMP | grep "predicted fragment length" | perl -ane 'print $F[scalar(@F)-2];')
+
+    if [ -z "$EXTEND_VALUE" ]; then
+        echo
+        echo "Extend value is not computed correctly.. exiting"
+        echo
+        exit
+    fi
+
+    if [ ! -z "$TMP" ]; then
+        rm $TMP
+    fi
+fi
+
 ## convert bam to bed format
 if [ -z "REMOVE_DUPLICATE" ]; then
-    bedtools bamtobed -i $BAMFILE | perl -ane 'if($F[0]=~/^chr[0-9a-zA-Z]+$/) { $F[4]=sprintf("%0.2f", 1/'$SIZEFACTOR'); print "$F[0]\t$F[1]\t$F[2]\tTAG\t$F[4]\t$F[5]\n"; }' | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTENDREAD | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t+\n";' | sort -k 1,1 -k 2n,2 -k 3n,3
+    bedtools bamtobed -i $BAMFILE | perl -ane 'if($F[0]=~/^chr[0-9a-zA-Z]+$/) { $F[4]=sprintf("%0.2f", 1/'$SIZEFACTOR'); print "$F[0]\t$F[1]\t$F[2]\tTAG\t$F[4]\t$F[5]\n"; }' | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t+\n";' | sort -k 1,1 -k 2n,2 -k 3n,3
 else
-    bedtools bamtobed -i $BAMFILE | perl -ane 'if($F[0]=~/^chr[0-9a-zA-Z]+$/) { $F[4]=sprintf("%0.2f", 1/'$SIZEFACTOR'); print "$F[0]\t$F[1]\t$F[2]\tTAG\t$F[4]\t$F[5]\n"; }' | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTENDREAD | sort -k 1,1 -k 2n,2 -k 3n,3 | uniq | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t+\n";'
-fi > $BEDFILE
+    bedtools bamtobed -i $BAMFILE | perl -ane 'if($F[0]=~/^chr[0-9a-zA-Z]+$/) { $F[4]=sprintf("%0.2f", 1/'$SIZEFACTOR'); print "$F[0]\t$F[1]\t$F[2]\tTAG\t$F[4]\t$F[5]\n"; }' | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | sort -k 1,1 -k 2n,2 -k 3n,3 | uniq | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t+\n";'
+fi

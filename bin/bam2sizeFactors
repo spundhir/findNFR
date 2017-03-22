@@ -1,0 +1,176 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+bam2sizeFactors: compute size factors for input bam files using DESeq2
+Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+VERSION="0.01"
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "bam2sizeFactors (compute size factors for input bam files using DESeq2)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: $VERSION
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bam2sizeFactors -i <files> [OPTIONS]"
+	echo "Options:"
+	echo " -i <files>  [mapped read files in BAM format separated by a comma]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+    echo "[NOTE]"
+    echo " [default output is to stdout. To exract size factors, use following command]"
+    echo " [\"bam2sizeFactors -i <BAM files> | grep \"#size factors\" | perl -ane 'print \$F[scalar(@F)-1];'\"]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:g:h ARG; do
+	case "$ARG" in
+		i) BAMFILEs=$OPTARG;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+echo
+if [ "$HELP" ]; then
+    usage
+fi
+
+echo
+echo -n "Check, if all required parameters and files are provided (`date`).. "
+## usage, if necessary file and directories are given/exist
+if [ -z "$BAMFILEs" ]; then
+    echo
+    echo "Error: one or more required paramter values not provided"
+    echo
+	usage
+fi
+echo "done"
+
+echo -n "Determine number of input bam files (`date`).. "
+oIFS=$IFS
+IFS=","
+BAMFILEa=($BAMFILEs)
+IFS=$oIFS
+echo "done"
+
+echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    echo
+    echo "computation for $GENOME is not available yet"
+    echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    echo
+    usage
+fi
+
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_MACS2="mm"
+elif [ "$GENOME" == "mm10" ]; then
+    GENOME_MACS2="mm"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_MACS2="hs"
+elif [ "$GENOME" == "hg38" ]; then
+    GENOME_MACS2="hs"
+fi
+echo done
+
+## index bam files and estimate size factors
+echo -n "Create index of input BAM files (`date`).. "
+for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
+    if [ ! -e "${BAMFILEa[$i]}.bai" ]; then
+        samtools index ${BAMFILEa[$i]}
+    fi
+done
+echo "done"
+
+## create temporary directory
+echo -n "Compute peak regions (`date`).. "
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+mkdir $TMP
+
+## reformat input BAM files into macs2 input format
+BAMFILEx=$(echo $BAMFILEs | perl -ane '$_=~s/\,/ /g; print $_;')
+
+<<"COMMENT"
+COMMENT
+## compute region peak file
+if [ ! -z "$GENOME_MACS2" ]; then
+    macs2 predictd -i $BAMFILEx -g $GENOME_MACS2 --outdir $TMP 2>$TMP/predictd.rep0
+else
+    macs2 predictd -i $BAMFILEx --outdir $TMP 2>$TMPpredictd.rep0
+fi
+wait
+
+FRAGMENTLENGTH=$(cat $TMP/predictd.rep0 | grep "predicted fragment length" | perl -ane 'print $F[scalar(@F)-2];')
+
+if [ ! -z "$GENOME_MACS2" ]; then
+    if echo $(macs2 --version 2>&1) | grep -qE "2\.0"; then
+        EXTEND=`echo $FRAGMENTLENGTH | perl -ane 'printf("%0.0f", $_/2);'`
+        macs2 callpeak -t $BAMFILEx --outdir $TMP -n MACS2 -g $GENOME_MACS2 -p 1e-3 --nomodel --shiftsize $EXTEND 2>$TMP/MACS2.log
+    else
+        EXTEND=`echo $FRAGMENTLENGTH | perl -ane 'printf("%0.0f", $_);'`
+        macs2 callpeak -t $BAMFILEx --outdir $TMP -n MACS2 -g $GENOME_MACS2 -p 1e-3 --nomodel --extsize $EXTEND 2>$TMP/MACS2.log
+    fi
+else
+    if echo $(macs2 --version 2>&1) | grep -qE "2\.0"; then
+        EXTEND=`echo $FRAGMENTLENGTH | perl -ane 'printf("%0.0f", $_/2);'`
+        macs2 callpeak -t $BAMFILEx --outdir $TMP -n MACS2 -p 1e-3 --nomodel --shiftsize $EXTEND 2>$TMP/MACS2.log
+    else
+        EXTEND=`echo $FRAGMENTLENGTH | perl -ane 'printf("%0.0f", $_);'`
+        macs2 callpeak -t $BAMFILEx --outdir $TMP -n MACS2 -p 1e-3 --nomodel --extsize $EXTEND 2>$TMP/MACS2.log
+    fi
+fi
+
+cat $TMP/MACS2_peaks.narrowPeak | sort -k 8rn,8 | head -n 20000 > $TMP/MACS2_peaks20K.narrowPeak
+BEDFILE="$TMP/MACS2_peaks20K.narrowPeak"
+echo "done"
+
+echo -n "Compute size factor for each replicate (`date`).. "
+if [ ${#BAMFILEa[@]} -gt 1 ]; then
+    estimateSizeFactor.pl -o b -b $BAMFILEs -x $BEDFILE -r $TMP/sizeFactorCount -g $GENOME -p $FINDNFRPATH/share/R/ &>/dev/null
+    estimateSizeFactor.pl -o c -r $TMP/sizeFactorCount -p $FINDNFRPATH/share/R/ > $TMP/sizeFactor
+else
+    perl -e 'print "'${BAMFILEa[0]}'\t1\n";' > $TMP/sizeFactor
+fi
+echo "done"
+
+## check, if size factor is computed properly
+if [ ! -s $TMP/sizeFactor ]; then
+    echo
+    echo "Error: Size factor is not computed properly.";
+    echo
+    exit 1
+fi
+
+echo -n "Retrieve size factors to normalize the expression of reads (`date`).. "
+SIZEFACTORa=($(cut -f 2 $TMP/sizeFactor));
+SIZEFACTORs=$(printf ",%s" "${SIZEFACTORa[@]}");
+SIZEFACTORs=$(echo $SIZEFACTORs | perl -ane '$_=~s/^\,//g; print $_;')
+echo "#size factors: $SIZEFACTORs"
+echo "done"
+
+rm -r $TMP
+
+exit
