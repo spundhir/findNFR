@@ -70,6 +70,17 @@ if [ ! -f "$GENOME_FILE" ]; then
     usage
 fi
 
+## define genome information required by Macs2
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_MACS2="mm"
+elif [ "$GENOME" == "mm10" ]; then
+    GENOME_MACS2="mm"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_MACS2="hs"
+elif [ "$GENOME" == "hg38" ]; then
+    GENOME_MACS2="hs"
+fi
+
 ## index bam files and estimate size factors
 if [ ! -e "$BAMFILE.bai" ]; then
     samtools index ${BAMFILEa[$i]}
@@ -77,9 +88,8 @@ fi
 
 ## determine read extension parameter, if required
 if [ ! -z "$EXTEND" ]; then
-    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    macs2 predictd -i $BAMFILE -g $GENOME_MACS2 &>$TMP
-    EXTEND_VALUE=$(cat $TMP | grep "predicted fragment length" | perl -ane 'print $F[scalar(@F)-2];')
+    #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    EXTEND_VALUE=$(macs2 predictd -i $BAMFILE -g $GENOME_MACS2 2>&1 | grep "predicted fragment length" | perl -ane 'print $F[scalar(@F)-2];')
 
     if [ -z "$EXTEND_VALUE" ]; then
         echo
@@ -88,7 +98,7 @@ if [ ! -z "$EXTEND" ]; then
         exit
     fi
 
-    if [ ! -z "$TMP" ]; then
+    if [ ! -z "predictd" ]; then
         rm $TMP
     fi
 fi

@@ -252,7 +252,6 @@ echo -n "Retrieve size factors to normalize the expression of reads... "
 SIZEFACTORa=($(cut -f 2 $OUTDIR/sizeFactor));
 SIZEFACTORs=$(printf ",%s" "${SIZEFACTORa[@]}");
 SIZEFACTORs=$(echo $SIZEFACTORs | perl -ane '$_=~s/^\,//g; print $_;')
-echo "#size factors: $SIZEFACTORs" >> $OUTDIR/PARAMETERS
 echo "done"
 
 ## convert input bam file into bed
@@ -262,7 +261,7 @@ for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
     ID=`echo ${BAMFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;'`;
 
     if [ ! -s "$OUTDIR/$ID.bed" ]; then
-        bam2bedForChIP -i ${BAMFILEa[$i]} -o $OUTDIR/$ID.bed -s ${SIZEFACTORa[$i]} -d -e -g $GENOME
+        bam2bedForChIP -i ${BAMFILEa[$i]} -s ${SIZEFACTORa[$i]} -d -e -g $GENOME > $OUTDIR/$ID.bed
     else
         echo -n "($OUTDIR/$ID.bed already exists).. "
     fi
@@ -313,7 +312,8 @@ echo "#timestamp: $DATE
 #reference genome: $GENOME
 #extend 3' end of reads: $EXTENDs
 #merge peaks separated by input distance: $MERGEDISTANCE
-#distribution to use for data fit: $DISTRIBUTION" > $OUTDIR/PARAMETERS
+#distribution to use for data fit: $DISTRIBUTION
+#size factors: $SIZEFACTORs" > $OUTDIR/PARAMETERS
 
 <<"COMMENT"
 COMMENT
@@ -324,18 +324,22 @@ if [ -z "$PARALLEL" ]; then
     for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
         ID=$(echo ${BEDFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
         PEAKFILEs="$PEAKFILEs,$OUTDIR/rep$i/$ID.peaks"
-        reads2peaks -i ${BEDFILEa[$i]} -o $OUTDIR/fitDistr -p $PVALUE -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/rep$i/$ID.peaks
+        reads2peaks -i ${BEDFILEa[$i]} -o $OUTDIR/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/rep$i/$ID.peaks
     done
     echo "done"
     PEAKFILEs=$(echo $PEAKFILEs | perl -ane '$_=~s/^\,//g; print $_;')
 
-    IFS=","
-    PEAKFILEa=($PEAKFILEs)
-    IFS=$oIFS
-    echo -n "Determine common peaks between replicates (`date`).. "
-    ID=`echo $BEDFILEs | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
-    multiIntersectBed.sh -i $PEAKFILEs | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$ID.All.peaks
-    echo "done"
+    if [ ${#BEDFILEa[@]} -gt 1 ]; then
+        IFS=","
+        PEAKFILEa=($PEAKFILEs)
+        IFS=$oIFS
+        echo -n "Determine common peaks between replicates (`date`).. "
+        ID=`echo $BEDFILEs | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
+        multiIntersectBed.sh -i $PEAKFILEs | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$ID.All.peaks
+        echo "done"
+    else
+        scp $OUTDIR/rep$i/$ID.peaks $OUTDIR/$ID.All.peaks
+    fi
 else
     echo -n "Split summit file(s) into multiple smaller files (`date`).. "
     if [ ! -d "$OUTDIR/parallel" ]; then
@@ -355,24 +359,28 @@ else
     done
     echo "done"
 
-    echo -n "Determine common peaks between replicates (`date`).. "
-    ID=`echo $BEDFILEs | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
-    for xfile in $(ls $OUTDIR/parallel/rep0/x*); do
-        ID_xfile=$(echo $xfile | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;');
-        peakFILEs=""
-        for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
-            ID=`echo ${BAMFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;'`;
-            peakFILEs="$peakFILEs,$OUTDIR//rep$i/$ID.peaks$ID_xfile"
-        done
-        peakFILEs=$(echo $peakFILEs | perl -ane '$_=~s/^\,//g; print $_;')
-        echo $peakFILEs
-        echo $ID_xfile
-    done | parallel --no-notice -j $PARALLEL -N 2 'multiIntersectBed.sh -i {1} | sort -k 1,1 -k 2n,2 -k 3n,3 > '$OUTDIR'/common/'$ID'.All.peaks{2}'
-    echo "done"
+    if [ ${#BEDFILEa[@]} -gt 1 ]; then
+        echo -n "Determine common peaks between replicates (`date`).. "
+        ID=`echo $BEDFILEs | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
+        for xfile in $(ls $OUTDIR/parallel/rep0/x*); do
+            ID_xfile=$(echo $xfile | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;');
+            peakFILEs=""
+            for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
+                ID=`echo ${BAMFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;'`;
+                peakFILEs="$peakFILEs,$OUTDIR//rep$i/$ID.peaks$ID_xfile"
+            done
+            peakFILEs=$(echo $peakFILEs | perl -ane '$_=~s/^\,//g; print $_;')
+            echo $peakFILEs
+            echo $ID_xfile
+        done | parallel --no-notice -j $PARALLEL -N 2 'multiIntersectBed.sh -i {1} | sort -k 1,1 -k 2n,2 -k 3n,3 > '$OUTDIR'/common/'$ID'.All.peaks{2}'
+        echo "done"
 
-    echo -n "Concatenate all result files into one file (`date`).. "
-    zless $OUTDIR/common/$ID.All.peaksx* | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$ID.All.peaks
-    echo "done"
+        echo -n "Concatenate all result files into one file (`date`).. "
+        zless $OUTDIR/common/$ID.All.peaksx* | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$ID.All.peaks
+        echo "done"
+    else
+        zless $OUTDIR/rep0/$ID.peaks* > $OUTDIR/$ID.All.peaks
+    fi
 fi
 
 echo -n "Check if peak file is created properly (`date`).. "
@@ -410,7 +418,7 @@ if [ ! -z "$CONTROLFILEs" ]; then
         ID=`echo ${CONTROLFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;'`;
 
         if [ ! -s "$OUTDIR/$ID.bed" ]; then
-            bam2bedForChIP -i ${CONTROLFILEa[$i]} -o $OUTDIR/$ID.bed -d -e -g $GENOME
+            bam2bedForChIP -i ${CONTROLFILEa[$i]} -d -e -g $GENOME > $OUTDIR/$ID.bed
         else
             echo -n "($OUTDIR/$ID.bed already exists).. "
         fi
@@ -444,8 +452,8 @@ done
 wait
 
 echo -n "Delete copied input BAM files (`date`).. "
-rm $OUTDIR/bw_files/*.bam
-rm $OUTDIR/bw_files/*.bam.bai
+#rm $OUTDIR/bw_files/*.bam
+#rm $OUTDIR/bw_files/*.bam.bai
 echo "done"
 
 echo "All done. Bye"

@@ -74,13 +74,15 @@ fi
 
 ## define block groups
 #echo "blockbuster.x -minClusterHeight $MINCLUSTERHEIGHT -minBlockHeight $MINBLOCKHEIGHT -distance $DISTANCE -scale $SCALE -blockHeight $BLOCKHEIGHT -print 1 $INPUTBEDFILE | perl -ane 'if(\$_=~/^>/) { \$id=\"\$F[1]:\$F[2]-\$F[3]\"; } else { print \"\$F[5]\\t\$F[1]\\t\$F[2]\\t\$F[3]\\t\$id\\n\"; }'"; exit;
-blockbuster.x -minClusterHeight $MINCLUSTERHEIGHT -minBlockHeight $MINBLOCKHEIGHT -distance $DISTANCE -scale $SCALE -blockHeight $BLOCKHEIGHT -print 1 $INPUTBEDFILE | perl -ane 'if($_=~/^>/) { $id="$F[1]:$F[2]-$F[3]"; } else { print "$F[5]\t$F[1]\t$F[2]\t$F[3]\t$id\n"; }' | $FINDNFRPATH/share/R/fitDistr.R -i stdin -o $OUTDIR/P_VALUE_TABLE -d $DISTRIBUTION 2>&1 >/dev/null
+blockbuster.x -minClusterHeight $MINCLUSTERHEIGHT -minBlockHeight $MINBLOCKHEIGHT -distance $DISTANCE -scale $SCALE -blockHeight $BLOCKHEIGHT -print 1 $INPUTBEDFILE | perl -ane 'if($_=~/^>/) { $id="$F[1]:$F[2]-$F[3]"; } else { print "$F[5]\t$F[1]\t$F[2]\t$F[3]\t$id\n"; }' > $OUTDIR/INPUT.BG
+
+$FINDNFRPATH/share/R/fitDistr.R -i $OUTDIR/INPUT.BG -o $OUTDIR/INPUT.BG.P_VALUE -d $DISTRIBUTION 2>&1 >/dev/null
 
 ## filter out significant block groups
 if [ ! -z "$ALL" ]; then
-    cat $OUTDIR/P_VALUE_TABLE | perl -ane '$sig="N"; if($F[5]<'$PVALUE') { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t+\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS
+    cat $OUTDIR/INPUT.BG.P_VALUE | perl -ane '$sig="N"; if($F[5]<'$PVALUE') { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t+\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS
 else
-    cat $OUTDIR/P_VALUE_TABLE | perl -ane '$sig="N"; if($F[5]<'$PVALUE') { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t+\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS | perl -ane 'if($F[6]=~/Y/) { print $_; }'
+    cat $OUTDIR/INPUT.BG.P_VALUE | perl -ane '$sig="N"; if($F[5]<'$PVALUE') { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t+\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS | perl -ane 'if($F[6]=~/Y/) { print $_; }'
 fi
 
 exit

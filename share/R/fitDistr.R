@@ -83,7 +83,7 @@ if(nrow(data)>=10) {
 
     #gofstat(model[[i]], fitnames=distr)
     cdfcomp(model, legendtext=distr)
-    qqcomp(model, legendtext=distr)
+    #qqcomp(model, legendtext=distr)
     dev.off()
 
     ## HOW TO EVALUATE WHICH MODEL IS BETTER
