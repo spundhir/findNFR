@@ -99,7 +99,7 @@ if [ ! -z "$EXTEND" ]; then
     fi
 
     if [ ! -z "predictd" ]; then
-        rm $TMP
+        rm predictd
     fi
 fi
 

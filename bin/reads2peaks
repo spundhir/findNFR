@@ -75,7 +75,9 @@ if [ ! -d "$OUTDIR" ]; then
 fi
 
 ## define block groups
-reads2bg -i $INPUTBEDFILE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT > $OUTDIR/INPUT.BG
+if [ ! -f "$OUTDIR/INPUT.BG" ]; then
+    reads2bg -i $INPUTBEDFILE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT > $OUTDIR/INPUT.BG
+fi
 
 ## define peaks
 if [ ! -z "$ALL" ]; then

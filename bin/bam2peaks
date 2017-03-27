@@ -46,7 +46,6 @@ usage() {
     echo "             [all the required input files should be provided as ABSOLUTE path]"
     echo "[OPTIONS]"
     echo " -o <dir>    [output directory to store results (default: peaks)"
-    echo " -r <dir>    [output directory to store results for control sample (default: peaks_random)"
     echo " -m <string> [genome (default: mm9)]"
     echo " -p <int>    [number of processors to use (run in parallel)]"
     echo " -c <int>    [minimum number of read in the block group (default: 2)]"
@@ -65,11 +64,10 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:r:m:p:c:e:x:s:g:t:l:v:d:h ARG; do
+while getopts i:o:m:p:c:e:x:s:g:t:l:v:d:h ARG; do
 	case "$ARG" in
 		i) BAMFILEs=$OPTARG;;
         o) OUTDIR=$OPTARG;;
-        r) RANDOMDIR=$OPTARG;;
         m) GENOME=$OPTARG;;
         p) PARALLEL=$OPTARG;;
         c) MINCLUSTERHEIGHT=$OPTARG;;
@@ -275,8 +273,10 @@ BEDFILEa=($BEDFILEs)
 IFS=$oIFS
 echo "done"
 
+<<"COMMENT"
+COMMENT
 ## check, if BED files are created properly
-echo -n "Check, if BED files are created properly.. (`date`)... "
+echo -n "Check, if BED files are created properly (`date`).. "
 for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
     if [ ! -s "${BEDFILEa[$i]}" ]; then
         echo
@@ -292,8 +292,6 @@ for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
     fi
 done
 echo "done"
-<<"COMMENT"
-COMMENT
 
 ## print chosen parameters to file
 DATE=`date`
@@ -321,7 +319,9 @@ if [ -z "$PARALLEL" ]; then
     echo -n "Predict peaks for each replicate (`date`).. "
     PEAKFILEs=""
     for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
-        mkdir $OUTDIR/rep$i/fitDistr/
+        if [ ! -d "$OUTDIR/rep$i/fitDistr/" ]; then
+            mkdir $OUTDIR/rep$i/fitDistr/
+        fi
         ID=$(echo ${BEDFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
         reads2peaks -i ${BEDFILEa[$i]} -o $OUTDIR/rep$i/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/rep$i/$ID.peaks
         PEAKFILEs="$PEAKFILEs,$OUTDIR/rep$i/$ID.peaks"
@@ -351,7 +351,9 @@ else
 
     echo -n "Predict peaks for each replicate (`date`).. "
     for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
-        mkdir $OUTDIR/rep$i/fitDistr/
+        if [ ! -d "$OUTDIR/rep$i/fitDistr/" ]; then
+            mkdir $OUTDIR/rep$i/fitDistr/
+        fi
         ls $OUTDIR/parallel/rep$i/x* | parallel --no-notice -j $PARALLEL 'reads2bg -i {} -c '$MINCLUSTERHEIGHT' -e '$MINBLOCKHEIGHT' -x '$DISTANCE' -s '$SCALE' -g '$BLOCKHEIGHT' > '$OUTDIR'/rep'$i'/fitDistr/INPUT.BG{/.}'
     done
     echo "done"
@@ -360,7 +362,8 @@ else
     echo -n "Merge all block groups files into one (`date`).. "
     for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
         ID=$(echo ${BEDFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
-        zless $OUTDIR/rep$i/fitDistr/INPUT.BGx* | bg2peaks -i stdin -o $OUTDIR/rep$i/fitDistr -p $PVALUE -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/rep$i/$ID.peaks
+        cat $OUTDIR/rep$i/fitDistr/INPUT.BGx* > $OUTDIR/rep$i/fitDistr/INPUT.BG
+        bg2peaks -i $OUTDIR/rep$i/fitDistr/INPUT.BG -o $OUTDIR/rep$i/fitDistr -p $PVALUE -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/rep$i/$ID.peaks
         PEAKFILEs="$PEAKFILEs,$OUTDIR/rep$i/$ID.peaks"
     done
     echo "done"
