@@ -274,7 +274,6 @@ IFS=$oIFS
 echo "done"
 
 <<"COMMENT"
-COMMENT
 ## check, if BED files are created properly
 echo -n "Check, if BED files are created properly (`date`).. "
 for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
@@ -292,6 +291,7 @@ for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
     fi
 done
 echo "done"
+COMMENT
 
 ## print chosen parameters to file
 DATE=`date`
@@ -365,7 +365,7 @@ else
     echo "done"
 
     PEAKFILEs=""
-    echo -n "Merge all block groups files into one (`date`).. "
+    echo -n "Merge all block groups files into one, and predict peaks (`date`).. "
     for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
         ID=$(echo ${BEDFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
         cat $OUTDIR/rep$i/fitDistr/INPUT.BGx* > $OUTDIR/rep$i/fitDistr/INPUT.BG
