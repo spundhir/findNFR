@@ -332,10 +332,10 @@ if [ -z "$PARALLEL" ]; then
     if [ ${#BEDFILEa[@]} -gt 1 ]; then
         echo -n "Determine common peaks between replicates (`date`).. "
         ID=`echo $BEDFILEs | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
-        multiIntersectBed.sh -i $PEAKFILEs | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$ID.All.peaks
+        multiIntersectBed.sh -i $PEAKFILEs | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/PEAKS.BED
         echo "done"
     else
-        scp $OUTDIR/rep0/$ID.peaks $OUTDIR/$ID.All.peaks
+        scp $OUTDIR/rep0/$ID.peaks $OUTDIR/PEAKS.BED
     fi
 else
     echo -n "Split summit file(s) into multiple smaller files (`date`).. "
@@ -354,7 +354,13 @@ else
         if [ ! -d "$OUTDIR/rep$i/fitDistr/" ]; then
             mkdir $OUTDIR/rep$i/fitDistr/
         fi
-        ls $OUTDIR/parallel/rep$i/x* | parallel --no-notice -j $PARALLEL 'reads2bg -i {} -c '$MINCLUSTERHEIGHT' -e '$MINBLOCKHEIGHT' -x '$DISTANCE' -s '$SCALE' -g '$BLOCKHEIGHT' > '$OUTDIR'/rep'$i'/fitDistr/INPUT.BG{/.}'
+        
+        ## check if block group files already exist
+        COUNT=$(for file in $(ls $OUTDIR/parallel/rep$i/xchr*); do file=$(echo $file | perl -ane '$_=~s/.*\///g; print $_;'); if [ ! -f "$OUTDIR/rep$i/fitDistr/INPUT.BG$file" ]; then echo $file; fi done | wc -l)
+
+        if [ "$COUNT" -gt 0 ]; then
+            ls $OUTDIR/parallel/rep$i/x* | parallel --no-notice -j $PARALLEL 'reads2bg -i {} -c '$MINCLUSTERHEIGHT' -e '$MINBLOCKHEIGHT' -x '$DISTANCE' -s '$SCALE' -g '$BLOCKHEIGHT' > '$OUTDIR'/rep'$i'/fitDistr/INPUT.BG{/.}'
+        fi
     done
     echo "done"
 
@@ -372,17 +378,17 @@ else
     if [ ${#BEDFILEa[@]} -gt 1 ]; then
         echo -n "Determine common peaks between replicates (`date`).. "
         ID=`echo $BEDFILEs | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
-        multiIntersectBed.sh -i $PEAKFILEs | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$ID.All.peaks
+        multiIntersectBed.sh -i $PEAKFILEs | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/PEAKS.BED
         echo "done"
     else
-        scp $OUTDIR/rep0/$ID.peaks $OUTDIR/$ID.All.peaks
+        scp $OUTDIR/rep0/$ID.peaks $OUTDIR/PEAKS.BED
     fi
 fi
 
 echo -n "Check if peak file is created properly (`date`).. "
-if [ ! -s "$OUTDIR/$ID.All.peaks" ]; then
+if [ ! -s "$OUTDIR/PEAKS.BED" ]; then
     echo
-    echo "Error: file $OUTDIR/$ID.All.peaks not created properly"
+    echo "Error: file $OUTDIR/PEAKS.BED not created properly"
     exit 1
 fi
 echo "done"
@@ -429,10 +435,17 @@ if [ ! -z "$CONTROLFILEs" ]; then
     echo -n "Predict peaks for control replicate (`date`).. "
     reads2peaks -i $OUTDIR/$RANDOMDIR/$ID.bed -o $OUTDIR/$RANDOMDIR/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/$RANDOMDIR/$ID.peaks
     echo "done"
-fi
 
-if [ -s "$OUTDIR/$RANDOMDIR/$ID.All.peaks.random" ]; then
-    intersectBed -a $OUTDIR/$ID.All.peaks -b $OUTDIR/$RANDOMDIR/$ID.All.peaks -v > $OUTDIR/$ID.All.peaks.sig
+    ## check if control peak file is computed properly
+    if [ -s "$OUTDIR/$RANDOMDIR/$ID.peaks" ]; then
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        intersectBed -a $OUTDIR/PEAKS.BED -b $OUTDIR/$RANDOMDIR/$ID.peaks -v > $TMP
+        mv $TMP $OUTDIR/PEAKS.BED
+    else
+        echo
+        echo "Error: control peak file $OUTDIR/$RANDOMDIR/$ID.peaks not created properly"
+        exit 1
+    fi
 fi
 echo "done"
 
@@ -446,6 +459,9 @@ for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
     fi
 done
 wait
+
+cut -f 1-6 $OUTDIR/PEAKS.BED | grep -v chrMT > $OUTDIR/PEAKS.BED.UCSC
+echo "done"
 
 echo -n "Delete copied input BAM files (`date`).. "
 #rm $OUTDIR/bw_files/*.bam
