@@ -4,6 +4,7 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file containing score values (can be stdin)"),
+	make_option(c("-m", "--method"), default=1, help="scaling method; 1: between 0 and 1, 2: percentile rank (default=%default)"),
     make_option(c("-c", "--scoreCol"), default=5, help="column in input file that contains score information (default=%default)")
 )
 
@@ -12,7 +13,7 @@ opt <- parse_args(parser)
 
 ## check, if all required arguments are given
 if(is.null(opt$inFile)) {
-	cat("\nProgram: score2percentileRank.R (R script to compute percential rank for input scores)\n")
+	cat("\nProgram: score2normalize.R (R script to normalize input scores)\n")
 	cat("Author: BRIC, University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
 	cat("Contact: pundhir@binf.ku.dk\n");
@@ -23,6 +24,7 @@ if(is.null(opt$inFile)) {
 ## load libraries
 suppressPackageStartupMessages(library(session))
 
+## load data
 if(identical(opt$inFile, "stdin")==T) {
     data <- read.table(file("stdin"))
 } else {
@@ -32,6 +34,9 @@ if(identical(opt$inFile, "stdin")==T) {
 ## function to compute percentile rank
 perc.rank <- function(x, xo)  length(x[x <= xo])/length(x)*100
 
+## function to scale between 0 and 1
+scale01 <- function(x){(x-min(x))/(max(x)-min(x))}
+
 ## compute percentile rank for input data
 opt$scoreCol <- as.numeric(opt$scoreCol)
 
@@ -39,9 +44,16 @@ data$rank <- rank(data[,c(opt$scoreCol)], ties.method = "random")
 
 rank_col <- ncol(data)
 
-data$percentileRank <- apply(data, 1, function(x) 100*((as.numeric(x[rank_col])-1)/(length(data[,rank_col])-1)))
+if(as.numeric(opt$method)==1) {
+    data$percentileRank <- scale01(data[,rank_col])
+} else if(as.numeric(opt$method)==2) {
+    data$percentileRank <- apply(data, 1, function(x) 100*((as.numeric(x[rank_col])-1)/(length(data[,rank_col])-1)))
 
-#data$percentileRank <- apply(data, 1, function(x) perc.rank(data[,opt$scoreCol], x[opt$scoreCol]))
+    #data$percentileRank <- apply(data, 1, function(x) perc.rank(data[,opt$scoreCol], x[opt$scoreCol]))
+} else {
+    cat("Error: -m option should be 1 or 2\n")
+    q()
+}
 
 write.table(data[order(-data$percentileRank),], "", sep="\t", row.names = F, col.names = F, quote = F)
 

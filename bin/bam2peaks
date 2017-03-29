@@ -147,12 +147,16 @@ fi
 
 if [ "$GENOME" == "mm9" ]; then
     GENOME_MACS2="mm"
+    GENOME_BLACKLIST="$FINDNFRPATH/data/annotations/mm9_blacklist.bed.gz"
 elif [ "$GENOME" == "mm10" ]; then
     GENOME_MACS2="mm"
+    GENOME_BLACKLIST="$FINDNFRPATH/data/annotations/mm10_blacklist.bed.gz"
 elif [ "$GENOME" == "hg19" ]; then
     GENOME_MACS2="hs"
+    GENOME_BLACKLIST="$FINDNFRPATH/data/annotations/hg19_blacklist.bed.gz"
 elif [ "$GENOME" == "hg38" ]; then
     GENOME_MACS2="hs"
+    GENOME_BLACKLIST="$FINDNFRPATH/data/annotations/hg38_blacklist.bed.gz"
 fi
 echo done
 
@@ -447,6 +451,18 @@ if [ ! -z "$CONTROLFILEs" ]; then
         exit 1
     fi
 fi
+echo "done"
+
+echo -n "Remove peaks overlapping with blacklisted regions (`date`).. "
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+intersectBed -a $OUTDIR/PEAKS.BED -b $GENOME_BLACKLIST -v > $TMP
+mv $TMP $OUTDIR/PEAKS.BED
+echo "done"
+
+echo -n "Compute normalized peak scores (`date`).. "
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+Rscript $FINDNFRPATH/share/R/score2normalize.R -i $OUTDIR/PEAKS.BED -m 1 > $TMP
+mv $TMP $OUTDIR/PEAKS.BED
 echo "done"
 
 echo -n "Convert input bam to bigWig format to visualize in UCSC browser (`date`).. "
