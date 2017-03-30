@@ -20,8 +20,7 @@ usage() {
     echo " -d <string> [distribution to use for data fit (pois or nbinom) (default: pois)]"
     echo " -w <int>    [merge blocks (peaks) separated by given distance (default: 20)]"
     echo " -a          [output all peaks (default: only statistically significant)]"
-    echo " -b          [output statistically significant peaks + only use these for merging overlapping peaks]"
-    echo "             [(default: use all peaks for merging, but report only ones having atleast one significant peak)]"
+    echo " -b          [use all peaks for merging (default: only statistically significant)]"
     echo " -h          [help]"
 	echo
 	exit 0
@@ -36,7 +35,7 @@ while getopts i:o:p:d:w:abh ARG; do
         d) DISTRIBUTION=$OPTARG;;
         w) DISTANCE_PEAKS=$OPTARG;;
         a) ALL=1;;
-        b) MERGE_SIG=1;;
+        b) MERGE_ALL=1;;
 		h) HELP=1;;
 	esac
 done
@@ -68,10 +67,10 @@ fi
 ## filter out significant block groups
 if [ ! -z "$ALL" ]; then
     cat $OUTDIR/INPUT.BG.P_VALUE | perl -ane '$sig="N"; if($F[6]<'$PVALUE') { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS
-elif [ ! -z "$MERGE_SIG" ]; then
-    cat $OUTDIR/INPUT.BG.P_VALUE | perl -ane 'if($F[6]<'$PVALUE') { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\tY\n"; }' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS
-else
+elif [ ! -z "$MERGE_ALL" ]; then
     cat $OUTDIR/INPUT.BG.P_VALUE | perl -ane '$sig="N"; if($F[6]<'$PVALUE') { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS | perl -ane 'if($F[6]=~/Y/) { print $_; }'
+else
+    cat $OUTDIR/INPUT.BG.P_VALUE | perl -ane 'if($F[6]<'$PVALUE') { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\tY\n"; }' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS
 fi
 
 ## remove temporary file, if exists

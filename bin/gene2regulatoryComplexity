@@ -22,6 +22,16 @@ copyright_info
 VERSION="0.01"
 OUTDIR="peaks";
 GENOME="mm9"
+PROCESSOR=1
+
+MINCLUSTERHEIGHT=2
+MINBLOCKHEIGHT=2
+DISTANCE=70
+SCALE="0.6"
+BLOCKHEIGHT="abs"
+PVALUE="0.05"
+MERGEDISTANCE=0
+DISTRIBUTION="nbinom"
 
 #### usage ####
 usage() {
@@ -29,30 +39,48 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: $VERSION
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: gene2regulatoryComplexity -i <file> -j <file(s)> [OPTIONS]"
+	echo "Usage: gene2regulatoryComplexity -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input genomic coordinates of genes in BED format]"
-    echo " -j <file>   [input file containing genomic coordinates of regions enriched for a particular feature in BED format]"
-    echo "             [format: chr start end score strand ... (typically PEAKS.BED from bam2peaks script)]"
-    echo "             [score represents quantitative measure of features such as epigenetic marks, splicing, methylation, motifs, expression at a region]"
-    echo "             [if multiple, please separate them by a comma]"
+    echo " -j <file>   [configuration file containing list of BAM files used to compute regulatory complexity]"
+    echo "             [format: each line corresponds to absolute path of BAM files corresponding to one epigenetic mark, eg.]"
+    echo "             [        h3k27me3_esc_Rep1.bam,h3k27me3_esc_Rep2.bam<SPACE|TAB>control_Rep1.bam]"
+    echo "             [        h3k4me3_esc_Rep1.bam,h3k4me3_esc_Rep2.bam<SPACE|TAB>control_Rep1.bam]"
+    echo "             [        h3k4me1_esc_Rep1.bam,h3k4me1_esc_Rep2.bam<SPACE|TAB>control_Rep1.bam]"
     echo "[OPTIONS]"
     echo " -o <dir>    [output directory to store results (default: analysis)"
-    echo " -g <string> [genome (default: mm9)]"
-    echo " -p <int>    [number of processors to use (run in parallel)]"
+    echo " -m <string> [genome (default: mm9)]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
+    echo "[OPTIONS: bam2peaks]"
+    echo " -c <int>    [minimum number of read in the block group (default: 2)]"
+    echo " -e <int>    [minimum number of read in the block (default: 2)]"
+    echo " -x <int>    [maximum distance between the blocks (default: 70)]"
+    echo " -s <float>  [scale to define blocks (default: 0.6)]"
+    echo " -g <int>    [block height (abs or rel) (default: abs)]"
+    echo " -t <float>  [FDR at which to consider a peak as significant (default: 0.05)]"
+    echo " -v <int>    [merge peaks separated by input distance (default: 0)]"
+    echo " -d <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:o:g:p::h ARG; do
+while getopts i:j:o:m:p:c:e:x:s:g:t:v:d:h ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
-        j) PEAKFILEs=$OPTARG;;
+        j) CONFIGFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
-        g) GENOME=$OPTARG;;
-        p) PARALLEL=$OPTARG;;
+        m) GENOME=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        c) MINCLUSTERHEIGHT=$OPTARG;;
+        e) MINBLOCKHEIGHT=$OPTARG;;
+        x) DISTANCE=$OPTARG;;
+        s) SCALE=$OPTARG;;
+        g) BLOCKHEIGHT=$OPTARG;;
+        t) PVALUE=$OPTARG;;
+        v) MERGEDISTANCE=$OPTARG;;
+        d) DISTRIBUTION=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -65,7 +93,7 @@ fi
 echo
 echo -n "Check, if all required parameters and files are provided (`date`).. "
 ## usage, if necessary file and directories are given/exist
-if [ -z "$GENEFILE" -o -z "$PEAKFILEs" ]; then
+if [ -z "$GENEFILE" -o ! -f "$CONFIGFILE" ]; then
     echo
     echo "Error: one or more required paramter values not provided"
     echo
@@ -85,16 +113,10 @@ function wait_for_jobs_to_finish {
 }
 ###############
 
-echo -n "Determine number of input peak files (`date`).. "
-oIFS=$IFS
-IFS=","
-PEAKFILEa=($PEAKFILEs)
-IFS=$oIFS
-echo "done"
-
 echo -n "Create directory structure (`date`).. "
 if [ ! -d "$OUTDIR" ]; then
     mkdir -p $OUTDIR
+    mkdir -p $OUTDIR/peaks
 fi
 echo "done"
 
@@ -110,14 +132,22 @@ if [ ! -f "$GENOME_FILE" ]; then
     usage
 fi
 
-if [ "$GENOME" == "mm9" ]; then
-    GENOME_MACS2="mm"
-elif [ "$GENOME" == "mm10" ]; then
-    GENOME_MACS2="mm"
-elif [ "$GENOME" == "hg19" ]; then
-    GENOME_MACS2="hs"
-elif [ "$GENOME" == "hg38" ]; then
-    GENOME_MACS2="hs"
+## create temporary BED file if input is from stdin
+if [ "$GENEFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/$TMP
+    GENEFILE=$OUTDIR/$TMP
 fi
-echo done
 
+while read LINE; do 
+    ID=$(echo ${LINE} | perl -ane '$_=~s/\..*//g; print $_;')
+    BAMFILE=$(echo $LINE | perl -ane 'print "$F[0]"')
+    CONTROLFILE=$(echo $LINE | perl -ane 'print "$F[1]"')
+    if [ -z "$CONTROLFILE" ]; then
+        bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION
+    else
+        bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE
+    fi
+done < $CONFIGFILE

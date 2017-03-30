@@ -30,7 +30,7 @@ usage() {
     echo " -g <int>    [block height (abs or rel) (default: abs)]"
     echo " -w <int>    [merge blocks (peaks) separated by given distance (default: 20)]"
     echo " -a          [output all peaks (default: only statistically significant)]"
-    echo " -b          [use statistical significant peaks only for merging (default: all)]"
+    echo " -b          [use all peaks merging (default: only statistically significant)]"
     echo " -h          [help]"
 	echo
 	exit 0
@@ -50,7 +50,7 @@ while getopts i:o:p:d:c:e:x:s:g:w:abh ARG; do
         g) BLOCKHEIGHT=$OPTARG;;
         w) DISTANCE_PEAKS=$OPTARG;;
         a) ALL=1;;
-        b) MERGE_SIG=1;;
+        b) MERGE_ALL=1;;
 		h) HELP=1;;
 	esac
 done
@@ -82,7 +82,7 @@ fi
 ## define peaks
 if [ ! -z "$ALL" ]; then
     bg2peaks -i $OUTDIR/INPUT.BG -o $OUTDIR -p $PVALUE -d $DISTRIBUTION -w $DISTANCE_PEAKS -a
-elif [ ! -z "$MERGE_SIG" ]; then
+elif [ ! -z "$MERGE_ALL" ]; then
     bg2peaks -i $OUTDIR/INPUT.BG -o $OUTDIR -p $PVALUE -d $DISTRIBUTION -w $DISTANCE_PEAKS -b
 else
     bg2peaks -i $OUTDIR/INPUT.BG -o $OUTDIR -p $PVALUE -d $DISTRIBUTION -w $DISTANCE_PEAKS

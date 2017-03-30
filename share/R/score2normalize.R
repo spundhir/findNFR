@@ -4,7 +4,6 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file containing score values (can be stdin)"),
-	make_option(c("-m", "--method"), default=1, help="scaling method; 1: between 0 and 1, 2: percentile rank (default=%default)"),
     make_option(c("-c", "--scoreCol"), default=5, help="column in input file that contains score information (default=%default)")
 )
 
@@ -37,24 +36,22 @@ perc.rank <- function(x, xo)  length(x[x <= xo])/length(x)*100
 ## function to scale between 0 and 1
 scale01 <- function(x){(x-min(x))/(max(x)-min(x))}
 
-## compute percentile rank for input data
+## normalize scores
 opt$scoreCol <- as.numeric(opt$scoreCol)
 
+## compute rank
 data$rank <- rank(data[,c(opt$scoreCol)], ties.method = "random")
 
 rank_col <- ncol(data)
 
-if(as.numeric(opt$method)==1) {
-    data$percentileRank <- scale01(data[,rank_col])
-} else if(as.numeric(opt$method)==2) {
-    data$percentileRank <- apply(data, 1, function(x) 100*((as.numeric(x[rank_col])-1)/(length(data[,rank_col])-1)))
+## compute scaled rank
+data$scaledRank <- scale01(data[,rank_col])
 
-    #data$percentileRank <- apply(data, 1, function(x) perc.rank(data[,opt$scoreCol], x[opt$scoreCol]))
-} else {
-    cat("Error: -m option should be 1 or 2\n")
-    q()
-}
+## compute percentile rank
+data$percentileRank <- apply(data, 1, function(x) 100*((as.numeric(x[rank_col])-1)/(length(data[,rank_col])-1)))
+#data$percentileRank <- apply(data, 1, function(x) perc.rank(data[,opt$scoreCol], x[opt$scoreCol]))
 
+## write output
 write.table(data[order(-data$percentileRank),], "", sep="\t", row.names = F, col.names = F, quote = F)
 
 q()

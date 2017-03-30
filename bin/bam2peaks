@@ -58,13 +58,14 @@ usage() {
     echo "             [if multiple, please separate them by a comma]"
     echo " -v <int>    [merge peaks separated by input distance (default: 0)]"
     echo " -d <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
+    echo " -b          [predict broad peaks]" 
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:m:p:c:e:x:s:g:t:l:v:d:h ARG; do
+while getopts i:o:m:p:c:e:x:s:g:t:l:v:d:bh ARG; do
 	case "$ARG" in
 		i) BAMFILEs=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -79,6 +80,7 @@ while getopts i:o:m:p:c:e:x:s:g:t:l:v:d:h ARG; do
         l) CONTROLFILEs=$OPTARG;;
         v) MERGEDISTANCE=$OPTARG;;
         d) DISTRIBUTION=$OPTARG;;
+        b) BROAD=1;;
 		h) HELP=1;;
 	esac
 done
@@ -314,7 +316,8 @@ echo "#timestamp: $DATE
 #extend 3' end of reads: $EXTENDs
 #merge peaks separated by input distance: $MERGEDISTANCE
 #distribution to use for data fit: $DISTRIBUTION
-#size factors: $SIZEFACTORs" > $OUTDIR/PARAMETERS
+#size factors: $SIZEFACTORs
+#broad: $BROAD" > $OUTDIR/PARAMETERS
 
 <<"COMMENT"
 COMMENT
@@ -327,7 +330,11 @@ if [ -z "$PARALLEL" ]; then
             mkdir $OUTDIR/rep$i/fitDistr/
         fi
         ID=$(echo ${BEDFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
-        reads2peaks -i ${BEDFILEa[$i]} -o $OUTDIR/rep$i/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/rep$i/$ID.peaks
+        if [ ! -z "$BROAD" ]; then
+            reads2peaks -i ${BEDFILEa[$i]} -o $OUTDIR/rep$i/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/rep$i/$ID.peaks
+        else
+            reads2peaks -i ${BEDFILEa[$i]} -o $OUTDIR/rep$i/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/rep$i/$ID.peaks
+        fi
         PEAKFILEs="$PEAKFILEs,$OUTDIR/rep$i/$ID.peaks"
     done
     echo "done"
@@ -373,7 +380,11 @@ else
     for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
         ID=$(echo ${BEDFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
         cat $OUTDIR/rep$i/fitDistr/INPUT.BGx* > $OUTDIR/rep$i/fitDistr/INPUT.BG
-        bg2peaks -i $OUTDIR/rep$i/fitDistr/INPUT.BG -o $OUTDIR/rep$i/fitDistr -p $PVALUE -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/rep$i/$ID.peaks
+        if [ ! -z "$BROAD" ]; then
+            bg2peaks -i $OUTDIR/rep$i/fitDistr/INPUT.BG -o $OUTDIR/rep$i/fitDistr -p $PVALUE -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/rep$i/$ID.peaks
+        else
+            bg2peaks -i $OUTDIR/rep$i/fitDistr/INPUT.BG -o $OUTDIR/rep$i/fitDistr -p $PVALUE -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/rep$i/$ID.peaks
+        fi
         PEAKFILEs="$PEAKFILEs,$OUTDIR/rep$i/$ID.peaks"
     done
     echo "done"
@@ -437,7 +448,11 @@ if [ ! -z "$CONTROLFILEs" ]; then
     cat $CONTROLBEDFILEx | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$RANDOMDIR/$ID.bed
 
     echo -n "Predict peaks for control replicate (`date`).. "
-    reads2peaks -i $OUTDIR/$RANDOMDIR/$ID.bed -o $OUTDIR/$RANDOMDIR/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/$RANDOMDIR/$ID.peaks
+    if [ ! -z "$BROAD" ]; then
+        reads2peaks -i $OUTDIR/$RANDOMDIR/$ID.bed -o $OUTDIR/$RANDOMDIR/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/$RANDOMDIR/$ID.peaks
+    else
+        reads2peaks -i $OUTDIR/$RANDOMDIR/$ID.bed -o $OUTDIR/$RANDOMDIR/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/$RANDOMDIR/$ID.peaks
+    fi
     echo "done"
 
     ## check if control peak file is computed properly
@@ -461,7 +476,7 @@ echo "done"
 
 echo -n "Compute normalized peak scores (`date`).. "
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-Rscript $FINDNFRPATH/share/R/score2normalize.R -i $OUTDIR/PEAKS.BED -m 1 > $TMP
+Rscript $FINDNFRPATH/share/R/score2normalize.R -i $OUTDIR/PEAKS.BED > $TMP
 mv $TMP $OUTDIR/PEAKS.BED
 echo "done"
 
