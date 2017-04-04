@@ -141,6 +141,8 @@ if [ "$GENEFILE" == "stdin" ]; then
     GENEFILE=$OUTDIR/$TMP
 fi
 
+echo -n "Start predicting peaks on input BAM files (`date`).. "
+OVERLAPFILES=""
 while read LINE; do 
     ID=$(echo ${LINE} | perl -ane '$_=~s/\..*//g; print $_;')
     BAMFILE=$(echo $LINE | perl -ane 'print "$F[0]"')
@@ -150,4 +152,22 @@ while read LINE; do
     else
         bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE
     fi
+
+    if [ -s "$OUTDIR/peaks/$ID/PEAKS.BED" ]; then
+        echo
+        echo "Peak file $OUTDIR/peaks/$ID/PEAKS.BED is not computed properly.. "
+        echo "exiting.. "
+        echo
+        exit(1)
+    else
+        intersectBed -a $GENEFILE -b $OUTDIR/peaks/$ID/PEAKS.BED -wao | perl -ane '' > $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED
+        OVERLAPFILES="$OVERLAPFILES,$OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED"
+    fi
 done < $CONFIGFILE
+echo "done"
+
+echo -n "Compute regulatory complexity of input genes (`date`).. "
+paste $OVERLAPFILES | perl -ane '' > $OUTDIR/REGULATORY_COMPLEXITY.BED
+echo "done"
+
+echo "All done.. bye"
