@@ -160,7 +160,8 @@ while read LINE; do
         echo
         exit(1)
     else
-        intersectBed -a $GENEFILE -b $OUTDIR/peaks/$ID/PEAKS.BED -wao | perl -ane '' > $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED
+        zless $GENEFILE | perl -ane '$start=$F[1]-1000; $end=$F[2]+1000; if($start<1) { print "$F[0]\t$F[1]\t$end"; } else { print "$F[0]\t$start\t$end"; } foreach(@F[3..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $OUTDIR/GENES.BED
+        intersectBed -a $OUTDIR/GENES.BED -b $OUTDIR/peaks/$ID/PEAKS.BED -wao | intersectBed2uniq -i stdin -c 11,15,16 -o sum > $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED
         OVERLAPFILES="$OVERLAPFILES,$OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED"
     fi
 done < $CONFIGFILE
