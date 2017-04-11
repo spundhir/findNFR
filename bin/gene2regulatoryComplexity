@@ -33,6 +33,8 @@ PVALUE="0.05"
 MERGEDISTANCE=0
 DISTRIBUTION="nbinom"
 
+WINDOW=1000
+
 #### usage ####
 usage() {
 	echo Program: "gene2regulatoryComplexity (predict regulatory complexity of genes)"
@@ -60,6 +62,8 @@ usage() {
     echo " -t <float>  [FDR at which to consider a peak as significant (default: 0.05)]"
     echo " -v <int>    [merge peaks separated by input distance (default: 0)]"
     echo " -d <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
+    echo "[OPTIONS: regulatory complexity]"
+    echo " -w <int>    [window size by which to flank genes (default: 1000 bp)]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -131,6 +135,7 @@ if [ ! -f "$GENOME_FILE" ]; then
     echo
     usage
 fi
+echo "done"
 
 ## create temporary BED file if input is from stdin
 if [ "$GENEFILE" == "stdin" ]; then
@@ -141,46 +146,62 @@ if [ "$GENEFILE" == "stdin" ]; then
     GENEFILE=$OUTDIR/$TMP
 fi
 
+echo -n "Flank input gene coordinates by $WINDOW bp (`date`).. "
+if [ ! -s "$OUTDIR/GENES.BED" ]; then
+    #zless $GENEFILE | perl -ane '$start=$F[1]-$WINDOW; $end=$F[2]+$WINDOW; if($start<1) { print "$F[0]\t$F[1]\t$end"; } else { print "$F[0]\t$start\t$end"; } foreach(@F[3..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $OUTDIR/GENES.BED
+    zless $GENEFILE | perl -ane '$start=$F[1]-$WINDOW; $end=$F[2]+$WINDOW; if($start<1) { print "$F[0]\t$F[1]\t$end"; } else { print "$F[0]\t$start\t$end"; } if(scalar(@F)>=6) { print "\t$F[3]\t$F[4]\t$F[5]\n"; } else { print "\t.\t.\t.\n"; }' > $OUTDIR/GENES.BED
+fi
+echo "done"
+
 echo -n "Start predicting peaks on input BAM files (`date`).. "
 OVERLAPFILE=""
 while read LINE; do 
     ID=$(echo $LINE | perl -ane 'print "$F[0]"')
     BAMFILE=$(echo $LINE | perl -ane 'print "$F[1]"')
     CONTROLFILE=$(echo $LINE | perl -ane 'print "$F[2]"')
-    if [ -z "$CONTROLFILE" ]; then
-        bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION
-    else
-        bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE
+    if [ ! -s "$OUTDIR/peaks/$ID/PEAKS.BED" ]; then
+        if [ -z "$CONTROLFILE" ]; then
+            bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION
+        else
+            bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE
+        fi
     fi
 
-    if [ -s "$OUTDIR/peaks/$ID/PEAKS.BED" ]; then
+    if [ ! -s "$OUTDIR/peaks/$ID/PEAKS.BED" ]; then
         echo
         echo "Peak file $OUTDIR/peaks/$ID/PEAKS.BED is not computed properly.. "
         echo "exiting.. "
         echo
         exit
-    else
-        #zless $GENEFILE | perl -ane '$start=$F[1]-1000; $end=$F[2]+1000; if($start<1) { print "$F[0]\t$F[1]\t$end"; } else { print "$F[0]\t$start\t$end"; } foreach(@F[3..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $OUTDIR/GENES.BED
-        zless $GENEFILE | perl -ane '$start=$F[1]-1000; $end=$F[2]+1000; if($start<1) { print "$F[0]\t$F[1]\t$end"; } else { print "$F[0]\t$start\t$end"; } if(scalar(@F)>=6) { print "\t$F[3]\t$F[4]\t$F[5]\n"; } else { print "\t.\t.\t.\n"; }' > $OUTDIR/GENES.BED
+    elif [ ! -s "$OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED" ]; then
         intersectBed -a $OUTDIR/GENES.BED -b $OUTDIR/peaks/$ID/PEAKS.BED -wao | intersectBed2uniq -i stdin -c 11,15,16 -o sum > $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED
-        OVERLAPFILE="$OVERLAPFILE,$OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED"
     fi
+
+    OVERLAPFILE="$OVERLAPFILE $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED"
 done < $CONFIGFILE
+OVERLAPFILE=$(echo $OVERLAPFILE | perl -ane '$_=~s/^\s+//g; print $_;')
 echo "done"
 
 echo -n "Compute regulatory complexity of input genes (`date`).. "
 oIFS=$IFS
-IFS=","
+IFS=" "
 OVERLAPFILES=($OVERLAPFILE)
 OVERLAPFILES_COUNT=${#OVERLAPFILES[@]}
 IFS=$oIFS
 
+HEADER="#chr\tstart\tend\tgene\tscore\tstrand"
+
 COLUMNS="1-6"
-for(( i=1; i<=3; i++ )); do
-    COLUMNS="$COLUMNS,$(perl -e '$last=(9*'$i'); $first=$last-2; print "$first-$last"')"
+for(( i=1; i<=$OVERLAPFILES_COUNT; i++ )); do
+    ID=$(echo ${OVERLAPFILES[$i-1]} | perl -ane '@t=split(/\//, $_); print $t[scalar(@t)-2];')
+    #HEADER="$HEADER\t$ID\t$ID\t$ID"
+    #COLUMNS="$COLUMNS,$(perl -e '$last=(9*'$i'); $first=$last-2; print "$first-$last"')"
+    HEADER="$HEADER\t$ID"
+    COLUMNS="$COLUMNS,$(perl -e '$last=(9*'$i'); $first=$last-2; print "$first"')"
 done
 
-paste $OVERLAPFILE | cut -f $COLUMNS > $OUTDIR/REGULATORY_COMPLEXITY.BED
+echo -e $HEADER > $OUTDIR/REGULATORY_COMPLEXITY.BED
+paste $OVERLAPFILE | cut -f $COLUMNS >> $OUTDIR/REGULATORY_COMPLEXITY.BED
 echo "done"
 
 echo "All done.. bye"
