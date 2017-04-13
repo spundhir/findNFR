@@ -1,0 +1,124 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+COLUMN=5
+OPERATION="sum"
+
+#### usage ####
+usage() {
+    echo
+	echo Program: "closestBed2uniq (Determine unique coordinates from secondary bed (B) file used as input to closestBed)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: closestBed2uniq -i <file> [OPTIONS]"
+	echo "Options:"
+    echo " -i <files>  [input file containing output from closestBed (can be stdin)]"
+    echo "[OPTIONS]"
+    echo " -c <int>    [columns from the A file to map onto intervals in B (default: 5)]"
+    echo "             [if multiple, please separate them by a comma]"
+    echo " -o <string> [operation that should be applied to -c (default: sum)]"
+    echo "             [valid operations: sum, mean]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:c:o:h ARG; do
+	case "$ARG" in
+		i) BEDFILE=$OPTARG;;
+        c) COLUMN=$OPTARG;;
+        o) OPERATION=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BEDFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## parse input column values in an array
+#oIFS=$IFS
+#IFS=","
+#COLUMNS=($COLUMN)
+#COLUMNS_COUNT=${#COLUMNS[@]}
+#IFS=$oIFS
+
+<<"COMMENT"
+COMMENT
+## create temporary BED file if input is from stdin
+if [ "$BEDFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    BEDFILE=$TMP
+fi
+
+COOR_COL=$(zless $BEDFILE | head -n 1 | perl -ane 'for($i=0; $i<scalar(@F); $i++) { if($i>0 && $F[$i]=~/^chr[0-9A-Za-z]+$/) { $col=$i+1; print "$col\n"; } }')
+
+zless $BEDFILE | perl -ane '
+    $coor_col='$COOR_COL'-1;
+    $key=$F[$coor_col];
+    foreach(@F[($coor_col+1)..($coor_col+3)]) {
+        $key.="\_$_";
+    }
+    if($i==0) {
+        $line=$F[$coor_col];
+        foreach(@F[($coor_col+1)..($coor_col+5)]) { $line.="\t$_"; }
+        $gene{$key}{'coor'}=$line;
+        @columns=split(/\,/, "'$COLUMN'");
+        foreach(@columns) {
+            $gene{$key}{$_}+=$F[$_-1];
+        }
+        $gene{$key}{'count'}=1;
+        $prev_key=$key;
+    } else {
+        if(defined($gene{$key})) {
+            @columns=split(/,/, "'$COLUMN'");
+            foreach(@columns) {
+                $gene{$key}{$_}+=$F[$_-1];
+            }
+            $gene{$key}{'count'}++;
+        } else {
+            print "$gene{$prev_key}{'coor'}";
+            @columns=split(/,/, "'$COLUMN'");
+            $operation="'$OPERATION'";
+            $line="";
+            foreach(@columns) {
+                if($operation=~/mean/) {
+                    $line.=sprintf("\t%0.2f", $gene{$prev_key}{$_}/$gene{$prev_key}{'count'});
+                } else {
+                    $line.=sprintf("\t%d", $gene{$prev_key}{$_});
+                }
+            }
+            $line=~s/\s+$//g;
+            print "$line\n";
+
+            $line=$F[$coor_col];
+            foreach(@F[($coor_col+1)..($coor_col+5)]) { $line.="\t$_"; }
+            $gene{$key}{'coor'}=$line;
+            @columns=split(/,/, "'$COLUMN'");
+            foreach(@columns) {
+                $gene{$key}{$_}+=$F[$_-1];
+            }
+            $gene{$key}{'count'}=1;
+            $prev_key=$key;
+        }
+    } $i++;
+    
+    END {
+        print "$gene{$prev_key}{'coor'}";
+        @columns=split(/,/, "'$COLUMN'");
+        foreach(@columns) {
+            print "\t$gene{$prev_key}{$_}";
+        }
+        print "\n";
+    }'
+
+## remove temporary files
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi

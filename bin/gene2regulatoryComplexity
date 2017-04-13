@@ -63,7 +63,7 @@ usage() {
     echo " -v <int>    [merge peaks separated by input distance (default: 0)]"
     echo " -d <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
     echo "[OPTIONS: regulatory complexity]"
-    echo " -w <int>    [window size by which to flank genes (default: 1000 bp)]"
+    echo " -w <int>    [window size by which to flank gene TSS (default: 1000 bp)]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -149,12 +149,18 @@ fi
 echo -n "Flank input gene coordinates by $WINDOW bp (`date`).. "
 if [ ! -s "$OUTDIR/GENES.BED" ]; then
     #zless $GENEFILE | perl -ane '$start=$F[1]-$WINDOW; $end=$F[2]+$WINDOW; if($start<1) { print "$F[0]\t$F[1]\t$end"; } else { print "$F[0]\t$start\t$end"; } foreach(@F[3..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $OUTDIR/GENES.BED
-    zless $GENEFILE | perl -ane '$start=$F[1]-$WINDOW; $end=$F[2]+$WINDOW; if($start<1) { print "$F[0]\t$F[1]\t$end"; } else { print "$F[0]\t$start\t$end"; } if(scalar(@F)>=6) { print "\t$F[3]\t$F[4]\t$F[5]\n"; } else { print "\t.\t.\t.\n"; }' > $OUTDIR/GENES.BED
+    #zless $GENEFILE | perl -ane '$start=$F[1]-$WINDOW; $end=$F[2]+$WINDOW; if($start<1) { print "$F[0]\t$F[1]\t$end"; } else { print "$F[0]\t$start\t$end"; } if(scalar(@F)>=6) { print "\t$F[3]\t$F[4]\t$F[5]\n"; } else { print "\t.\t.\t.\n"; }' > $OUTDIR/GENES.BED
+    zless $GENEFILE | bed2window -i stdin -w $WINDOW -x > $OUTDIR/GENES.BED
+fi
+
+if [ ! -s "$OUTDIR/GENES_TSS.BED" ]; then
+    zless $GENEFILE | bed2window -i stdin -w 0 -t > $OUTDIR/GENES_TSS.BED
 fi
 echo "done"
 
 echo -n "Start predicting peaks on input BAM files (`date`).. "
 OVERLAPFILE=""
+PROXIMALFILE=""
 while read LINE; do 
     ID=$(echo $LINE | perl -ane 'print "$F[0]"')
     BAMFILE=$(echo $LINE | perl -ane 'print "$F[1]"')
@@ -173,13 +179,24 @@ while read LINE; do
         echo "exiting.. "
         echo
         exit
-    elif [ ! -s "$OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED" ]; then
-        intersectBed -a $OUTDIR/GENES.BED -b $OUTDIR/peaks/$ID/PEAKS.BED -wao | intersectBed2uniq -i stdin -c 11,15,16 -o sum > $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED
     fi
 
+    if [ ! -s "$OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED" ]; then
+        intersectBed -a $OUTDIR/GENES.BED -b $OUTDIR/peaks/$ID/PEAKS.BED -wao | intersectBed2uniq -i stdin -c 11,15,16 -o sum > $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED
+    fi
     OVERLAPFILE="$OVERLAPFILE $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED"
+
+    if [ ! -s "$OUTDIR/peaks/$ID/PEAKS_PROXIMAL_GENES.BED" ]; then
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        closestBed -a <(sortBed -i $OUTDIR/peaks/$ID/PEAKS.BED) -b <(sortBed -i $OUTDIR/GENES_TSS.BED) -t first | closestBed2uniq -i stdin -c 8,9,10 -o sum > $OUTDIR/peaks/$ID/$TMP
+        cat $OUTDIR/GENES_TSS.BED | perl -ane '$match=`grep -w \"$F[3]\" '$OUTDIR/peaks/$ID/$TMP' -m 1`; if($match=~/^$/) { chomp($_); print "$_\t0\t0\t0\n"; } else { chomp($match); print "$match\n"; }' > $OUTDIR/peaks/$ID/PEAKS_PROXIMAL_GENES.BED
+        rm $OUTDIR/peaks/$ID/$TMP
+    fi
+    PROXIMALFILE="$PROXIMALFILE $OUTDIR/peaks/$ID/PEAKS_PROXIMAL_GENES.BED"
 done < $CONFIGFILE
+
 OVERLAPFILE=$(echo $OVERLAPFILE | perl -ane '$_=~s/^\s+//g; print $_;')
+PROXIMALFILE=$(echo $PROXIMALFILE | perl -ane '$_=~s/^\s+//g; print $_;')
 echo "done"
 
 echo -n "Compute regulatory complexity of input genes (`date`).. "
@@ -189,7 +206,7 @@ OVERLAPFILES=($OVERLAPFILE)
 OVERLAPFILES_COUNT=${#OVERLAPFILES[@]}
 IFS=$oIFS
 
-HEADER="#chr\tstart\tend\tgene\tscore\tstrand"
+HEADER="chr\tstart\tend\tgene\tscore\tstrand"
 
 COLUMNS="1-6"
 for(( i=1; i<=$OVERLAPFILES_COUNT; i++ )); do
@@ -200,8 +217,11 @@ for(( i=1; i<=$OVERLAPFILES_COUNT; i++ )); do
     COLUMNS="$COLUMNS,$(perl -e '$last=(9*'$i'); $first=$last-2; print "$first"')"
 done
 
-echo -e $HEADER > $OUTDIR/REGULATORY_COMPLEXITY.BED
-paste $OVERLAPFILE | cut -f $COLUMNS >> $OUTDIR/REGULATORY_COMPLEXITY.BED
+echo -e $HEADER > $OUTDIR/OVERLAPPING_REGULATORY_COMPLEXITY.BED
+paste $OVERLAPFILE | cut -f $COLUMNS >> $OUTDIR/OVERLAPPING_REGULATORY_COMPLEXITY.BED
+
+echo -e $HEADER > $OUTDIR/PROXIMAL_REGULATORY_COMPLEXITY.BED
+paste $PROXIMALFILE | cut -f $COLUMNS >> $OUTDIR/PROXIMAL_REGULATORY_COMPLEXITY.BED
 echo "done"
 
 echo "All done.. bye"
