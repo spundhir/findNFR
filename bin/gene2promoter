@@ -174,11 +174,13 @@ else
         DISTANCE=2000
     fi
 
-    bedtools merge -i <(sortBed -i $OUTDIR/PEAKS.BED) -d $DISTANCE > $OUTDIR/PEAKS.BED.MERGED
+    bedtools merge -i <(sortBed -i $OUTDIR/PEAKS.BED) -d $DISTANCE > $OUTDIR/merge_distance/PEAKS.BED.MERGED
 
     zless $GENEFILE | bed2window -i stdin -w 0 -t | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/merge_distance/GENES_TSS.BED
 
-    closestBed -a <(sortBed -i $OUTDIR/merge_distance/GENES_TSS.BED) -b $OUTDIR/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < 500 && $F[scalar(@F)-1] >= 0) { $start=$F[7]-1000; $end=$F[8]+1000; $defined="Y"; } else { $start=$F[1]-1000; $end=$F[1]+1000; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";' > $OUTDIR/GENES_PROMOTER.BED
+    closestBed -a <(sortBed -i $OUTDIR/merge_distance/GENES_TSS.BED) -b $OUTDIR/merge_distance/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < 500 && $F[scalar(@F)-1] >= 0) { $start=$F[7]-1000; $end=$F[8]+1000; $defined="Y"; } else { $start=$F[1]-1000; $end=$F[1]+1000; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";' > $OUTDIR/merge_distance/GENES_PROMOTER.BED
+
+    zless $OUTDIR/merge_distance/GENES_PROMOTER.BED | cut -f 1-6 > $OUTDIR/GENES_PROMOTER.BED
 fi
 echo "done"
 
