@@ -1,0 +1,185 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+gene2promoter: predict promoter region of genes using h3k4me3 modification
+Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+VERSION="0.01"
+OUTDIR="peaks";
+GENOME="mm9"
+PROCESSOR=1
+
+MINCLUSTERHEIGHT=2
+MINBLOCKHEIGHT=2
+DISTANCE=70
+SCALE="0.6"
+BLOCKHEIGHT="abs"
+PVALUE="0.05"
+MERGEDISTANCE=0
+DISTRIBUTION="nbinom"
+
+#### usage ####
+usage() {
+	echo Program: "gene2promoter (predict promoter region of genes using h3k4me3 modification)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: $VERSION
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: gene2promoter -i <file> -j <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input genomic coordinates of genes in BED format]"
+    echo " -j <file>   [h3k4me3 modification data in BAM format]"
+    echo "             [if multiple, please separate them by a comma]"
+    echo "[OPTIONS]"
+    echo " -o <dir>    [output directory to store results (default: promoter)"
+    echo " -m <string> [genome (default: mm9)]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
+    echo " -k <file>   [IgG control file in BAM format]"
+    echo "[OPTIONS: bam2peaks]"
+    echo " -c <int>    [minimum number of read in the block group (default: 2)]"
+    echo " -e <int>    [minimum number of read in the block (default: 2)]"
+    echo " -x <int>    [maximum distance between the blocks (default: 70)]"
+    echo " -s <float>  [scale to define blocks (default: 0.6)]"
+    echo " -g <int>    [block height (abs or rel) (default: abs)]"
+    echo " -t <float>  [FDR at which to consider a peak as significant (default: 0.05)]"
+    echo " -v <int>    [merge peaks separated by input distance (default: 0)]"
+    echo " -d <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:o:m:p:k:c:e:x:s:g:t:v:d:h ARG; do
+	case "$ARG" in
+		i) GENEFILE=$OPTARG;;
+        j) BAMFILE=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        m) GENOME=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        k) CONTROLFILE=$OPTARG;;
+        c) MINCLUSTERHEIGHT=$OPTARG;;
+        e) MINBLOCKHEIGHT=$OPTARG;;
+        x) DISTANCE=$OPTARG;;
+        s) SCALE=$OPTARG;;
+        g) BLOCKHEIGHT=$OPTARG;;
+        t) PVALUE=$OPTARG;;
+        v) MERGEDISTANCE=$OPTARG;;
+        d) DISTRIBUTION=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+echo
+if [ "$HELP" ]; then
+    usage
+fi
+
+echo
+echo -n "Check, if all required parameters and files are provided (`date`).. "
+## usage, if necessary file and directories are given/exist
+if [ -z "$GENEFILE" -o -z "$BAMFILE" ]; then
+    echo
+    echo "Error: one or more required paramter values not provided"
+    echo
+	usage
+fi
+echo "done"
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+echo -n "Create directory structure (`date`).. "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+
+if [ ! -d "$OUTDIR/merge_distance" ]; then
+    mkdir -p $OUTDIR/merge_distance
+fi
+echo "done"
+
+echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    echo
+    echo "computation for $GENOME is not available yet"
+    echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    echo
+    usage
+fi
+echo "done"
+
+## create temporary BED file if input is from stdin
+if [ "$GENEFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/$TMP
+    GENEFILE=$OUTDIR/$TMP
+fi
+
+echo -n "Predict peaks on H3K4me3 data (`date`).. "
+if [ ! -s "$OUTDIR/PEAKS.BED" ]; then
+    if [ -z "$CONTROLFILE" ]; then
+        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION
+    else
+        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE
+    fi
+fi
+echo "done"
+
+echo -n "Determine optimal distance between peaks to merge (`date`).. "
+if [ ! -s "$OUTDIR/PEAKS.BED" ]; then
+    echo
+    echo "Peak file $OUTDIR/PEAKS.BED is not computed properly.. "
+    echo "exiting.. "
+    echo
+    exit
+else
+    closestBed -a <(sortBed -i $OUTDIR/PEAKS.BED) -b <(sortBed -i $OUTDIR/PEAKS.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F[14])/2; print "$mean\t$F[20]\n";' | sort -k 2n,2 > $OUTDIR/merge_distance/PEAKS.BED.DIST
+
+    bed2shuffle -i $OUTDIR/PEAKS.BED -g $GENOME > $OUTDIR/merge_distance/SHUFFLE.BED
+
+    closestBed -a <(sortBed -i $OUTDIR/merge_distance/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/merge_distance/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F[14])/2; print "$mean\t$F[20]\n";' | sort -k 2n,2 > $OUTDIR/merge_distance/SHUFFLE.BED.DIST
+
+    DISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i <(cut -f 2 $OUTDIR/merge_distance/PEAKS.BED.DIST) -j <(cut -f 2 $OUTDIR/merge_distance/SHUFFLE.BED.DIST))
+  
+    if [ "$DISTANCE" -gt 2000 ]; then
+        DISTANCE=2000
+    fi
+
+    bedtools merge -i <(sortBed -i $OUTDIR/PEAKS.BED) -d $DISTANCE > $OUTDIR/PEAKS.BED.MERGED
+
+    zless $GENEFILE | bed2window -i stdin -w 0 -t | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/merge_distance/GENES_TSS.BED
+
+    closestBed -a <(sortBed -i $OUTDIR/merge_distance/GENES_TSS.BED) -b $OUTDIR/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < 500 && $F[scalar(@F)-1] >= 0) { $start=$F[7]-1000; $end=$F[8]+1000; $defined="Y"; } else { $start=$F[1]-1000; $end=$F[1]+1000; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";' > $OUTDIR/GENES_PROMOTER.BED
+fi
+echo "done"
+
+echo "All done.. bye"
