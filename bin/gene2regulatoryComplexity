@@ -192,7 +192,6 @@ while read LINE; do
 
     if [ ! -s "$OUTDIR/peaks/$ID/PEAKS_PROXIMAL_GENES.BED" ]; then
         TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-## make sure to exclude peaks overlapping promoter (use -io) 
         closestBed -a <(sortBed -i $OUTDIR/peaks/$ID/PEAKS.BED) -b <(sortBed -i $OUTDIR/GENES_PROMOTER.BED) -t first -io | closestBed2uniq -i stdin -c 8,9,10 -o sum > $OUTDIR/peaks/$ID/$TMP
         cat $OUTDIR/GENES_PROMOTER.BED | perl -ane '$match=`grep -w \"$F[3]\" '$OUTDIR/peaks/$ID/$TMP' -m 1`; if($match=~/^$/) { chomp($_); print "$_\t0\t0\t0\n"; } else { chomp($match); print "$match\n"; }' > $OUTDIR/peaks/$ID/PEAKS_PROXIMAL_GENES.BED
         rm $OUTDIR/peaks/$ID/$TMP
