@@ -4,7 +4,8 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 option_list <- list(
 	make_option(c("-i", "--firstFile"), help="file containing numeric distribution (should be first column)"),
-    make_option(c("-j", "--secondFile"), help="file containing numeric distribution (should be first column)")
+    make_option(c("-j", "--secondFile"), help="file containing numeric distribution (should be first column)"),
+    make_option(c("-m", "--method"), default="median", help="method to use (intersection, median, quantile; default: %default)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -26,30 +27,45 @@ suppressPackageStartupMessages(library(session))
 suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(RColorBrewer))
 
+## function to remove outliers from a distribution
+remove_outliers <- function(x, na.rm = TRUE, ...) {
+    qnt <- quantile(x, probs=c(.25, .75), na.rm = na.rm, ...)
+    H <- 1.5 * IQR(x, na.rm = na.rm)
+    y <- x
+    y[x < (qnt[1] - H)] <- NA
+    y[x > (qnt[2] + H)] <- NA
+    y
+}
+
+## start analysis
 peaks <- read.table(opt$firstFile)
 shuffle <- read.table(opt$secondFile)
 peaks$class <- "peaks"
 shuffle$class <- "shuffle"
 df <- rbind(peaks, shuffle)
-# lower.limit <- min(log(df$V2))
-# upper.limit <- max(log(df$V2))
+# lower.limit <- min(log(df$V1))
+# upper.limit <- max(log(df$V1))
 
-# lower.limit <- as.numeric(summary(log(df$V2))[2])
-# upper.limit <- as.numeric(summary(log(df$V2))[5])
+# lower.limit <- as.numeric(summary(log(df$V1))[2])
+# upper.limit <- as.numeric(summary(log(df$V1))[5])
 
-lower.limit <- as.numeric(round(log(quantile(df$V1, probs=0.0005, type=8)), digits=2))
-upper.limit <- as.numeric(round(log(quantile(df$V1, probs=0.95, type=8)), digits=2))
+lower.limit <- as.numeric(quantile(log(df$V1[!is.na(remove_outliers(df$V1))]), probs=0.05, type=8))
+upper.limit <- as.numeric(quantile(log(df$V1[!is.na(remove_outliers(df$V1))]), probs=0.95, type=8))
 
 peaks.density <- density(log(subset(df, class=="peaks")$V1), from=lower.limit, to=upper.limit, n=2^10)
 shuffle.density <- density(log(subset(df, class=="shuffle")$V1), from=lower.limit, to=upper.limit, n=2^10)
 
 density.difference <- peaks.density$y - shuffle.density$y
-intersection <- round(peaks.density$x[which(diff(density.difference > 0) != 0) + 1], digits=2)
-cat(round(exp(intersection)))
-#cat(exp(intersection-1))
 
-# summary(round(peaks.density$x[which(density.difference>0)]))
+if(opt$method=="intersection") {
+    intersection <- round(peaks.density$x[which(diff(density.difference > 0) != 0) + 1], digits=2)
+    cat(round(exp(intersection)))
+} else if(opt$method=="quantile") {
+    cat(round(exp(round(quantile(peaks.density$x[which(density.difference>0)], probs=0.75, type=8)))))
+} else {
+    cat(round(exp(median(peaks.density$x[which(density.difference>0)]))))
+}
 
-# ggplot(df, aes(x=log(V2), fill=class)) + geom_density(alpha=.3)
+# ggplot(df, aes(x=log(V1), fill=class)) + geom_density(alpha=.3)
 
 q()

@@ -148,6 +148,8 @@ if [ "$GENEFILE" == "stdin" ]; then
 fi
 
 echo -n "Start predicting peaks on input BAM files (`date`).. "
+BAMFILEs=""
+REPLICATES=0
 while read LINE; do
     ID=$(echo $LINE | perl -ane 'print "$F[0]"')
     BAMFILE=$(echo $LINE | perl -ane 'print "$F[1]"')
@@ -167,13 +169,17 @@ while read LINE; do
         echo
         exit
     fi
+
+    REPLICATES=$(echo $BAMFILE | perl -an -F'/\,/' -e 'print scalar(@F);')
+    BAMFILEs="$BAMFILEs,$BAMFILE"
 done < $CONFIGFILE
+BAMFILEs=$(echo $BAMFILEs | perl -ane '$_=~s/^\,//; print $_;')
 echo "done"
 
 echo -n "Define gene promoter (`date`).. "
 if grep -qw h3k4me3 $CONFIGFILE; then
     BAMFILE=$(grep -w h3k4me3 $CONFIGFILE | cut -f 2 -d " ")
-    gene2promoter -i $GENEFILE -j $BAMFILE -o $OUTDIR/peaks/h3k4me3
+    gene2promoter -i $GENEFILE -j $BAMFILE -o $OUTDIR/peaks/h3k4me3 -n $WINDOW
     mv $OUTDIR/peaks/h3k4me3/GENES_PROMOTER.BED $OUTDIR/GENES_PROMOTER.BED
 else
     zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\tNA\n";' > $OUTDIR/GENES_PROMOTER.BED
@@ -210,7 +216,7 @@ OVERLAPFILES=($OVERLAPFILE)
 OVERLAPFILES_COUNT=${#OVERLAPFILES[@]}
 IFS=$oIFS
 
-HEADER="chr\tstart\tend\tgene\tscore\tstrand"
+HEADER="chr\tstart\tend\tgene\tscore\tstrand\tpromoter_defined"
 
 COLUMNS="1-7"
 for(( i=1; i<=$OVERLAPFILES_COUNT; i++ )); do
@@ -226,6 +232,16 @@ paste $OVERLAPFILE | cut -f $COLUMNS >> $OUTDIR/OVERLAPPING_REGULATORY_COMPLEXIT
 
 echo -e $HEADER > $OUTDIR/PROXIMAL_REGULATORY_COMPLEXITY.BED
 paste $PROXIMALFILE | cut -f $COLUMNS >> $OUTDIR/PROXIMAL_REGULATORY_COMPLEXITY.BED
+echo "done"
+
+echo -n "Compute regulatory complexity of input genes using histone reads overlapping to gene promoters (`date`).. "
+if [ ! -s "$OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED" -a "$REPLICATES" -gt 1 ]; then
+    echo -e $HEADER > $OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED
+    bed2expr -i $OUTDIR/GENES_PROMOTER.BED -j $BAMFILEs -d -v 1 -g $GENOME >> $OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED
+elif [ ! -s "$OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED" ]; then
+    echo -e $HEADER > $OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED
+    bed2expr -i $OUTDIR/GENES_PROMOTER.BED -j $BAMFILEs -d -g $GENOME >> $OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED
+fi
 echo "done"
 
 echo "All done.. bye"
