@@ -3,6 +3,7 @@
 
 COLUMN=5
 OPERATION="sum"
+COLUMN_SECONDARY=6
 
 #### usage ####
 usage() {
@@ -19,17 +20,19 @@ usage() {
     echo "             [if multiple, please separate them by a comma]"
     echo " -o <string> [operation that should be applied to -c (default: sum)]"
     echo "             [valid operations: sum, mean]"
+    echo " -n <int>    [number of columns to include from secondary bed (B) file (default: 6)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:c:o:h ARG; do
+while getopts i:c:o:n:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         c) COLUMN=$OPTARG;;
         o) OPERATION=$OPTARG;;
+        n) COLUMN_SECONDARY=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -58,6 +61,7 @@ if [ "$BEDFILE" == "stdin" ]; then
 fi
 
 COOR_COL=$(zless $BEDFILE | head -n 1 | perl -ane 'for($i=0; $i<scalar(@F); $i++) { if($i>0 && $F[$i]=~/^chr[0-9A-Za-z]+$/) { $col=$i+1; print "$col\n"; } }')
+COLUMN_SECONDARY=$(echo $COLUMN_SECONDARY | perl -ane '$_=$_-1; print $_;')
 
 zless $BEDFILE | perl -ane '
     $coor_col='$COOR_COL'-1;
@@ -67,7 +71,7 @@ zless $BEDFILE | perl -ane '
     }
     if($i==0) {
         $line=$F[$coor_col];
-        foreach(@F[($coor_col+1)..($coor_col+5)]) { $line.="\t$_"; }
+        foreach(@F[($coor_col+1)..($coor_col+'$COLUMN_SECONDARY')]) { $line.="\t$_"; }
         $gene{$key}{'coor'}=$line;
         @columns=split(/\,/, "'$COLUMN'");
         foreach(@columns) {
@@ -98,7 +102,7 @@ zless $BEDFILE | perl -ane '
             print "$line\n";
 
             $line=$F[$coor_col];
-            foreach(@F[($coor_col+1)..($coor_col+5)]) { $line.="\t$_"; }
+            foreach(@F[($coor_col+1)..($coor_col+'$COLUMN_SECONDARY')]) { $line.="\t$_"; }
             $gene{$key}{'coor'}=$line;
             @columns=split(/,/, "'$COLUMN'");
             foreach(@columns) {
