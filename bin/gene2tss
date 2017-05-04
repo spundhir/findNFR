@@ -1,0 +1,110 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+gene2tss: refine tss of input gene regions using CAGE data
+Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "gene2tss (refine tss of input gene regions using CAGE data)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: $VERSION
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: gene2tss -i <file> -j <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input genomic coordinates of genes in BED format (can be stdin)]"
+    echo " -j <file>   [input genomic coordinates of TSS defined using CAGE, for example]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:h ARG; do
+	case "$ARG" in
+		i) GENEFILE=$OPTARG;;
+        j) TSSFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+>&2 echo
+if [ "$HELP" ]; then
+    usage
+fi
+
+>&2 echo
+>&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
+## usage, if necessary file and directories are given/exist
+if [ -z "$GENEFILE" -o -z "$TSSFILE" ]; then
+    >&2 echo
+    >&2 echo "Error: one or more required paramter values not provided"
+    >&2 echo
+	>&2 usage
+fi
+>&2 echo "done"
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        >&2 echo $job
+        wait $job
+    done
+    >&2 echo $1
+}
+###############
+
+<<"COMMENT"
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+COMMENT
+
+## create temporary BED file if input is from stdin
+if [ "$GENEFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    GENEFILE=$TMP
+fi
+
+NCOL_GENEFILE=$(zless $GENEFILE | head -n 1 | perl -ane 'print scalar(@F);')
+
+closestBed -a <(zless $GENEFILE | sortBed -i stdin) -b <(sortBed -i $TSSFILE) -d -t first | perl -ane 'if($F[scalar(@F)-1]<=50) { print "$F[0]\t$F['$((NCOL_GENEFILE+1))']\t$F['$((NCOL_GENEFILE+2))']"; foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; } print "\n"; } else { $mid=sprintf("%d", ($F[1]+$F[2])/2); $start=$mid; $end=$mid+1; print "$F[0]\t$start\t$end"; foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; } print "\n"; }'
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi

@@ -470,11 +470,11 @@ if [ ! -z "$CONTROLFILEs" ]; then
     cat $CONTROLBEDFILEx | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$RANDOMDIR/$ID.bed
 
     echo -n "Predict peaks for control replicate (`date`).. "
-    #if [ ! -z "$BROAD" ]; then
-    #    reads2peaks -i $OUTDIR/$RANDOMDIR/$ID.bed -o $OUTDIR/$RANDOMDIR/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/$RANDOMDIR/$ID.peaks
-    #else
-    #    reads2peaks -i $OUTDIR/$RANDOMDIR/$ID.bed -o $OUTDIR/$RANDOMDIR/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/$RANDOMDIR/$ID.peaks
-    #fi
+    if [ ! -z "$BROAD" ]; then
+        reads2peaks -i $OUTDIR/$RANDOMDIR/$ID.bed -o $OUTDIR/$RANDOMDIR/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/$RANDOMDIR/$ID.peaks
+    else
+        reads2peaks -i $OUTDIR/$RANDOMDIR/$ID.bed -o $OUTDIR/$RANDOMDIR/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/$RANDOMDIR/$ID.peaks
+    fi
     echo "done"
 
     ## check if control peak file is computed properly

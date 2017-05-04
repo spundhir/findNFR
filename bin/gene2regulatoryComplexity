@@ -154,13 +154,13 @@ while read LINE; do
     ID=$(echo $LINE | perl -ane 'print "$F[0]"')
     BAMFILE=$(echo $LINE | perl -ane 'print "$F[1]"')
     CONTROLFILE=$(echo $LINE | perl -ane 'print "$F[2]"')
-    #if [ ! -s "$OUTDIR/peaks/$ID/PEAKS.BED" ]; then
+    if [ ! -s "$OUTDIR/peaks/$ID/PEAKS.BED" ]; then
         if [ -z "$CONTROLFILE" ]; then
             bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION
         else
             bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE
         fi
-    #fi
+    fi
 
     if [ ! -s "$OUTDIR/peaks/$ID/PEAKS.BED" ]; then
         echo
@@ -235,13 +235,13 @@ paste $PROXIMALFILE | cut -f $COLUMNS >> $OUTDIR/PROXIMAL_REGULATORY_COMPLEXITY.
 echo "done"
 
 echo -n "Compute regulatory complexity of input genes using histone reads overlapping to gene promoters (`date`).. "
-#if [ ! -s "$OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED" -a "$REPLICATES" -gt 1 ]; then
+if [ ! -s "$OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED" -a "$REPLICATES" -gt 1 ]; then
     echo -e $HEADER > $OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED
     bed2expr -i $OUTDIR/GENES_PROMOTER.BED -j $BAMFILEs -d -v 1 -g $GENOME >> $OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED
-#elif [ ! -s "$OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED" ]; then
+elif [ ! -s "$OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED" ]; then
     echo -e $HEADER > $OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED
     bed2expr -i $OUTDIR/GENES_PROMOTER.BED -j $BAMFILEs -d -g $GENOME >> $OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED
-#fi
+fi
 echo "done"
 
 echo "All done.. bye"
