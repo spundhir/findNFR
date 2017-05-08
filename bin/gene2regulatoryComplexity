@@ -122,6 +122,7 @@ echo -n "Create directory structure (`date`).. "
 if [ ! -d "$OUTDIR" ]; then
     mkdir -p $OUTDIR
     mkdir -p $OUTDIR/peaks
+    mkdir -p $OUTDIR/nfrDynAna
 fi
 echo "done"
 
@@ -151,6 +152,9 @@ echo -n "Start predicting peaks on input BAM files (`date`).. "
 BAMFILEs=""
 REPLICATES=0
 while read LINE; do
+    TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/) { print "1"; } else { print "0" }');
+    [ "$TPM" -eq "1" ] && continue;
+
     ID=$(echo $LINE | perl -ane 'print "$F[0]"')
     BAMFILE=$(echo $LINE | perl -ane 'print "$F[1]"')
     CONTROLFILE=$(echo $LINE | perl -ane 'print "$F[2]"')
@@ -235,6 +239,7 @@ paste $PROXIMALFILE | cut -f $COLUMNS >> $OUTDIR/PROXIMAL_REGULATORY_COMPLEXITY.
 echo "done"
 
 echo -n "Compute regulatory complexity of input genes using histone reads overlapping to gene promoters (`date`).. "
+<<"COMMENT"
 if [ ! -s "$OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED" -a "$REPLICATES" -gt 1 ]; then
     echo -e $HEADER > $OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED
     bed2expr -i $OUTDIR/GENES_PROMOTER.BED -j $BAMFILEs -d -v 1 -g $GENOME >> $OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED
@@ -242,6 +247,14 @@ elif [ ! -s "$OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED" ]; then
     echo -e $HEADER > $OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED
     bed2expr -i $OUTDIR/GENES_PROMOTER.BED -j $BAMFILEs -d -g $GENOME >> $OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED
 fi
+COMMENT
+
+nfrDynAna2Matrix -i $OUTDIR/GENES_PROMOTER.BED -j $CONFIGFILE -o $OUTDIR/nfrDynAna -r 1 -n 1 -g $GENOME -c
+
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+cat <(cat $CONFIGFILE | perl -ane 'BEGIN { $line=""; } if($_=~/^tpm/) { @count=split(/\,/,$F[1]); foreach(@count) { $line.="$F[0]\t"; } } END { $line=~s/\t$//g; print "chr\tstart\tend\tgene\tscore\tstrand\tpromoter_defined\t$line\n"; }') <(cat $OUTDIR/nfrDynAna/NFR_DYNAMICS_SIG.stat) > $OUTDIR/nfrDynAna/$TMP
+mv $OUTDIR/nfrDynAna/$TMP $OUTDIR/nfrDynAna/NFR_DYNAMICS_SIG.stat
+
 echo "done"
 
 echo "All done.. bye"
