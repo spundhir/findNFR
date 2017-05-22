@@ -83,7 +83,7 @@ fi
 
 ## index bam files and estimate size factors
 if [ ! -e "$BAMFILE.bai" ]; then
-    samtools index ${BAMFILEa[$i]}
+    samtools index $BAMFILE
 fi
 
 ## determine read extension parameter, if required
@@ -101,6 +101,8 @@ if [ ! -z "$EXTEND" ]; then
     if [ ! -z "predictd" ]; then
         rm predictd
     fi
+else
+    EXTEND_VALUE=0
 fi
 
 ## convert bam to bed format
