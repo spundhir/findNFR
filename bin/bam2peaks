@@ -21,7 +21,7 @@ copyright_info
 
 VERSION="0.01"
 OUTDIR="peaks";
-RANDOMDIR="peaks_random";
+CONTROLDIR="peaks_control";
 DISTANCE=70
 SCALE="0.6"
 MINCLUSTERHEIGHT=2
@@ -130,7 +130,7 @@ if [ ! -d "$OUTDIR/rep0" ]; then
         mkdir $OUTDIR/rep$i
     done
     mkdir $OUTDIR/logs/
-    mkdir $OUTDIR/$RANDOMDIR
+    mkdir $OUTDIR/$CONTROLDIR
     mkdir $OUTDIR/bw_files/
 fi
 echo "done"
@@ -305,7 +305,7 @@ echo "#timestamp: $DATE
 #version: $VERSION
 #input BAM file(s): $BAMFILEs
 #output directory: $OUTDIR
-#output directory for randomly shuffled peaks: $OUTDIR/$RANDOMDIR
+#output directory for control peaks: $OUTDIR/$CONTROLDIR
 #minimum reads in block group: $MINCLUSTERHEIGHT
 #minimum reads in block: $MINBLOCKHEIGHT
 #minimum distance between the blocks: $DISTANCE
@@ -331,15 +331,13 @@ if [ -z "$PARALLEL" ]; then
             mkdir $OUTDIR/rep$i/fitDistr/
         fi
         ID=$(echo ${BEDFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
-        if [ ! -z "$BROAD" ]; then
-            reads2peaks -i ${BEDFILEa[$i]} -o $OUTDIR/rep$i/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/rep$i/$ID.peaks
-        else
-            reads2peaks -i ${BEDFILEa[$i]} -o $OUTDIR/rep$i/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/rep$i/$ID.peaks
-        fi
+
+        reads2peaks -i ${BEDFILEa[$i]} -o $OUTDIR/rep$i/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/rep$i/$ID.peaks
+
         PEAKFILEs="$PEAKFILEs,$OUTDIR/rep$i/$ID.peaks"
 
         ## now also analyze peaks which are above threshold pvalue ($PVALUE), however are <0.2
-        intersectBed -a <(cat $OUTDIR/$i/fitDistr/INPUT.BG.P_VALUE | perl -ane 'if($F[6]<0.2) { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\tN\n"; }') -b $OUTDIR/rep$i/$ID.peaks -v | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $MERGEDISTANCE > $OUTDIR/rep$i/$ID.allPeaks
+        intersectBed -a <(cat $OUTDIR/$i/fitDistr/INPUT.BG.P_VALUE | perl -ane 'if($F[6]<1) { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\tN\n"; }') -b $OUTDIR/rep$i/$ID.peaks -v | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $MERGEDISTANCE > $OUTDIR/rep$i/$ID.allPeaks
         ALLPEAKFILEs="$ALLPEAKFILEs,$OUTDIR/rep$i/$ID.allPeaks"
     done
     echo "done"
@@ -349,8 +347,8 @@ if [ -z "$PARALLEL" ]; then
     if [ ${#BEDFILEa[@]} -gt 1 ]; then
         echo -n "Determine common peaks between replicates (`date`).. "
         ID=`echo $BEDFILEs | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
-        multiIntersectBed.sh -i $PEAKFILEs | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/PEAKS.BED
-        multiIntersectBed.sh -i $ALLPEAKFILEs | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/ALLPEAKS.BED
+        multiIntersectBed.sh -i $PEAKFILEs | perl -ane 'if($F[3]>=2) { print $_; }' | cut -f 1-3 | bed2expr -i stdin -j $BAMFILEs -d -g $GENOME | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]\t"; $sum=0; $count=0; foreach(@F[3..scalar(@F)-1]) { $sum+=$_; $count++; } $mean=sprintf("%d", $sum/$count); print "$mean\t.\tY\n";' | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/PEAKS.BED
+        multiIntersectBed.sh -i $ALLPEAKFILEs | perl -ane 'if($F[3]>=2) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]\tNA\t.\tN\n"; }' | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/ALLPEAKS.BED
         echo "done"
     else
         scp $OUTDIR/rep0/$ID.peaks $OUTDIR/PEAKS.BED
@@ -389,15 +387,12 @@ else
     for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
         ID=$(echo ${BEDFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
         cat $OUTDIR/rep$i/fitDistr/INPUT.BGx* > $OUTDIR/rep$i/fitDistr/INPUT.BG
-        if [ ! -z "$BROAD" ]; then
-            bg2peaks -i $OUTDIR/rep$i/fitDistr/INPUT.BG -o $OUTDIR/rep$i/fitDistr -p $PVALUE -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/rep$i/$ID.peaks
-        else
-            bg2peaks -i $OUTDIR/rep$i/fitDistr/INPUT.BG -o $OUTDIR/rep$i/fitDistr -p $PVALUE -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/rep$i/$ID.peaks
-        fi
+        bg2peaks -i $OUTDIR/rep$i/fitDistr/INPUT.BG -o $OUTDIR/rep$i/fitDistr -p $PVALUE -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/rep$i/$ID.peaks
+
         PEAKFILEs="$PEAKFILEs,$OUTDIR/rep$i/$ID.peaks"
 
         ## now also analyze peaks which are above threshold pvalue ($PVALUE), however are <0.2
-        intersectBed -a <(cat $OUTDIR/rep$i/fitDistr/INPUT.BG.P_VALUE | perl -ane 'if($F[6]<0.2) { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\tN\n"; }') -b $OUTDIR/rep$i/$ID.peaks -v | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $MERGEDISTANCE > $OUTDIR/rep$i/$ID.allPeaks
+        intersectBed -a <(cat $OUTDIR/rep$i/fitDistr/INPUT.BG.P_VALUE | perl -ane 'if($F[6]<1) { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\tN\n"; }') -b $OUTDIR/rep$i/$ID.peaks -v | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $MERGEDISTANCE > $OUTDIR/rep$i/$ID.allPeaks
         ALLPEAKFILEs="$ALLPEAKFILEs,$OUTDIR/rep$i/$ID.allPeaks"
     done
     echo "done"
@@ -407,8 +402,8 @@ else
     if [ ${#BEDFILEa[@]} -gt 1 ]; then
         echo -n "Determine common peaks between replicates (`date`).. "
         ID=`echo $BEDFILEs | perl -ane '$_=~s/^.*\///g; $_=~s/Rep.*$//g; $_=~s/\_$//g; print $_;'`;
-        multiIntersectBed.sh -i $PEAKFILEs | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/PEAKS.BED
-        multiIntersectBed.sh -i $ALLPEAKFILEs | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/ALLPEAKS.BED
+        multiIntersectBed.sh -i $PEAKFILEs | perl -ane 'if($F[3]>=2) { print $_; }' | cut -f 1-3 | bed2expr -i stdin -j $BAMFILEs -d -g $GENOME | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]\t"; $sum=0; $count=0; foreach(@F[3..scalar(@F)-1]) { $sum+=$_; $count++; } $mean=sprintf("%d", $sum/$count); print "$mean\t.\tY\n";' | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/PEAKS.BED
+        multiIntersectBed.sh -i $ALLPEAKFILEs | perl -ane 'if($F[3]>=2) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]\tNA\t.\tN\n"; }' | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/ALLPEAKS.BED
         echo "done"
     else
         scp $OUTDIR/rep0/$ID.peaks $OUTDIR/PEAKS.BED
@@ -467,33 +462,47 @@ if [ ! -z "$CONTROLFILEs" ]; then
 
     CONTROLBEDFILEx=$(echo $CONTROLBEDFILEs | perl -ane '$_=~s/^\,//g; print $_;' | perl -ane '$_=~s/\,/ /g; print $_;')
 
-    cat $CONTROLBEDFILEx | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$RANDOMDIR/$ID.bed
+    cat $CONTROLBEDFILEx | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$CONTROLDIR/$ID.bed
 
     echo -n "Predict peaks for control replicate (`date`).. "
-    if [ ! -z "$BROAD" ]; then
-        reads2peaks -i $OUTDIR/$RANDOMDIR/$ID.bed -o $OUTDIR/$RANDOMDIR/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE -b > $OUTDIR/$RANDOMDIR/$ID.peaks
-    else
-        reads2peaks -i $OUTDIR/$RANDOMDIR/$ID.bed -o $OUTDIR/$RANDOMDIR/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/$RANDOMDIR/$ID.peaks
-    fi
+    reads2peaks -i $OUTDIR/$CONTROLDIR/$ID.bed -o $OUTDIR/$CONTROLDIR/fitDistr -p $PVALUE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/$CONTROLDIR/$ID.peaks
     echo "done"
 
     ## check if control peak file is computed properly
-    if [ -s "$OUTDIR/$RANDOMDIR/$ID.peaks" ]; then
+    if [ -s "$OUTDIR/$CONTROLDIR/$ID.peaks" ]; then
         TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-        intersectBed -a $OUTDIR/PEAKS.BED -b $OUTDIR/$RANDOMDIR/$ID.peaks -v > $TMP
+        intersectBed -a $OUTDIR/PEAKS.BED -b $OUTDIR/$CONTROLDIR/$ID.peaks -v > $TMP
         mv $TMP $OUTDIR/PEAKS.BED
 
         ## now also analyze peaks which are above threshold pvalue ($PVALUE), however are <0.2
-        intersectBed -a <(cat $OUTDIR/$RANDOMDIR/fitDistr/INPUT.BG.P_VALUE | perl -ane 'if($F[6]<0.2) { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\tN\n"; }') -b $OUTDIR/$RANDOMDIR/$ID.peaks -v | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $MERGEDISTANCE > $OUTDIR/$RANDOMDIR/$ID.allPeaks
-        intersectBed -a $OUTDIR/ALLPEAKS.BED -b $OUTDIR/$RANDOMDIR/$ID.allPeaks -v > $TMP
-        mv $TMP $OUTDIR/ALLPEAKS.BED
+        #intersectBed -a <(cat $OUTDIR/$CONTROLDIR/fitDistr/INPUT.BG.P_VALUE | perl -ane 'if($F[6]<1) { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\tN\n"; }') -b $OUTDIR/$CONTROLDIR/$ID.peaks -v | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $MERGEDISTANCE > $OUTDIR/$CONTROLDIR/$ID.allPeaks
+        #intersectBed -a $OUTDIR/ALLPEAKS.BED -b $OUTDIR/$CONTROLDIR/$ID.allPeaks -v > $TMP
+        #mv $TMP $OUTDIR/ALLPEAKS.BED
     else
         echo
-        echo "Error: control peak file $OUTDIR/$RANDOMDIR/$ID.peaks not created properly"
+        echo "Error: control peak file $OUTDIR/$CONTROLDIR/$ID.peaks not created properly"
         exit 1
     fi
 fi
 echo "done"
+
+## merge peaks into broad peaks, if required
+if [ ! -z "$BROAD" ]; then
+    mkdir $OUTDIR/peaks_broad
+    echo "merge peaks into broad peaks (`date`).. "
+    bed2merge -i $OUTDIR/PEAKS.BED -j $BAMFILEs -o $OUTDIR/peaks_broad/peaks.merged -x $DISTRIBUTION -d $MERGEDISTANCE -g $GENOME    
+    echo "done"
+
+    echo -n "Remove broad peaks overlapping with blacklisted regions (`date`).. "
+    intersectBed -a $OUTDIR/peaks_broad/peaks.merged -b $GENOME_BLACKLIST -v > $OUTDIR/BROADPEAKS.BED
+    echo "done"
+
+    echo -n "Compute normalized peak scores (`date`).. "
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    Rscript $FINDNFRPATH/share/R/score2normalize.R -i $OUTDIR/BROADPEAKS.BED > $TMP
+    mv $TMP $OUTDIR/BROADPEAKS.BED
+    echo "done"
+fi
 
 echo -n "Remove peaks overlapping with blacklisted regions (`date`).. "
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)

@@ -152,17 +152,26 @@ echo -n "Start predicting peaks on input BAM files (`date`).. "
 BAMFILEs=""
 REPLICATES=0
 while read LINE; do
-    TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/) { print "1"; } else { print "0" }');
+    TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/) { print "1"; } else { print "0" }')
     [ "$TPM" -eq "1" ] && continue;
 
     ID=$(echo $LINE | perl -ane 'print "$F[0]"')
     BAMFILE=$(echo $LINE | perl -ane 'print "$F[1]"')
     CONTROLFILE=$(echo $LINE | perl -ane 'print "$F[2]"')
+    BROAD=$(echo $ID | perl -ane 'if($_!~/^$/ && ($_=~/h3k27me3/i || $_=~/h3k36me3/i || $_=~/h3k9me3/i)) { print "1"; } elsif($_!~/^$/) { print "0" }')
     if [ ! -s "$OUTDIR/peaks/$ID/PEAKS.BED" ]; then
         if [ -z "$CONTROLFILE" ]; then
-            bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION
+            if [ "$BROAD" -eq 1 ]; then
+                bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -b
+            else
+                bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -b
+            fi
         else
-            bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE
+            if [ "$BROAD" -eq 1 ]; then
+                bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE -b
+            else
+                bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE
+            fi
         fi
     fi
 
