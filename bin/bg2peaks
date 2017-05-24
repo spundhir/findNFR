@@ -60,9 +60,9 @@ if [ ! -d "$OUTDIR" ]; then
 fi
 
 ## fit distribution to the input block groups
-#if [ ! -f "$OUTDIR/INPUT.BG.P_VALUE" ]; then
+if [ ! -f "$OUTDIR/INPUT.BG.P_VALUE" ]; then
     cat $INPUTFILE | perl -ane 'print "$F[4]\t$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[5]\n";' | $FINDNFRPATH/share/R/fitDistr.R -i stdin -o $OUTDIR/INPUT.BG.P_VALUE -d $DISTRIBUTION 2>&1 >/dev/null
-#fi
+fi
 
 ## filter out significant block groups
 if [ ! -z "$ALL" ]; then

@@ -368,15 +368,18 @@ else
 
     echo -n "Predict peaks for each replicate (`date`).. "
     for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
-        if [ ! -d "$OUTDIR/rep$i/fitDistr/" ]; then
-            mkdir $OUTDIR/rep$i/fitDistr/
-        fi
-        
-        ## check if block group files already exist
-        COUNT=$(for file in $(ls $OUTDIR/parallel/rep$i/xchr*); do file=$(echo $file | perl -ane '$_=~s/.*\///g; print $_;'); if [ ! -f "$OUTDIR/rep$i/fitDistr/INPUT.BG$file" ]; then echo $file; fi done | wc -l)
+        if [ ! -s "$OUTDIR/rep$i/fitDistr/INPUT.BG" ]; then
+            if [ ! -d "$OUTDIR/rep$i/fitDistr/" ]; then
+                mkdir $OUTDIR/rep$i/fitDistr/
+            fi
+            
+            ## check if block group files already exist
+            COUNT=$(for file in $(ls $OUTDIR/parallel/rep$i/xchr*); do file=$(echo $file | perl -ane '$_=~s/.*\///g; print $_;'); if [ ! -f "$OUTDIR/rep$i/fitDistr/INPUT.BG$file" ]; then echo $file; fi done | wc -l)
 
-        if [ "$COUNT" -gt 0 ]; then
-            ls $OUTDIR/parallel/rep$i/x* | parallel --no-notice -j $PARALLEL 'reads2bg -i {} -c '$MINCLUSTERHEIGHT' -e '$MINBLOCKHEIGHT' -x '$DISTANCE' -s '$SCALE' -g '$BLOCKHEIGHT' > '$OUTDIR'/rep'$i'/fitDistr/INPUT.BG{/.}'
+            if [ "$COUNT" -gt 0 ]; then
+                ls $OUTDIR/parallel/rep$i/x* | parallel --no-notice -j $PARALLEL 'reads2bg -i {} -c '$MINCLUSTERHEIGHT' -e '$MINBLOCKHEIGHT' -x '$DISTANCE' -s '$SCALE' -g '$BLOCKHEIGHT' > '$OUTDIR'/rep'$i'/fitDistr/INPUT.BG{/.}'
+            fi
+            cat $OUTDIR/rep$i/fitDistr/INPUT.BGx* > $OUTDIR/rep$i/fitDistr/INPUT.BG
         fi
     done
     echo "done"
@@ -386,7 +389,6 @@ else
     echo -n "Merge all block groups files into one, and predict peaks (`date`).. "
     for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
         ID=$(echo ${BEDFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;')
-        cat $OUTDIR/rep$i/fitDistr/INPUT.BGx* > $OUTDIR/rep$i/fitDistr/INPUT.BG
         bg2peaks -i $OUTDIR/rep$i/fitDistr/INPUT.BG -o $OUTDIR/rep$i/fitDistr -p $PVALUE -d $DISTRIBUTION -w $MERGEDISTANCE > $OUTDIR/rep$i/$ID.peaks
 
         PEAKFILEs="$PEAKFILEs,$OUTDIR/rep$i/$ID.peaks"
@@ -488,13 +490,15 @@ echo "done"
 
 ## merge peaks into broad peaks, if required
 if [ ! -z "$BROAD" ]; then
-    mkdir $OUTDIR/peaks_broad
-    echo "merge peaks into broad peaks (`date`).. "
-    bed2merge -i $OUTDIR/PEAKS.BED -j $BAMFILEs -o $OUTDIR/peaks_broad/peaks.merged -x $DISTRIBUTION -d $MERGEDISTANCE -g $GENOME    
-    echo "done"
+    #if [ ! -s "$OUTDIR/peaks_broad/peaks.merged" ]; then
+        mkdir $OUTDIR/peaks_broad
+        echo "merge peaks into broad peaks (`date`).. "
+        bed2merge -i $OUTDIR/PEAKS.BED -j $BAMFILEs -o $OUTDIR/peaks_broad/peaks.merged -x $DISTRIBUTION -d $MERGEDISTANCE -g $GENOME
+        echo "done"
+    #fi
 
     echo -n "Remove broad peaks overlapping with blacklisted regions (`date`).. "
-    intersectBed -a $OUTDIR/peaks_broad/peaks.merged -b $GENOME_BLACKLIST -v > $OUTDIR/BROADPEAKS.BED
+    intersectBed -a $OUTDIR/peaks_broad/peaks.merged -b $GENOME_BLACKLIST -v | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]\t$F[3]\t.\tY\n";' > $OUTDIR/BROADPEAKS.BED
     echo "done"
 
     echo -n "Compute normalized peak scores (`date`).. "
