@@ -488,26 +488,6 @@ if [ ! -z "$CONTROLFILEs" ]; then
 fi
 echo "done"
 
-## merge peaks into broad peaks, if required
-if [ ! -z "$BROAD" ]; then
-    #if [ ! -s "$OUTDIR/peaks_broad/peaks.merged" ]; then
-        mkdir $OUTDIR/peaks_broad
-        echo "merge peaks into broad peaks (`date`).. "
-        bed2merge -i $OUTDIR/PEAKS.BED -j $BAMFILEs -o $OUTDIR/peaks_broad/peaks.merged -x $DISTRIBUTION -d $MERGEDISTANCE -g $GENOME
-        echo "done"
-    #fi
-
-    echo -n "Remove broad peaks overlapping with blacklisted regions (`date`).. "
-    intersectBed -a $OUTDIR/peaks_broad/peaks.merged -b $GENOME_BLACKLIST -v | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]\t$F[3]\t.\tY\n";' > $OUTDIR/BROADPEAKS.BED
-    echo "done"
-
-    echo -n "Compute normalized peak scores (`date`).. "
-    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    Rscript $FINDNFRPATH/share/R/score2normalize.R -i $OUTDIR/BROADPEAKS.BED > $TMP
-    mv $TMP $OUTDIR/BROADPEAKS.BED
-    echo "done"
-fi
-
 echo -n "Remove peaks overlapping with blacklisted regions (`date`).. "
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 intersectBed -a $OUTDIR/PEAKS.BED -b $GENOME_BLACKLIST -v > $TMP
@@ -526,6 +506,26 @@ Rscript $FINDNFRPATH/share/R/score2normalize.R -i $OUTDIR/ALLPEAKS.BED > $TMP
 mv $TMP $OUTDIR/ALLPEAKS.BED
 echo "done"
 
+## merge peaks into broad peaks, if required
+if [ ! -z "$BROAD" ]; then
+    if [ ! -s "$OUTDIR/peaks_broad/peaks.merged" ]; then
+        mkdir $OUTDIR/peaks_broad
+        echo "merge peaks into broad peaks (`date`).. "
+        bed2merge -i $OUTDIR/PEAKS.BED -j $BAMFILEs -o $OUTDIR/peaks_broad/peaks.merged -x $DISTRIBUTION -d $MERGEDISTANCE -g $GENOME
+        echo "done"
+    fi
+
+    echo -n "Remove broad peaks overlapping with blacklisted regions (`date`).. "
+    intersectBed -a $OUTDIR/peaks_broad/peaks.merged -b $GENOME_BLACKLIST -v | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]\t$F[3]\t.\tY\n";' > $OUTDIR/BROADPEAKS.BED
+    echo "done"
+
+    echo -n "Compute normalized peak scores (`date`).. "
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    Rscript $FINDNFRPATH/share/R/score2normalize.R -i $OUTDIR/BROADPEAKS.BED > $TMP
+    mv $TMP $OUTDIR/BROADPEAKS.BED
+    echo "done"
+fi
+
 echo -n "Convert input bam to bigWig format to visualize in UCSC browser (`date`).. "
 for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
     ID=$(echo ${BAMFILEa[$i]} | perl -ane '$_=~s/\.bam.*//g; print $_;');
@@ -538,6 +538,8 @@ done
 wait
 
 cut -f 1-6 $OUTDIR/PEAKS.BED | grep -v chrMT > $OUTDIR/PEAKS.BED.UCSC
+cut -f 1-6 $OUTDIR/ALLPEAKS.BED | grep -v chrMT > $OUTDIR/ALLPEAKS.BED.UCSC
+cut -f 1-6 $OUTDIR/BROADPEAKS.BED | grep -v chrMT > $OUTDIR/BROADPEAKS.BED.UCSC
 echo "done"
 
 echo -n "Delete copied input BAM files (`date`).. "
