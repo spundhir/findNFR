@@ -3,7 +3,7 @@
 
 PVALUE=0.05
 DISTRIBUTION="pois"
-DISTANCE_PEAKS=0
+DISTANCE_PEAKS=20
 
 #### usage ####
 usage() {
@@ -18,20 +18,24 @@ usage() {
     echo "[OPTIONS]"
     echo " -p <float>  [pvalue for read enrichment (default: 0.05)]"
     echo " -d <string> [distribution to use for data fit (pois or nbinom) (default: pois)]"
-    echo " -w <int>    [merge blocks (peaks) separated by given distance (default: 0)]"
+    echo " -w <int>    [merge blocks (peaks) separated by given distance (default: 20)]"
+    echo " -a          [merging: all block groups; output: all peaks (default: merging and output: only statistically significant)]"
+    echo " -b          [merging: all block groups; output: only significant (default: merging output: only statistically significant)]"
     echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:p:d:w:h ARG; do
+while getopts i:o:p:d:w:abh ARG; do
 	case "$ARG" in
 		i) INPUTFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         p) PVALUE=$OPTARG;;
         d) DISTRIBUTION=$OPTARG;;
         w) DISTANCE_PEAKS=$OPTARG;;
+        a) ALL=1;;
+        b) MERGE_ALL=1;;
 		h) HELP=1;;
 	esac
 done
@@ -60,22 +64,18 @@ if [ ! -f "$OUTDIR/INPUT.BG.P_VALUE" ]; then
     cat $INPUTFILE | perl -ane 'print "$F[4]\t$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[5]\n";' | $FINDNFRPATH/share/R/fitDistr.R -i stdin -o $OUTDIR/INPUT.BG.P_VALUE -d $DISTRIBUTION 2>&1 >/dev/null
 fi
 
+## filter out significant block groups
+if [ ! -z "$ALL" ]; then
+    cat $OUTDIR/INPUT.BG.P_VALUE | perl -ane '$sig="N"; if($F[6]<'$PVALUE') { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS
+elif [ ! -z "$MERGE_ALL" ]; then
+    cat $OUTDIR/INPUT.BG.P_VALUE | perl -ane '$sig="N"; if($F[6]<'$PVALUE') { $sig="Y"; } print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\t$sig\n";' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS | perl -ane 'if($F[6]=~/Y/) { print $_; }'
+else
+    cat $OUTDIR/INPUT.BG.P_VALUE | perl -ane 'if($F[6]<'$PVALUE') { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\tY\n"; }' | sortBed -i stdin | bedtools merge -c 4,5,6,7 -o distinct,sum,distinct,distinct -d $DISTANCE_PEAKS
+fi
+
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
     rm $TMP
 fi
-
-## create final output containing both significant (Y) and non-significant peaks (N)
-TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-
-cat $OUTDIR/INPUT.BG.P_VALUE | perl -ane 'if($F[6]<'$PVALUE') { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\t$F[6]\tY\n"; }' | sortBed -i stdin | bedtools merge -c 4,5,6,7,8 -o distinct,sum,distinct,mean,distinct -d $DISTANCE_PEAKS > $OUTDIR/$TMP.sig
-
-cat $OUTDIR/INPUT.BG.P_VALUE | perl -ane 'if($F[6]>='$PVALUE') { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[0]\t.\t$F[6]\tN\n"; }' | sortBed -i stdin | bedtools merge -c 4,5,6,7,8 -o distinct,sum,distinct,mean,distinct -d $DISTANCE_PEAKS > $OUTDIR/$TMP.nonsig
-
-cat $OUTDIR/$TMP.sig <(intersectBed -a $OUTDIR/$TMP.nonsig -b $OUTDIR/$TMP.sig -v)
-
-## remove temporary file
-rm $OUTDIR/$TMP.sig
-rm $OUTDIR/$TMP.nonsig
 
 exit

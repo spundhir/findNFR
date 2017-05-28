@@ -1,14 +1,11 @@
 #!/bin/bash
 #PBS -l nodes=1:ppn=4
 
-PVALUE=0.05
-DISTRIBUTION="pois"
 MINCLUSTERHEIGHT=2
 MINBLOCKHEIGHT=2
 DISTANCE=70
 SCALE="0.6"
 BLOCKHEIGHT="abs"
-DISTANCE_PEAKS=0
 
 #### usage ####
 usage() {
@@ -16,47 +13,37 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: reads2peaks -i <file> -o <dir>"
+	echo "Usage: reads2peaks -i <file>"
 	echo "Options:"
 	echo " -i <file>   [input file containing mapped reads in BED format (can be stdin)]"
-    echo " -o <dir>    [output directory to keep fitDistr.R results]"
     echo "[OPTIONS]"
-    echo " -p <float>  [pvalue for read enrichment (default: 0.05)]"
-    echo " -d <string> [distribution to use for data fit (pois or nbinom) (default: pois)]"
     echo " -c <int>    [minimum number of read in the block group (default: 2)]"
     echo " -e <int>    [minimum number of read in the block (default: 2)]"
     echo " -x <int>    [maximum distance between the blocks (default: 70)]"
     echo " -s <float>  [scale to define blocks (default: 0.6)]"
     echo " -g <int>    [block height (abs or rel) (default: abs)]"
-    echo " -w <int>    [merge blocks (peaks) separated by given distance (default: 0)]"
-    echo " -a          [output all peaks (default: only statistically significant)]"
-    echo " -b          [use all peaks merging (default: only statistically significant)]"
     echo " -h          [help]"
+    echo "[NOTE]"
+    echo " [output format: chr start end name read_count strand]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:p:d:c:e:x:s:g:w:abh ARG; do
+while getopts i:c:e:x:s:g:h ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
-        o) OUTDIR=$OPTARG;;
-        p) PVALUE=$OPTARG;;
-        d) DISTRIBUTION=$OPTARG;;
         c) MINCLUSTERHEIGHT=$OPTARG;;
         e) MINBLOCKHEIGHT=$OPTARG;;
         x) DISTANCE=$OPTARG;;
         s) SCALE=$OPTARG;;
         g) BLOCKHEIGHT=$OPTARG;;
-        w) DISTANCE_PEAKS=$OPTARG;;
-        a) ALL=1;;
-        b) MERGE_ALL=1;;
 		h) HELP=1;;
 	esac
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ -z "$INPUTBEDFILE" -o -z "$OUTDIR" -o "$HELP" ]; then
+if [ -z "$INPUTBEDFILE" -o "$HELP" ]; then
 	usage
 fi
 
@@ -69,27 +56,13 @@ if [ "$INPUTBEDFILE" == "stdin" ]; then
     INPUTBEDFILE=$TMP
 fi
 
-## create output directory, if it does not exist
-if [ ! -d "$OUTDIR" ]; then
-    mkdir -p $OUTDIR
-fi
-
 ## define block groups
-if [ ! -f "$OUTDIR/INPUT.BG" ]; then
-    reads2bg -i $INPUTBEDFILE -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT > $OUTDIR/INPUT.BG
-fi
-
-## define peaks
-if [ ! -z "$ALL" ]; then
-    bg2peaks -i $OUTDIR/INPUT.BG -o $OUTDIR -p $PVALUE -d $DISTRIBUTION -w $DISTANCE_PEAKS -a
-elif [ ! -z "$MERGE_ALL" ]; then
-    bg2peaks -i $OUTDIR/INPUT.BG -o $OUTDIR -p $PVALUE -d $DISTRIBUTION -w $DISTANCE_PEAKS -b
-else
-    bg2peaks -i $OUTDIR/INPUT.BG -o $OUTDIR -p $PVALUE -d $DISTRIBUTION -w $DISTANCE_PEAKS
-fi
+#echo "blockbuster.x -minClusterHeight $MINCLUSTERHEIGHT -minBlockHeight $MINBLOCKHEIGHT -distance $DISTANCE -scale $SCALE -blockHeight $BLOCKHEIGHT -print 1 $INPUTBEDFILE | perl -ane 'if(\$_=~/^>/) { \$id=\"\$F[1]:\$F[2]-\$F[3]\"; } else { print \"\$F[5]\\t\$F[1]\\t\$F[2]\\t\$F[3]\\t\$id\\n\"; }'"; exit;
+blockbuster.x -minClusterHeight $MINCLUSTERHEIGHT -minBlockHeight $MINBLOCKHEIGHT -distance $DISTANCE -scale $SCALE -blockHeight $BLOCKHEIGHT -print 1 $INPUTBEDFILE | perl -ane 'if($_=~/^>/) { $id="$F[1]:$F[2]-$F[3]"; } else { print "$F[1]\t$F[2]\t$F[3]\t$id\t$F[5]\t$F[4]\n"; }' | sortBed -i stdin | bedtools merge -c 5 -o sum -d 0
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
     rm $TMP
 fi
+
 exit

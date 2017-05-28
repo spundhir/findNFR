@@ -31,7 +31,7 @@ usage() {
 	echo "Usage: bed2merge -i <file> -j <file> -o <file>"
 	echo "Options:"
 	echo " -i <file>   [input file containing genomic coordinate in BED format (can be stdin)]"
-    echo "             [format: chr start end name score strand]"
+    echo "             [format: chr start end name score strand p-value]"
     echo " -j <file>   [input BAM file(s) to measure signal]"
     echo "             [if multiple, please separate them by a comma]"
     echo " -o <file>   [output file]"
@@ -75,9 +75,9 @@ fi
 
 ## check, if input file is in right format
 NCOL=$(zless $INPUTBEDFILE | head -n 1 | perl -ane 'print scalar(@F);');
-if [ "$NCOL" -lt 6 ]; then
+if [ "$NCOL" -lt 7 ]; then
     echo
-    echo "$INPUTBEDFILE should be in format - chr start end name score strand"
+    echo "$INPUTBEDFILE should be in format - chr start end name score strand p-value"
     echo
     usage
 fi
@@ -113,7 +113,8 @@ if [ -z "$PVALUE" ]; then
 fi
 
 ## merge peaks flanked by regions having signal below p-value threshold
-cat <(cut -f 1-3,5 $INPUTBEDFILE) <(cat $OUTFILE.gaps | perl -ane 'if($F[5]<'$PVALUE') { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\n"; }') | sortBed -i stdin | bedtools merge -c 4 -o sum -d $DISTANCE > $OUTFILE
+#cat <(cut -f 1-3,5,7 $INPUTBEDFILE) <(cat $OUTFILE.gaps | perl -ane 'if($F[5]<'$PVALUE') { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }') | sortBed -i stdin | bedtools merge -c 4,5 -o sum,mean -d $DISTANCE | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]\t$F[3]\t.\t$F[4]\n";'> $OUTFILE
+cat <(cut -f 1-3,5,7 $INPUTBEDFILE) <(cat $OUTFILE.gaps | perl -ane 'if($F[5]<'$PVALUE') { print "$F[1]\t$F[2]\t$F[3]\t$F[4]\tNA\n"; }') | sortBed -i stdin | bedtools merge -c 4,5 -o sum,collapse -d $DISTANCE | perl -ane '$F[4]=~s/NA[\,]*//g; @pVal=split(/\,/,$F[4]); $sum=0; foreach(@pVal) { $sum+=$_; } $pVal=sprintf("%0.10f", $sum/scalar(@pVal)); print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]\t$F[3]\t.\t$pVal\n";' > $OUTFILE
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
