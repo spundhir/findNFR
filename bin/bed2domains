@@ -1,0 +1,115 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+bed2domains: determine domains of H3K27me3 and H3K36me3 enriched regions
+Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+DISTRIBUTION="nbinom"
+GENOME="mm9"
+APPROACH=1
+
+#### usage ####
+usage() {
+	echo Program: "bed2domains (determine domains of H3K27me3 and H3K36me3 enriched regions)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2domains -i <file> -j <file> -k <file> -l <file> -o <dir>"
+	echo "Options:"
+	echo " -i <file>   [input file containing H3K27me3 enriched regions in BED format]"
+	echo " -j <file>   [input file containing H3K36me3 enriched regions in BED format]"
+    echo " -k <file>   [input H3K27me3 BAM file(s)]"
+    echo "             [if multiple, please separate them by a comma]"
+    echo " -l <file>   [input H3K36me3 BAM file(s)]"
+    echo "             [if multiple, please separate them by a comma]"
+    echo " -o <dir>   [output directory]"
+    echo "[OPTIONS]"
+    echo " -x <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:k:l:o:x:g:h ARG; do
+	case "$ARG" in
+		i) BEDFILE_K27ME3=$OPTARG;;
+		j) BEDFILE_K36ME3=$OPTARG;;
+		k) BAMFILE_K27ME3=$OPTARG;;
+		l) BAMFILE_K36ME3=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        x) DISTRIBUTION=$OPTARG;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ ! -f "$BEDFILE_K27ME3" -o ! -f "$BEDFILE_K36ME3" -o -z "$BAMFILE_K27ME3" -o -z "$BAMFILE_K36ME3" -o -z "$OUTDIR" -o "$HELP" ]; then
+	usage
+fi
+
+## create output directory, if it do not exist
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+
+## compute h3k27me3 signal in gaps
+if [ ! -s "$OUTDIR/gaps.signal.h3k27me3" ]; then
+    sortBed -i $BEDFILE_K27ME3 | perl -ane 'if(defined($gap_start) && $gap_chr=~/^$F[0]$/) { print "$F[0]\t$gap_start\t$F[1]\t1\tgap\t0\t0\n"; $gap_start=$F[2]; $gap_chr=$F[0]; } else { $gap_start=$F[2]; $gap_chr=$F[0]; } print $_;' | grep gap | cut -f 1-3 | bedtools makewindows -b stdin -w 10000 | bed2window -i stdin -w 5000 | bed2expr -i stdin -j $BAMFILE_K27ME3 -g mm9 | perl -ane '$sum=0; foreach(@F[3..scalar(@F)-1]) { $sum+=$_; } chomp($_); print "$sum\t$_\n";' | ~/software/myScripts/findNFR/share/R/fitDistr.R -i stdin -o $OUTDIR/gaps.signal.h3k27me3 -d $DISTRIBUTION 2>&1>/dev/null
+fi
+
+## compute h3k36me3 signal in gaps
+if [ ! -s "$OUTDIR/gaps.signal.h3k36me3" ]; then
+    sortBed -i $BEDFILE_K36ME3 | perl -ane 'if(defined($gap_start) && $gap_chr=~/^$F[0]$/) { print "$F[0]\t$gap_start\t$F[1]\t1\tgap\t0\t0\n"; $gap_start=$F[2]; $gap_chr=$F[0]; } else { $gap_start=$F[2]; $gap_chr=$F[0]; } print $_;' | grep gap | cut -f 1-3 | bedtools makewindows -b stdin -w 10000 | bed2window -i stdin -w 5000 | bed2expr -i stdin -j $BAMFILE_K36ME3 -g mm9 | perl -ane '$sum=0; foreach(@F[3..scalar(@F)-1]) { $sum+=$_; } chomp($_); print "$sum\t$_\n";' | ~/software/myScripts/findNFR/share/R/fitDistr.R -i stdin -o $OUTDIR/gaps.signal.h3k36me3 -d $DISTRIBUTION 2>&1>/dev/null
+fi
+
+## define h3k27me3 domains
+PVALUE_H3K27ME3=$($FINDNFRPATH/share/R/findDomainThreshold.R -i $OUTDIR/gaps.signal.h3k27me3)
+cat <(cat $BEDFILE_K27ME3 | perl -ane 'chomp($_); print "$F[0]\t$F[1]\t$F[2]\th3k27me3\n";') <(cat $OUTDIR/gaps.signal.h3k27me3 | perl -ane 'if($F[5]<'$PVALUE_H3K27ME3') { print "$F[1]\t$F[2]\t$F[3]\th3k27me3_gaps\n"; }') | sortBed -i stdin | mergeBed -c 2,3,4 -o collapse -d 0 | perl -ane '@start=split(/\,/,$F[3]); @end=split(/\,/,$F[4]); @chromatin=split(/\,/,$F[5]); $start=0; for($i=$start; $i<scalar(@chromatin); $i++) { if($chromatin[$i]!~/gaps/) { $start=$i; last; } } $end=scalar(@chromatin)-1; for($i=$end; $i>=0; $i--) { if($chromatin[$i]!~/gaps/) { $end=$i; last; } } chomp($_); print "$F[0]\t$start[$start]\t$end[$end]\t$F[3]\t$F[4]\t$F[5]\n";' | perl -ane 'if($F[5]=~/h3k27me3,(h3k27me3_gaps\,)+h3k27me3[^\_]+/) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]-H3K27me3\t0\t.\t$F[1]\t$F[2]\t0,0,255\n"; }' > $OUTDIR/domains.esc.h3k27me3
+
+## define h3k36me3 domains
+PVALUE_H3K36ME3=$($FINDNFRPATH/share/R/findDomainThreshold.R -i $OUTDIR/gaps.signal.h3k36me3)
+cat <(cat $BEDFILE_K36ME3 | perl -ane 'chomp($_); print "$F[0]\t$F[1]\t$F[2]\th3k36me3\n";') <(cat $OUTDIR/gaps.signal.h3k36me3 | perl -ane 'if($F[5]<'$PVALUE_H3K36ME3') { print "$F[1]\t$F[2]\t$F[3]\th3k36me3_gaps\n"; }') | sortBed -i stdin | mergeBed -c 2,3,4 -o collapse -d 0 | perl -ane '@start=split(/\,/,$F[3]); @end=split(/\,/,$F[4]); @chromatin=split(/\,/,$F[5]); $start=0; for($i=$start; $i<scalar(@chromatin); $i++) { if($chromatin[$i]!~/gaps/) { $start=$i; last; } } $end=scalar(@chromatin)-1; for($i=$end; $i>=0; $i--) { if($chromatin[$i]!~/gaps/) { $end=$i; last; } } chomp($_); print "$F[0]\t$start[$start]\t$end[$end]\t$F[3]\t$F[4]\t$F[5]\n";' | perl -ane 'if($F[5]=~/h3k36me3,(h3k36me3_gaps\,)+h3k36me3[^\_]+/) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]-H3K36me3\t0\t.\t$F[1]\t$F[2]\t0,0,255\n"; }' > $OUTDIR/domains.esc.h3k36me3
+
+## concatenate both h3k27me3 and h3k36me3 domains in one file
+cat $OUTDIR/domains.esc.h3k27me3 $OUTDIR/domains.esc.h3k36me3 | sortBed -i stdin > $OUTDIR/domains.esc
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP;
+fi
+
+exit
+
+## APPROACH 2
+<<"COMMENT"
+multiIntersectBed -i <(sortBed -i esc/h3k27me3_peaks/BROADPEAKS.BED) <(sortBed -i esc/h3k36me3_peaks/BROADPEAKS.BED) -names h3k27me3 h3k36me3 | perl -ane 'if(defined($gap_start) && $gap_chr=~/^$F[0]$/) { print "$F[0]\t$gap_start\t$F[1]\t1\tgap\t0\t0\n"; $gap_start=$F[2]; $gap_chr=$F[0]; } else { $gap_start=$F[2]; $gap_chr=$F[0]; } print $_;' > histone_and_gaps.bed
+
+cat histone_and_gaps.bed | grep 'gap\|h3k27me3,h3k36me3' | bedtools makewindows -b stdin -w 10000 | bed2window -i stdin -w 5000 | bed2expr -i stdin -j /home/pundhir/project/chip-seq-analysis/data/histone_marks/mouse/plath/h3k27me3_esc_Rep1.bam,/home/pundhir/project/chip-seq-analysis/data/histone_marks/mouse/plath/h3k36me3_esc_Rep1.bam -g mm9 > gaps.signal  
+
+cat gaps.signal | perl -ane 'chomp($_); print "$F[3]\t$_\n";' | ~/software/myScripts/findNFR/share/R/fitDistr.R -i stdin -o gaps.signal.h3k27me3 -d nbinom
+
+cat gaps.signal | perl -ane 'chomp($_); print "$F[4]\t$_\n";' | ~/software/myScripts/findNFR/share/R/fitDistr.R -i stdin -o gaps.signal.h3k36me3 -d nbinom
+
+cat <(cat histone_and_gaps.bed | grep -v 'gap\|h3k27me3,h3k36me3' | grep -w h3k36me3 | cut -f 1-3,5) <(paste <(cut -f 2,3,4,5,7 gaps.signal.h3k27me3 | sortBed -i stdin) <(cut -f 2,3,4,6,7 gaps.signal.h3k36me3 | sortBed -i stdin) | perl -ane 'chomp($_); if($F[4]<0.3 && $F[4]<$F[9]) { print "$_\th3k27me3_gaps\n"; } elsif($F[4]>$F[9] && $F[9]<0.3) { print "$_\th3k36me3_gaps\n"; } else { print "$_\tnone\n"; }' | grep -w h3k36me3_gaps | cut -f 1-3,11) | sortBed -i stdin | mergeBed -c 2,3,4 -o collapse -d 0 | perl -ane '@start=split(/\,/,$F[3]); @end=split(/\,/,$F[4]); @chromatin=split(/\,/,$F[5]); $start=0; for($i=$start; $i<scalar(@chromatin); $i++) { if($chromatin[$i]!~/gaps/) { $start=$i; last; } } $end=scalar(@chromatin)-1; for($i=$end; $i>=0; $i--) { if($chromatin[$i]!~/gaps/) { $end=$i; last; } } chomp($_); print "$F[0]\t$start[$start]\t$end[$end]\t$F[3]\t$F[4]\t$F[5]\n";' | perl -ane 'if($F[5]=~/h3k36me3,(h3k36me3_gaps\,)+h3k36me3[^\_]+/) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]-H3K36me3\t0\t.\t$F[1]\t$F[2]\t255,0,0\n"; }' > domains.esc.h3k36me3
+
+cat <(cat histone_and_gaps.bed | grep -v 'gap\|h3k27me3,h3k36me3' | grep -w h3k27me3 | cut -f 1-3,5) <(paste <(cut -f 2,3,4,5,7 gaps.signal.h3k27me3 | sortBed -i stdin) <(cut -f 2,3,4,6,7 gaps.signal.h3k36me3 | sortBed -i stdin) | perl -ane 'chomp($_); if($F[4]<0.3 && $F[4]<$F[9]) { print "$_\th3k27me3_gaps\n"; } elsif($F[4]>$F[9] && $F[9]<0.3) { print "$_\th3k36me3_gaps\n"; } else { print "$_\tnone\n"; }' | grep -w h3k27me3_gaps | cut -f 1-3,11) | sortBed -i stdin | mergeBed -c 2,3,4 -o collapse -d 0 | perl -ane '@start=split(/\,/,$F[3]); @end=split(/\,/,$F[4]); @chromatin=split(/\,/,$F[5]); $start=0; for($i=$start; $i<scalar(@chromatin); $i++) { if($chromatin[$i]!~/gaps/) { $start=$i; last; } } $end=scalar(@chromatin)-1; for($i=$end; $i>=0; $i--) { if($chromatin[$i]!~/gaps/) { $end=$i; last; } } chomp($_); print "$F[0]\t$start[$start]\t$end[$end]\t$F[3]\t$F[4]\t$F[5]\n";' | perl -ane 'if($F[5]=~/h3k27me3,(h3k27me3_gaps\,)+h3k27me3[^\_]+/) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$F[1]-$F[2]-H3K27me3\t0\t.\t$F[1]\t$F[2]\t0,0,255\n"; }' > domains.esc.h3k27me3
+
+cat domains.esc.h3k36me3 domains.esc.h3k27me3 | sortBed -i stdin > domains.esc
+COMMENT

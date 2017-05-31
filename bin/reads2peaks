@@ -29,15 +29,13 @@ usage() {
     echo " -s <float>  [scale to define blocks (default: 0.6)]"
     echo " -g <int>    [block height (abs or rel) (default: abs)]"
     echo " -w <int>    [merge blocks (peaks) separated by given distance (default: 0)]"
-    echo " -a          [output all peaks (default: only statistically significant)]"
-    echo " -b          [use all peaks merging (default: only statistically significant)]"
     echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:p:d:c:e:x:s:g:w:abh ARG; do
+while getopts i:o:p:d:c:e:x:s:g:w:h ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -49,8 +47,6 @@ while getopts i:o:p:d:c:e:x:s:g:w:abh ARG; do
         s) SCALE=$OPTARG;;
         g) BLOCKHEIGHT=$OPTARG;;
         w) DISTANCE_PEAKS=$OPTARG;;
-        a) ALL=1;;
-        b) MERGE_ALL=1;;
 		h) HELP=1;;
 	esac
 done
@@ -80,13 +76,7 @@ if [ ! -f "$OUTDIR/INPUT.BG" ]; then
 fi
 
 ## define peaks
-if [ ! -z "$ALL" ]; then
-    bg2peaks -i $OUTDIR/INPUT.BG -o $OUTDIR -p $PVALUE -d $DISTRIBUTION -w $DISTANCE_PEAKS -a
-elif [ ! -z "$MERGE_ALL" ]; then
-    bg2peaks -i $OUTDIR/INPUT.BG -o $OUTDIR -p $PVALUE -d $DISTRIBUTION -w $DISTANCE_PEAKS -b
-else
-    bg2peaks -i $OUTDIR/INPUT.BG -o $OUTDIR -p $PVALUE -d $DISTRIBUTION -w $DISTANCE_PEAKS
-fi
+bg2peaks -i $OUTDIR/INPUT.BG -o $OUTDIR -p $PVALUE -d $DISTRIBUTION -w $DISTANCE_PEAKS
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then

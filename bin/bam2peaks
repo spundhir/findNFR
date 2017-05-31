@@ -495,9 +495,11 @@ if [ ! -z "$BROAD" ]; then
         echo "done"
     fi
 
-    echo -n "Remove broad peaks overlapping with blacklisted regions (`date`).. "
-    intersectBed -a $OUTDIR/peaks_broad/peaks.merged -b $GENOME_BLACKLIST -v > $OUTDIR/BROADPEAKS.BED
-    echo "done"
+    ## DON'T DO THAT: some broad peaks are lost just because they overlap only marginally with a blacklisted region
+    #echo -n "Remove broad peaks overlapping with blacklisted regions (`date`).. "
+    #intersectBed -a $OUTDIR/peaks_broad/peaks.merged -b $GENOME_BLACKLIST -v > $OUTDIR/BROADPEAKS.BED
+    #echo "done"
+    scp $OUTDIR/peaks_broad/peaks.merged $OUTDIR/BROADPEAKS.BED
 
     echo -n "Compute normalized peak scores (`date`).. "
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
