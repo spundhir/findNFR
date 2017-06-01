@@ -203,6 +203,9 @@ echo -n "Compute histone peaks overlapping and proximal to genes (`date`).. "
 OVERLAPFILE=""
 PROXIMALFILE=""
 while read LINE; do
+    TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/) { print "1"; } else { print "0" }')
+    [ "$TPM" -eq "1" ] && continue;
+
     ID=$(echo $LINE | perl -ane 'print "$F[0]"')
     #if [ ! -s "$OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED" ]; then
         intersectBed -a $OUTDIR/GENES_PROMOTER.BED -b $OUTDIR/peaks/$ID/PEAKS.BED -wao | intersectBed2uniq -i stdin -c 12,16,17 -o sum -n 7 > $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED
