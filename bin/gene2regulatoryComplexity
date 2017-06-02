@@ -199,6 +199,7 @@ else
 fi
 echo "done"
 
+exit
 echo -n "Compute histone peaks overlapping and proximal to genes (`date`).. "
 OVERLAPFILE=""
 PROXIMALFILE=""
