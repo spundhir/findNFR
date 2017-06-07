@@ -51,7 +51,7 @@ usage() {
     echo " -m <string> [genome (default: mm9)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
     echo " -k <file>   [IgG control file in BAM format]"
-    echo " -n <int>    [assign peak to a gene, if within this distance to promoter (default: 500)]"
+    echo " -n <int>    [assign peak to a gene, if within this distance to TSS (default: 500)]"
     echo "[OPTIONS: bam2peaks]"
     echo " -c <int>    [minimum number of read in the block group (default: 2)]"
     echo " -e <int>    [minimum number of read in the block (default: 2)]"
@@ -166,18 +166,20 @@ if [ ! -s "$OUTDIR/PEAKS.BED" ]; then
     echo
     exit
 else
-    closestBed -a <(sortBed -i $OUTDIR/PEAKS.BED) -b <(sortBed -i $OUTDIR/PEAKS.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F[14])/2; print "$mean\t$F[20]\n";' | sort -k 2n,2 > $OUTDIR/merge_distance/PEAKS.BED.DIST
+    NCOL=$(head -n 1 $OUTDIR/PEAKS.BED | perl -ane 'print scalar(@F);')
+    closestBed -a <(sortBed -i $OUTDIR/PEAKS.BED) -b <(sortBed -i $OUTDIR/PEAKS.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/merge_distance/PEAKS.BED.DIST
 
     bed2shuffle -i $OUTDIR/PEAKS.BED -g $GENOME > $OUTDIR/merge_distance/SHUFFLE.BED
 
-    closestBed -a <(sortBed -i $OUTDIR/merge_distance/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/merge_distance/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F[14])/2; print "$mean\t$F[20]\n";' | sort -k 2n,2 > $OUTDIR/merge_distance/SHUFFLE.BED.DIST
+    closestBed -a <(sortBed -i $OUTDIR/merge_distance/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/merge_distance/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/merge_distance/SHUFFLE.BED.DIST
 
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     cut -f 2 $OUTDIR/merge_distance/PEAKS.BED.DIST > $OUTDIR/merge_distance/PEAKS.BED.DIST.$TMP
     cut -f 2 $OUTDIR/merge_distance/SHUFFLE.BED.DIST > $OUTDIR/merge_distance/SHUFFLE.BED.DIST.$TMP
     DISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/merge_distance/PEAKS.BED.DIST.$TMP -j $OUTDIR/merge_distance/SHUFFLE.BED.DIST.$TMP -m median)
-    rm $OUTDIR/merge_distance/PEAKS.BED.DIST.$TMP
-    rm $OUTDIR/merge_distance/SHUFFLE.BED.DIST.$TMP
+    echo $DISTANCE
+    #rm $OUTDIR/merge_distance/PEAKS.BED.DIST.$TMP
+    #rm $OUTDIR/merge_distance/SHUFFLE.BED.DIST.$TMP
   
     if [ "$DISTANCE" -gt 1000 ]; then
         DISTANCE=1000
@@ -187,10 +189,10 @@ else
 
     zless $GENEFILE | bed2window -i stdin -w 0 -t | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/merge_distance/GENES_TSS.BED
 
-    closestBed -a <(sortBed -i $OUTDIR/merge_distance/GENES_TSS.BED) -b $OUTDIR/merge_distance/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-1000; $end=$F[8]+1000; $defined="Y"; } else { $start=$F[1]-1000; $end=$F[1]+1000; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";' > $OUTDIR/merge_distance/GENES_PROMOTER.BED
+    closestBed -a <(sortBed -i $OUTDIR/merge_distance/GENES_TSS.BED) -b $OUTDIR/merge_distance/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";' > $OUTDIR/merge_distance/GENES_PROMOTER.BED
 
     #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    #cat <(grep -w Y $OUTDIR/merge_distance/GENES_PROMOTER.BED) <(closestBed -a <(grep -vw Y $OUTDIR/merge_distance/GENES_PROMOTER.BED | bed2window -i stdin -w 0 | cut -f 1-6) -b <(cat $OUTDIR/ALLPEAKS.BED | perl -ane 'if($F[6]<0.2) { print $_; }' | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-1000; $end=$F[8]+1000; $defined="Y1"; } else { $start=$F[1]-1000; $end=$F[1]+1000; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";') > $TMP
+    #cat <(grep -w Y $OUTDIR/merge_distance/GENES_PROMOTER.BED) <(closestBed -a <(grep -vw Y $OUTDIR/merge_distance/GENES_PROMOTER.BED | bed2window -i stdin -w 0 | cut -f 1-6) -b <(cat $OUTDIR/ALLPEAKS.BED | perl -ane 'if($F[6]<0.2) { print $_; }' | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y1"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";') > $TMP
     #mv $TMP $OUTDIR/merge_distance/GENES_PROMOTER.BED
 
     zless $OUTDIR/merge_distance/GENES_PROMOTER.BED > $OUTDIR/GENES_PROMOTER.BED

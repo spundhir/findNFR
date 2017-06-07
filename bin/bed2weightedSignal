@@ -1,0 +1,70 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+bed2weightedSignal: computed signal for input regions weighted by their distance to each other
+Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "bed2weightedSignal (computed signal for input regions weighted by their distance to each other)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2weightedSignal -i <file> -j <file> -o <dir>"
+	echo "Options:"
+	echo " -i <file>     [input file containing genomic coordinates of regions in BED format]"
+    echo "               [format: chr start end gene_name score strand (..)]"
+	echo " -j <file>     [input file containing genomic coordinates of signal in BED format]"
+    echo "               [format: chr start end name score strand (..)]"
+    echo "[OPTIONS]"
+    echo " -g <string>   [genome (default: mm9)]"
+	echo " -h            [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:h ARG; do
+	case "$ARG" in
+		i) REGIONFILE=$OPTARG;;
+		j) SIGNALFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ ! -f "$REGIONFILE" -o ! -f "$SIGNALFILE" -o "$HELP" ]; then
+	usage
+fi
+
+if [ ! -z "$OVERLAP" ]; then
+    intersectBed -a $REGIONFILE -b $SIGNALFILE -wao | intersectBed2uniq -i stdin -c 12,16,17 -o sum -n 7 > $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED
+else
+    closestBed -a <(sortBed -i $OUTDIR/peaks/$ID/PEAKS.BED) -b <(sortBed -i $OUTDIR/GENES_PROMOTER.BED) -t first -io | closestBed2uniq -i stdin -c 8,9,10 -o sum -n 7 > $OUTDIR/peaks/$ID/$TMP
+    cat $OUTDIR/GENES_PROMOTER.BED | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$OUTDIR/peaks/$ID/$TMP' -m 1`; if($match=~/^$/) { chomp($_); print "$_\t0\t0\t0\n"; } else { chomp($match); print "$match\n"; }' > $OUTDIR/peaks/$ID/PEAKS_PROXIMAL_GENES.BED
+    rm $OUTDIR/peaks/$ID/$TMP
+fi
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP;
+fi
+
+exit

@@ -62,8 +62,8 @@ usage() {
     echo " -t <float>  [FDR at which to consider a peak as significant (default: 0.05)]"
     echo " -v <int>    [merge peaks separated by input distance (default: 0)]"
     echo " -d <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
-    echo "[OPTIONS: regulatory complexity]"
-    echo " -w <int>    [window size by which to flank gene TSS (default: 1000 bp)]"
+    echo "[OPTIONS: gene2promoter]"
+    echo " -w <int>    [assign h3k4me3 peak to a gene as promoter region, if within this distance to TSS (default: 1000 bp)]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -145,6 +145,10 @@ if [ "$GENEFILE" == "stdin" ]; then
     while read LINE; do
         echo ${LINE}
     done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/$TMP
+    GENEFILE=$OUTDIR/$TMP
+else
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    zless $GENEFILE | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } print $_;' > $OUTDIR/$TMP
     GENEFILE=$OUTDIR/$TMP
 fi
 
