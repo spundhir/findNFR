@@ -191,9 +191,11 @@ echo "done"
 
 echo -n "Define gene promoter (`date`).. "
 if grep -qw h3k4me3 $CONFIGFILE; then
-    BAMFILE=$(grep -w h3k4me3 $CONFIGFILE | cut -f 2 -d " ")
-    gene2promoter -i $GENEFILE -j $BAMFILE -o $OUTDIR/peaks/h3k4me3 -n $WINDOW
-    mv $OUTDIR/peaks/h3k4me3/GENES_PROMOTER.BED $OUTDIR/GENES_PROMOTER.BED
+    if [ ! -s "$OUTDIR/GENES_PROMOTER.BED" ]; then
+        BAMFILE=$(grep -w h3k4me3 $CONFIGFILE | cut -f 2 -d " ")
+        gene2promoter -i $GENEFILE -j $BAMFILE -o $OUTDIR/peaks/h3k4me3 -n $WINDOW
+        mv $OUTDIR/peaks/h3k4me3/GENES_PROMOTER.BED $OUTDIR/GENES_PROMOTER.BED
+    fi
 else
     zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\tNA\n";' > $OUTDIR/GENES_PROMOTER.BED
 fi

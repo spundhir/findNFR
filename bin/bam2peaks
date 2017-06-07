@@ -521,7 +521,9 @@ wait
 
 cut -f 1-6 $OUTDIR/PEAKS.BED | grep -v chrMT > $OUTDIR/PEAKS.BED.UCSC
 cut -f 1-6 $OUTDIR/ALLPEAKS.BED | grep -v chrMT > $OUTDIR/ALLPEAKS.BED.UCSC
-cut -f 1-6 $OUTDIR/BROADPEAKS.BED | grep -v chrMT > $OUTDIR/BROADPEAKS.BED.UCSC
+if [ ! -z "$BROAD" ]; then
+    cut -f 1-6 $OUTDIR/BROADPEAKS.BED | grep -v chrMT > $OUTDIR/BROADPEAKS.BED.UCSC
+fi
 echo "done"
 
 echo -n "Delete copied input BAM files (`date`).. "

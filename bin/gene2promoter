@@ -189,9 +189,9 @@ else
 
     closestBed -a <(sortBed -i $OUTDIR/merge_distance/GENES_TSS.BED) -b $OUTDIR/merge_distance/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-1000; $end=$F[8]+1000; $defined="Y"; } else { $start=$F[1]-1000; $end=$F[1]+1000; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";' > $OUTDIR/merge_distance/GENES_PROMOTER.BED
 
-    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    cat <(grep -w Y $OUTDIR/merge_distance/GENES_PROMOTER.BED) <(closestBed -a <(grep -vw Y $OUTDIR/merge_distance/GENES_PROMOTER.BED | bed2window -i stdin -w 0 | cut -f 1-6) -b <(sortBed -i $OUTDIR/ALLPEAKS.BED) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-1000; $end=$F[8]+1000; $defined="Y1"; } else { $start=$F[1]-1000; $end=$F[1]+1000; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";') > $TMP
-    mv $TMP $OUTDIR/merge_distance/GENES_PROMOTER.BED
+    #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    #cat <(grep -w Y $OUTDIR/merge_distance/GENES_PROMOTER.BED) <(closestBed -a <(grep -vw Y $OUTDIR/merge_distance/GENES_PROMOTER.BED | bed2window -i stdin -w 0 | cut -f 1-6) -b <(cat $OUTDIR/ALLPEAKS.BED | perl -ane 'if($F[6]<0.2) { print $_; }' | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-1000; $end=$F[8]+1000; $defined="Y1"; } else { $start=$F[1]-1000; $end=$F[1]+1000; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";') > $TMP
+    #mv $TMP $OUTDIR/merge_distance/GENES_PROMOTER.BED
 
     zless $OUTDIR/merge_distance/GENES_PROMOTER.BED > $OUTDIR/GENES_PROMOTER.BED
 fi
