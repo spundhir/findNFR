@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 copyright_info
 
 GENOME="mm9"
+SCORE_COL=5
 
 #### usage ####
 usage() {
@@ -34,17 +35,20 @@ usage() {
     echo "               [format: chr start end name score strand (..)]"
     echo "[OPTIONS]"
     echo " -g <string>   [genome (default: mm9)]"
+    echo " -c <int>      [column containing score information of signal; -j argument (default: 5)]"
+    echo "               [if multiple, please separate them by a comma]"
 	echo " -h            [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:h ARG; do
+while getopts i:j:g:c:h ARG; do
 	case "$ARG" in
 		i) REGIONFILE=$OPTARG;;
 		j) SIGNALFILE=$OPTARG;;
         g) GENOME=$OPTARG;;
+        c) SCORE_COL=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -54,17 +58,50 @@ if [ ! -f "$REGIONFILE" -o ! -f "$SIGNALFILE" -o "$HELP" ]; then
 	usage
 fi
 
-if [ ! -z "$OVERLAP" ]; then
-    intersectBed -a $REGIONFILE -b $SIGNALFILE -wao | intersectBed2uniq -i stdin -c 12,16,17 -o sum -n 7 > $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED
+## populating files based on input genome
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+elif [ "$GENOME" == "rn5" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/rat.rn5.genome"
 else
-    closestBed -a <(sortBed -i $OUTDIR/peaks/$ID/PEAKS.BED) -b <(sortBed -i $OUTDIR/GENES_PROMOTER.BED) -t first -io | closestBed2uniq -i stdin -c 8,9,10 -o sum -n 7 > $OUTDIR/peaks/$ID/$TMP
-    cat $OUTDIR/GENES_PROMOTER.BED | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$OUTDIR/peaks/$ID/$TMP' -m 1`; if($match=~/^$/) { chomp($_); print "$_\t0\t0\t0\n"; } else { chomp($match); print "$match\n"; }' > $OUTDIR/peaks/$ID/PEAKS_PROXIMAL_GENES.BED
-    rm $OUTDIR/peaks/$ID/$TMP
+    echo "Presently the program only support analysis for mm9, hg19 or rn5"
+    echo
+    usage
+fi
+
+## determine width of the input regions
+WIDTH=$(zless $REGIONFILE | perl -ane '$max=0; if($F[2]-$F[1] > $max) { $max=$F[2]-$F[1]; } END { print $max; }')
+
+## reformat score columns based on number of fields in region file
+NCOL_REGION=$(zless $REGIONFILE | head -n 1 | perl -ane 'print scalar(@F);')
+NCOL_SIGNAL=$(zless $SIGNALFILE | head -n 1 | perl -ane 'print scalar(@F);')
+oIFS=$IFS
+IFS=","
+SCORE_COLS=($SCORE_COL)
+IFS=$oIFS
+
+## compute signal at each input region
+if [ "$WIDTH" -gt 1 ]; then
+    SCORE_COL=$((${SCORE_COLS[0]}+$NCOL_REGION))
+    for(( i=1; i<${#SCORE_COLS[@]}; i++)); do
+        SCORE_COL="$SCORE_COL,$((${SCORE_COLS[$i]}+$NCOL_REGION))"
+    done
+
+    intersectBed -a $REGIONFILE -b $SIGNALFILE -wao | intersectBed2uniq -i stdin -c $SCORE_COL -o sum -n $NCOL_REGION
+else
+    DISTANCE_COL=$(($NCOL_REGION+$NCOL_SIGNAL+1))
+    SCORE_COL="$SCORE_COL,$DISTANCE_COL"
+
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    closestBed -a <(sortBed -i $SIGNALFILE) -b <(sortBed -i $REGIONFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL -o collapse -n 7 > $TMP
+    cat $OUTDIR/GENES_PROMOTER.BED | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$TMP' -m 1`; if($match=~/^$/) { chomp($_); print "$_\t0\t0\t0\n"; } else { chomp($match); print "$match\n"; }'
 fi
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
-    rm $TMP;
+rm $TMP;
 fi
 
 exit

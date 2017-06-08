@@ -19,7 +19,7 @@ usage() {
     echo " -c <int>    [columns from the A file to map onto intervals in B (default: 5)]"
     echo "             [if multiple, please separate them by a comma]"
     echo " -o <string> [operation that should be applied to -c (default: sum)]"
-    echo "             [valid operations: sum, mean]"
+    echo "             [valid operations: sum, mean, collapse, max]"
     echo " -n <int>    [number of columns to include from secondary bed (B) file (default: 6)]"
 	echo " -h          [help]"
 	echo
@@ -75,7 +75,13 @@ zless $BEDFILE | perl -ane '
         $gene{$key}{'coor'}=$line;
         @columns=split(/\,/, "'$COLUMN'");
         foreach(@columns) {
-            $gene{$key}{$_}+=$F[$_-1];
+            if($F[$_-1]=~/^[0-9\.]+$/ && ('$OPERATION'=~/sum/ || '$OPERATION'=~/mean/)) { 
+                if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
+                $gene{$key}{$_}+=$F[$_-1];
+            } else {
+                if(!defined($gene{$key}{$_})) { $gene{$key}{$_}=""; }
+                $gene{$key}{$_}="$gene{$key}{$_},$F[$_-1]";
+            }
         }
         $gene{$key}{'count'}=1;
         $prev_key=$key;
@@ -83,7 +89,13 @@ zless $BEDFILE | perl -ane '
         if(defined($gene{$key})) {
             @columns=split(/,/, "'$COLUMN'");
             foreach(@columns) {
-                $gene{$key}{$_}+=$F[$_-1];
+                if($F[$_-1]=~/^[0-9\.]+$/ && ('$OPERATION'=~/sum/ || '$OPERATION'=~/mean/)) { 
+                    if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
+                    $gene{$key}{$_}+=$F[$_-1];
+                } else {
+                    if(!defined($gene{$key}{$_})) { $gene{$key}{$_}=""; }
+                    $gene{$key}{$_}="$gene{$key}{$_},$F[$_-1]";
+                }
             }
             $gene{$key}{'count'}++;
         } else {
@@ -94,6 +106,15 @@ zless $BEDFILE | perl -ane '
             foreach(@columns) {
                 if($operation=~/mean/) {
                     $line.=sprintf("\t%0.2f", $gene{$prev_key}{$_}/$gene{$prev_key}{'count'});
+                } elsif($operation=~/collapse/) {
+                    $gene{$prev_key}{$_}=~s/^\,//g;
+                    $line.=sprintf("\t%s", $gene{$prev_key}{$_});
+                } elsif($operation=~/max/) {
+                    $gene{$prev_key}{$_}=~s/^\,//g;
+                    @t=split(/\,/,$gene{$prev_key}{$_});
+                    $max=0;
+                    foreach(@t) { if ($_ > $max) { $max=$_; } }
+                    $line.="\t$max";
                 } else {
                     $line.=sprintf("\t%d", $gene{$prev_key}{$_});
                 }
@@ -106,7 +127,13 @@ zless $BEDFILE | perl -ane '
             $gene{$key}{'coor'}=$line;
             @columns=split(/,/, "'$COLUMN'");
             foreach(@columns) {
-                $gene{$key}{$_}+=$F[$_-1];
+                if($F[$_-1]=~/^[0-9\.]+$/ && ('$OPERATION'=~/sum/ || '$OPERATION'=~/mean/)) { 
+                    if($F[$_-1]=~/^\.$/) { $F[$_-1]=-1; }
+                    $gene{$key}{$_}+=$F[$_-1];
+                } else {
+                    if(!defined($gene{$key}{$_})) { $gene{$key}{$_}=""; }
+                    $gene{$key}{$_}="$gene{$key}{$_},$F[$_-1]";
+                }
             }
             $gene{$key}{'count'}=1;
             $prev_key=$key;
@@ -116,10 +143,26 @@ zless $BEDFILE | perl -ane '
     END {
         print "$gene{$prev_key}{'coor'}";
         @columns=split(/,/, "'$COLUMN'");
+        $operation="'$OPERATION'";
+        $line="";
         foreach(@columns) {
-            print "\t$gene{$prev_key}{$_}";
+            if($operation=~/mean/) {
+                $line.=sprintf("\t%0.2f", $gene{$prev_key}{$_}/$gene{$prev_key}{'count'});
+            } elsif($operation=~/collapse/) {
+                $gene{$prev_key}{$_}=~s/^\,//g;
+                $line.=sprintf("\t%s", $gene{$prev_key}{$_});
+            } elsif($operation=~/max/) {
+                $gene{$prev_key}{$_}=~s/^\,//g;
+                @t=split(/\,/,$gene{$prev_key}{$_});
+                $max=0;
+                foreach(@t) { if ($_ > $max) { $max=$_; } }
+                $line.="\t$max";
+            } else {
+                $line.=sprintf("\t%d", $gene{$prev_key}{$_});
+            }
         }
-        print "\n";
+        $line=~s/\s+$//g;
+        print "$line\n";
     }'
 
 ## remove temporary files
