@@ -27,9 +27,9 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: bed2weightedSignal -i <file> -j <file> -o <dir>"
+	echo "Usage: bed2weightedSignal -i <file> -j <file>"
 	echo "Options:"
-	echo " -i <file>     [input file containing genomic coordinates of regions in BED format]"
+	echo " -i <file>     [input file containing genomic coordinates of regions in BED format (can be stdin)]"
     echo "               [format: chr start end gene_name score strand (..)]"
 	echo " -j <file>     [input file containing genomic coordinates of signal in BED format]"
     echo "               [format: chr start end name score strand (..)]"
@@ -54,7 +54,7 @@ while getopts i:j:g:c:h ARG; do
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ ! -f "$REGIONFILE" -o ! -f "$SIGNALFILE" -o "$HELP" ]; then
+if [ -z "$REGIONFILE" -o ! -f "$SIGNALFILE" -o "$HELP" ]; then
 	usage
 fi
 
@@ -71,6 +71,15 @@ else
     usage
 fi
 
+## create temporary BED file if input is from stdin
+if [ "$REGIONFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo -e "${LINE}"
+    done > $TMP
+    REGIONFILE=$TMP
+fi
+
 ## determine width of the input regions
 WIDTH=$(zless $REGIONFILE | perl -ane '$max=0; if($F[2]-$F[1] > $max) { $max=$F[2]-$F[1]; } END { print $max; }')
 
@@ -83,7 +92,7 @@ SCORE_COLS=($SCORE_COL)
 IFS=$oIFS
 
 ## compute signal at each input region
-if [ "$WIDTH" -gt 1 ]; then
+if [ "$WIDTH" -gt 2 ]; then
     SCORE_COL=$((${SCORE_COLS[0]}+$NCOL_REGION))
     for(( i=1; i<${#SCORE_COLS[@]}; i++)); do
         SCORE_COL="$SCORE_COL,$((${SCORE_COLS[$i]}+$NCOL_REGION))"
@@ -93,15 +102,20 @@ if [ "$WIDTH" -gt 1 ]; then
 else
     DISTANCE_COL=$(($NCOL_REGION+$NCOL_SIGNAL+1))
     SCORE_COL="$SCORE_COL,$DISTANCE_COL"
+    oIFS=$IFS
+    IFS=","
+    SCORE_COLS=($SCORE_COL)
+    IFS=$oIFS
 
-    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    closestBed -a <(sortBed -i $SIGNALFILE) -b <(sortBed -i $REGIONFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL -o collapse -n 7 > $TMP
-    cat $OUTDIR/GENES_PROMOTER.BED | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$TMP' -m 1`; if($match=~/^$/) { chomp($_); print "$_\t0\t0\t0\n"; } else { chomp($match); print "$match\n"; }'
+    TMP_CLOSESTBED=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    closestBed -a <(sortBed -i $SIGNALFILE) -b <(sortBed -i $REGIONFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL -o collapse -n 7 > $TMP_CLOSESTBED
+    cat $REGIONFILE | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$TMP_CLOSESTBED' -m 1`; if($match=~/^$/) { chomp($_); print "$_"; for($i=0; $i<'${#SCORE_COLS[@]}'; $i++) { print "\tNA"; } print "\n"; } else { chomp($match); print "$match\n"; }'
+    rm $TMP_CLOSESTBED
 fi
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
-rm $TMP;
+    rm $TMP;
 fi
 
 exit
