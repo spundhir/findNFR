@@ -12,7 +12,7 @@ opt <- parse_args(parser)
 
 ## check, if all required arguments are given
 if(is.null(opt$inFile)) {
-	cat("\nProgram: score2normalize.R (R script to normalize input scores)\n")
+	cat("\nProgram: score2normalize.R (R script to normalize input scores (rank, scaled rank, percentile rank)\n")
 	cat("Author: BRIC, University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
 	cat("Contact: pundhir@binf.ku.dk\n");

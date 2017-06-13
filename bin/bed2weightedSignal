@@ -35,7 +35,7 @@ usage() {
     echo "               [format: chr start end name score strand (..)]"
     echo "[OPTIONS]"
     echo " -g <string>   [genome (default: mm9)]"
-    echo " -c <int>      [column containing score information of signal; -j argument (default: 5)]"
+    echo " -c <int>      [column containing score information in signal file; -j argument (default: 5)]"
     echo "               [if multiple, please separate them by a comma]"
 	echo " -h            [help]"
 	echo
@@ -108,8 +108,10 @@ else
     IFS=$oIFS
 
     TMP_CLOSESTBED=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    closestBed -a <(sortBed -i $SIGNALFILE) -b <(sortBed -i $REGIONFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL -o collapse -n 7 > $TMP_CLOSESTBED
-    cat $REGIONFILE | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$TMP_CLOSESTBED' -m 1`; if($match=~/^$/) { chomp($_); print "$_"; for($i=0; $i<'${#SCORE_COLS[@]}'; $i++) { print "\tNA"; } print "\n"; } else { chomp($match); print "$match\n"; }'
+    closestBed -a <(sortBed -i $SIGNALFILE) -b <(sortBed -i $REGIONFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL -o collapse -n $NCOL_REGION > $TMP_CLOSESTBED
+
+    cat $REGIONFILE | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$TMP_CLOSESTBED' -m 1`; if($match=~/^$/) { chomp($_); print "$_"; for($i=0; $i<'${#SCORE_COLS[@]}'; $i++) { print "\tNA"; } print "\n"; } else { chomp($match); print "$match\n"; }' | $FINDNFRPATH/share/R/bed2weightedSignal.R -i stdin -s $((NCOL_REGION+1)) -d $((NCOL_REGION+${#SCORE_COLS[@]}))
+
     rm $TMP_CLOSESTBED
 fi
 
