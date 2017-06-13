@@ -206,37 +206,50 @@ fi
 echo "done"
 
 exit
-echo -n "Compute histone peaks overlapping and proximal to genes (`date`).. "
-OVERLAPFILE=""
-PROXIMALFILE=""
+echo -n "Compute regulatory complexity of input genes - promoter, distal and gene body (`date`).. "
+WS_PROMOTER_FILE=""
+WS_DISTAL_FILE=""
+WS_GENEBODY_FILE=""
 while read LINE; do
     TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/) { print "1"; } else { print "0" }')
     [ "$TPM" -eq "1" ] && continue;
 
     ID=$(echo $LINE | perl -ane 'print "$F[0]"')
-    #if [ ! -s "$OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED" ]; then
-        intersectBed -a $OUTDIR/GENES_PROMOTER.BED -b $OUTDIR/peaks/$ID/PEAKS.BED -wao | intersectBed2uniq -i stdin -c 12,16,17 -o sum -n 7 > $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED
-    #fi
-    OVERLAPFILE="$OVERLAPFILE $OUTDIR/peaks/$ID/PEAKS_OVERLAPPING_GENES.BED"
 
-    #if [ ! -s "$OUTDIR/peaks/$ID/PEAKS_PROXIMAL_GENES.BED" ]; then
+    if [ ! -d "$OUTDIR/peaks/$ID/WS" ]; then
+        mkdir $OUTDIR/peaks/$ID/WS
+    fi
+
+    if [ ! -s "$OUTDIR/peaks/$ID/WS/WS_PROMOTER.BED" ]; then
+        bed2weightedSignal -i $OUTDIR/GENES_PROMOTER.BED -j $OUTDIR/peaks/$ID/PEAKS.BED -g $GENOME -c 5 > $OUTDIR/peaks/$ID/WS/WS_PROMOTER.BED
+    fi
+    WS_PROMOTER_FILE="$WS_PROMOTER_FILE $OUTDIR/peaks/$ID/WS/WS_PROMOTER.BED"
+
+    if [ ! -s "$OUTDIR/peaks/$ID/WS/WS_DISTAL.BED" ]; then
         TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-        closestBed -a <(sortBed -i $OUTDIR/peaks/$ID/PEAKS.BED) -b <(sortBed -i $OUTDIR/GENES_PROMOTER.BED) -t first -io | closestBed2uniq -i stdin -c 8,9,10 -o sum -n 7 > $OUTDIR/peaks/$ID/$TMP
-        cat $OUTDIR/GENES_PROMOTER.BED | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$OUTDIR/peaks/$ID/$TMP' -m 1`; if($match=~/^$/) { chomp($_); print "$_\t0\t0\t0\n"; } else { chomp($match); print "$match\n"; }' > $OUTDIR/peaks/$ID/PEAKS_PROXIMAL_GENES.BED
-        rm $OUTDIR/peaks/$ID/$TMP
-    #fi
-    PROXIMALFILE="$PROXIMALFILE $OUTDIR/peaks/$ID/PEAKS_PROXIMAL_GENES.BED"
+        intersectBed -a $OUTDIR/peaks/$ID/PEAKS.BED -b $OUTDIR/GENES_PROMOTER.BED -v > $TMP 
+        bed2window -i $OUTDIR/GENES_PROMOTER.BED -w 1 | bed2weightedSignal -i stdin -j $TMP -g $GENOME -c 5 > $OUTDIR/peaks/$ID/WS/WS_DISTAL.BED
+    fi
+    WS_DISTAL_FILE="$WS_DISTAL_FILE $OUTDIR/peaks/$ID/WS/WS_DISTAL.BED"
+
+    if [ ! -s "$OUTDIR/peaks/$ID/WS/WS_GENEBODY.BED" ]; then
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        intersectBed -a $OUTDIR/peaks/$ID/PEAKS.BED -b $GENEFILE -u > $TMP 
+        bed2window -i $GENEFILE -w 1 | bed2weightedSignal -i stdin -j $TMP -g $GENOME -c 5 > $OUTDIR/peaks/$ID/WS/WS_GENEBODY.BED
+    fi
+    WS_GENEBODY_FILE="$WS_GENEBODY_FILE $OUTDIR/peaks/$ID/WS/WS_GENEBODY.BED"
 done < $CONFIGFILE
 
-OVERLAPFILE=$(echo $OVERLAPFILE | perl -ane '$_=~s/^\s+//g; print $_;')
-PROXIMALFILE=$(echo $PROXIMALFILE | perl -ane '$_=~s/^\s+//g; print $_;')
+WS_PROMOTER_FILE=$(echo $WS_PROMOTER_FILE | perl -ane '$_=~s/^\s+//g; print $_;')
+WS_DISTAL_FILE=$(echo $WS_DISTAL_FILE | perl -ane '$_=~s/^\s+//g; print $_;')
+WS_GENEBODY_FILE=$(echo $WS_GENEBODY_FILE | perl -ane '$_=~s/^\s+//g; print $_;')
 echo "done"
 
 echo -n "Compute regulatory complexity of input genes (`date`).. "
 oIFS=$IFS
 IFS=" "
-OVERLAPFILES=($OVERLAPFILE)
-OVERLAPFILES_COUNT=${#OVERLAPFILES[@]}
+WS_PROMOTER_FILES=($WS_PROMOTER_FILE)
+WS_PROMOTER_FILES_COUNT=${#WS_PROMOTER_FILES[@]}
 IFS=$oIFS
 
 HEADER="chr\tstart\tend\tgene\tscore\tstrand\tpromoter_defined"
@@ -268,11 +281,11 @@ elif [ ! -s "$OUTDIR/PROMOTER_REGULATORY_COMPLEXITY.BED" ]; then
 fi
 COMMENT
 
-nfrDynAna2Matrix -i $OUTDIR/GENES_PROMOTER.BED -j $CONFIGFILE -o $OUTDIR/nfrDynAna -r 1 -n 1 -g $GENOME -c
+#nfrDynAna2Matrix -i $OUTDIR/GENES_PROMOTER.BED -j $CONFIGFILE -o $OUTDIR/nfrDynAna -r 1 -n 1 -g $GENOME -c
 
-TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-cat <(cat $CONFIGFILE | perl -ane 'BEGIN { $line=""; } if($_=~/^tpm/) { @count=split(/\,/,$F[1]); foreach(@count) { $line.="$F[0]\t"; } } END { $line=~s/\t$//g; print "chr\tstart\tend\tgene\tscore\tstrand\tpromoter_defined\t$line\n"; }') <(cat $OUTDIR/nfrDynAna/NFR_DYNAMICS_SIG.stat) > $OUTDIR/nfrDynAna/$TMP
-mv $OUTDIR/nfrDynAna/$TMP $OUTDIR/nfrDynAna/NFR_DYNAMICS_SIG.stat
+#TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+#cat <(cat $CONFIGFILE | perl -ane 'BEGIN { $line=""; } if($_=~/^tpm/) { @count=split(/\,/,$F[1]); foreach(@count) { $line.="$F[0]\t"; } } END { $line=~s/\t$//g; print "chr\tstart\tend\tgene\tscore\tstrand\tpromoter_defined\t$line\n"; }') <(cat $OUTDIR/nfrDynAna/NFR_DYNAMICS_SIG.stat) > $OUTDIR/nfrDynAna/$TMP
+#mv $OUTDIR/nfrDynAna/$TMP $OUTDIR/nfrDynAna/NFR_DYNAMICS_SIG.stat
 
 echo "done"
 
