@@ -198,5 +198,3 @@ else
     zless $OUTDIR/merge_distance/GENES_PROMOTER.BED > $OUTDIR/GENES_PROMOTER.BED
 fi
 echo "done"
-
-echo "All done.. bye"
