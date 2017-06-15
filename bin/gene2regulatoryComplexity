@@ -205,13 +205,12 @@ echo "done"
 
 echo -n "Define gene promoter (`date`).. "
 if grep -qw h3k4me3 $CONFIGFILE; then
-    #if [ ! -s "$OUTDIR/GENES_PROMOTER.BED" ]; then
+    if [ ! -s "$OUTDIR/GENES_PROMOTER.BED" ]; then
         BAMFILE=$(grep -w h3k4me3 $CONFIGFILE | cut -f 2 -d " ")
-        gene2promoter -i $GENEFILE -j $BAMFILE -o $OUTDIR/peaks/h3k4me3 -n $WINDOW
-        mv $OUTDIR/peaks/h3k4me3/GENES_PROMOTER.BED $OUTDIR/GENES_PROMOTER.BED
-    #fi
+        gene2promoter -i $GENEFILE -j $BAMFILE -o $OUTDIR/peaks/h3k4me3 -n $WINDOW | sort -k 4,4 > $OUTDIR/GENES_PROMOTER.BED
+    fi
 else
-    zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\tNA\n";' > $OUTDIR/GENES_PROMOTER.BED
+    zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\tNA\n";' | sort -k 4,4 > $OUTDIR/GENES_PROMOTER.BED
 fi
 echo "done"
 
@@ -267,22 +266,22 @@ IFS=$oIFS
 
 HEADER_PROMOTER="chr\tstart\tend\tgene\tscore\tstrand\tpromoter_defined"
 HEADER_DISTAL="chr\tstart\tend\tgene\tscore\tstrand\tpromoter_defined"
-HEADER_GENEBODY="chr\tstart\tend\tgene\tscore\tstrand\tpromoter_defined"
+HEADER_GENEBODY="chr\tstart\tend\tgene\tscore\tstrand"
 
 WS_PROMOTER_COLUMNS="1-7"
 WS_DISTAL_COLUMNS="1-7"
 WS_GENEBODY_COLUMNS="1-6"
 for(( i=1; i<=$WS_PROMOTER_FILES_COUNT; i++ )); do
     ID=$(echo ${WS_PROMOTER_FILES[$i-1]} | perl -ane '@t=split(/\//, $_); print $t[scalar(@t)-3];')
-    HEADER_PROMOTER="$HEADER_PROMOTER\t$ID"
+    HEADER_PROMOTER="$HEADER_PROMOTER\t$ID (promoter)"
     NCOL=$(head -n 1 ${WS_PROMOTER_FILES[$i-1]} | perl -ane 'print scalar(@F);')
     WS_PROMOTER_COLUMNS="$WS_PROMOTER_COLUMNS,$(perl -e '$col=('$NCOL'*'$i'); print "$col"')"
 
-    HEADER_DISTAL="$HEADER_DISTAL\t$ID"
+    HEADER_DISTAL="$HEADER_DISTAL\t$ID (distal)"
     NCOL=$(head -n 1 ${WS_DISTAL_FILES[$i-1]} | perl -ane 'print scalar(@F);')
     WS_DISTAL_COLUMNS="$WS_DISTAL_COLUMNS,$(perl -e '$col=('$NCOL'*'$i'); print "$col"')"
 
-    HEADER_GENEBODY="$HEADER_GENEBODY\t$ID"
+    HEADER_GENEBODY="$HEADER_GENEBODY\t$ID (genebody)"
     NCOL=$(head -n 1 ${WS_GENEBODY_FILES[$i-1]} | perl -ane 'print scalar(@F);')
     WS_GENEBODY_COLUMNS="$WS_GENEBODY_COLUMNS,$(perl -e '$col=('$NCOL'*'$i'); print "$col"')"
 done
@@ -295,6 +294,8 @@ paste $WS_DISTAL_FILE | cut -f $WS_DISTAL_COLUMNS >> $OUTDIR/RC_DISTAL.BED
 
 echo -e $HEADER_GENEBODY > $OUTDIR/RC_GENEBODY.BED
 paste $WS_GENEBODY_FILE | cut -f $WS_GENEBODY_COLUMNS >> $OUTDIR/RC_GENEBODY.BED
+
+paste $OUTDIR/RC_PROMOTER.BED <(cut -f 8-$((WS_PROMOTER_FILES_COUNT+7)) $OUTDIR/RC_DISTAL.BED) <(cut -f 7-$((WS_PROMOTER_FILES_COUNT+6)) $OUTDIR/RC_GENEBODY.BED) > $OUTDIR/RC.BED
 echo "done"
 
 <<"COMMENT"

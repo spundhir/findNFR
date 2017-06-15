@@ -88,21 +88,21 @@ while getopts i:j:o:m:p:k:n:c:e:x:s:g:t:v:d:h ARG; do
 	esac
 done
 
-echo
+>&2 echo
 if [ "$HELP" ]; then
     usage
 fi
 
-echo
-echo -n "Check, if all required parameters and files are provided (`date`).. "
+>&2 echo
+>&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
 ## usage, if necessary file and directories are given/exist
 if [ -z "$GENEFILE" -o -z "$BAMFILE" ]; then
-    echo
-    echo "Error: one or more required paramter values not provided"
-    echo
+    >&2 echo
+    >&2 echo "Error: one or more required paramter values not provided"
+    >&2 echo
 	usage
 fi
-echo "done"
+>&2 echo "done"
 
 ###################
 #helperfunction
@@ -116,7 +116,7 @@ function wait_for_jobs_to_finish {
 }
 ###############
 
-echo -n "Create directory structure (`date`).. "
+>&2 echo -n "Create directory structure (`date`).. "
 if [ ! -d "$OUTDIR" ]; then
     mkdir -p $OUTDIR
 fi
@@ -124,20 +124,20 @@ fi
 if [ ! -d "$OUTDIR/merge_distance" ]; then
     mkdir -p $OUTDIR/merge_distance
 fi
-echo "done"
+>&2 echo "done"
 
-echo -n "Populating files based on input genome, $GENOME (`date`).. "
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
 GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
 if [ ! -f "$GENOME_FILE" ]; then
-    echo
-    echo "computation for $GENOME is not available yet"
-    echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
-    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
-    echo
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
     usage
 fi
-echo "done"
+>&2 echo "done"
 
 ## create temporary BED file if input is from stdin
 if [ "$GENEFILE" == "stdin" ]; then
@@ -148,22 +148,22 @@ if [ "$GENEFILE" == "stdin" ]; then
     GENEFILE=$OUTDIR/$TMP
 fi
 
-echo -n "Predict peaks on H3K4me3 data (`date`).. "
+>&2 echo -n "Predict peaks on H3K4me3 data (`date`).. "
 if [ ! -s "$OUTDIR/PEAKS.BED" ]; then
     if [ -z "$CONTROLFILE" ]; then
-        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION
+        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION &>/dev/null
     else
-        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE
+        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE &>/dev/null
     fi
 fi
-echo "done"
+>&2 echo "done"
 
-echo -n "Determine optimal distance between peaks to merge (`date`).. "
+>&2 echo -n "Determine optimal distance between peaks to merge (`date`).. "
 if [ ! -s "$OUTDIR/PEAKS.BED" ]; then
-    echo
-    echo "Peak file $OUTDIR/PEAKS.BED is not computed properly.. "
-    echo "exiting.. "
-    echo
+    >&2 echo
+    >&2 echo "Peak file $OUTDIR/PEAKS.BED is not computed properly.. "
+    >&2 echo "exiting.. "
+    >&2 echo
     exit
 else
     NCOL=$(head -n 1 $OUTDIR/PEAKS.BED | perl -ane 'print scalar(@F);')
@@ -177,7 +177,7 @@ else
     cut -f 2 $OUTDIR/merge_distance/PEAKS.BED.DIST > $OUTDIR/merge_distance/PEAKS.BED.DIST.$TMP
     cut -f 2 $OUTDIR/merge_distance/SHUFFLE.BED.DIST > $OUTDIR/merge_distance/SHUFFLE.BED.DIST.$TMP
     DISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/merge_distance/PEAKS.BED.DIST.$TMP -j $OUTDIR/merge_distance/SHUFFLE.BED.DIST.$TMP -m median)
-    echo $DISTANCE
+    >&2 echo $DISTANCE
     #rm $OUTDIR/merge_distance/PEAKS.BED.DIST.$TMP
     #rm $OUTDIR/merge_distance/SHUFFLE.BED.DIST.$TMP
   
@@ -189,12 +189,10 @@ else
 
     zless $GENEFILE | bed2window -i stdin -w 0 -t | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/merge_distance/GENES_TSS.BED
 
-    closestBed -a <(sortBed -i $OUTDIR/merge_distance/GENES_TSS.BED) -b $OUTDIR/merge_distance/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";' > $OUTDIR/merge_distance/GENES_PROMOTER.BED
+    closestBed -a <(sortBed -i $OUTDIR/merge_distance/GENES_TSS.BED) -b $OUTDIR/merge_distance/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";'
 
     #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     #cat <(grep -w Y $OUTDIR/merge_distance/GENES_PROMOTER.BED) <(closestBed -a <(grep -vw Y $OUTDIR/merge_distance/GENES_PROMOTER.BED | bed2window -i stdin -w 0 | cut -f 1-6) -b <(cat $OUTDIR/ALLPEAKS.BED | perl -ane 'if($F[6]<0.2) { print $_; }' | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y1"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";') > $TMP
     #mv $TMP $OUTDIR/merge_distance/GENES_PROMOTER.BED
-
-    zless $OUTDIR/merge_distance/GENES_PROMOTER.BED > $OUTDIR/GENES_PROMOTER.BED
 fi
-echo "done"
+>&2 echo "done"
