@@ -102,7 +102,58 @@ fi
 
 NCOL_GENEFILE=$(zless $GENEFILE | head -n 1 | perl -ane 'print scalar(@F);')
 
-closestBed -a <(zless $GENEFILE | sortBed -i stdin) -b <(sortBed -i $TSSFILE) -d -t first | perl -ane 'if($F[scalar(@F)-1]<=50) { print "$F[0]\t$F['$((NCOL_GENEFILE+1))']\t$F['$((NCOL_GENEFILE+2))']"; foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; } print "\n"; } else { $mid=sprintf("%d", ($F[1]+$F[2])/2); $start=$mid; $end=$mid+1; print "$F[0]\t$start\t$end"; foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; } print "\n"; }'
+# last three columns are: distance to upper boundary, distance to lower boundary, width of region
+closestBed -a <(zless $GENEFILE | sortBed -i stdin) -b <(sortBed -i $TSSFILE) -d -t first | perl -ane 'if($F[scalar(@F)-1]<=50) { print "$F[0]\t$F['$((NCOL_GENEFILE+1))']\t$F['$((NCOL_GENEFILE+2))']"; foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; } $up=$F[1]-$F['$((NCOL_GENEFILE+1))']; $down=$F[2]-$F['$((NCOL_GENEFILE+1))']; $width=$F[2]-$F[1]; print "\t$up\t$down\t$width\n"; } else { $mid=sprintf("%d", ($F[1]+$F[2])/2); $start=$mid; $end=$mid+1; print "$F[0]\t$start\t$end"; foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; } print "\t0\t0\t1\n"; }'
+<<"COMMENT"
+closestBed -a <(zless $GENEFILE | sortBed -i stdin) -b <(sortBed -i $TSSFILE) -d -t first | perl -ane '
+    if($F[scalar(@F)-1]<=50) {
+        print "$F[0]\t$F['$((NCOL_GENEFILE+1))']\t$F['$((NCOL_GENEFILE+2))']";
+        foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; }
+        if($F[5]=~/\+/) {
+            $up=$F[1]-$F['$((NCOL_GENEFILE+1))'];
+            $down=$F[2]-$F['$((NCOL_GENEFILE+1))'];
+            if($down<0) {
+                $down=0;
+            }
+        }
+        elsif($F[5]=~/\-/) {
+            $up=$F['$((NCOL_GENEFILE+1))']-$F[2];
+            $down=$F['$((NCOL_GENEFILE+1))']-$F[1];
+            if($down<0) {
+                $down=0;
+            }
+        }
+        $width=$F[2]-$F[1];
+        print "\t$up\t$down\t$width\n";
+    }
+    else {
+        $mid=sprintf("%d", ($F[1]+$F[2])/2);
+        $start=$mid; $end=$mid+1;
+        print "$F[0]\t$start\t$end";
+        foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; }
+        print "\t0\t0\t1\n";
+    }'
+
+closestBed -a <(zless $GENEFILE | sortBed -i stdin) -b <(sortBed -i $TSSFILE) -D b -t first | perl -ane '
+    if(abs($F[scalar(@F)-1])<=50) {
+        print "$F[0]\t$F['$((NCOL_GENEFILE+1))']\t$F['$((NCOL_GENEFILE+2))']";
+        foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; }
+        if($F[scalar(@F)-1]==0) {
+            if($F[5]=~/\-/) { $up=$F[2]-$F['$((NCOL_GENEFILE+1))']; $down=$F[1]-$F['$((NCOL_GENEFILE+1))']; }
+            else { $up=$F[1]-$F['$((NCOL_GENEFILE+1))']; $down=$F[2]-$F['$((NCOL_GENEFILE+1))']; }
+        } 
+        elsif($F[scalar(@F)-1]<0) { $down=0; $up=$F[scalar(@F)-1]; }
+        else { $down=$F[scalar(@F)-1]; $up=0; }
+        $width=$F[2]-$F[1];
+        print "\t".abs($up)."\t".abs($down)."\t$width\n";
+    }
+    else {
+        $mid=sprintf("%d", ($F[1]+$F[2])/2); $start=$mid; $end=$mid+1;
+        print "$F[0]\t$start\t$end";
+        foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; }
+        print "\t0\t0\t1\n"; 
+    }'
+COMMENT
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then

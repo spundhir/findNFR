@@ -189,7 +189,19 @@ else
 
     zless $GENEFILE | bed2window -i stdin -w 0 -t | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/merge_distance/GENES_TSS.BED
 
-    closestBed -a <(sortBed -i $OUTDIR/merge_distance/GENES_TSS.BED) -b $OUTDIR/merge_distance/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";'
+    closestBed -a <(sortBed -i $OUTDIR/merge_distance/GENES_TSS.BED) -b $OUTDIR/merge_distance/PEAKS.BED.MERGED -d -t first | perl -ane '$tss_chr=$F[0]; $tss_start=$F[1]; $tss_end=$F[2]; if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$tss_chr:$tss_start-$tss_end";
+    if($F[5]=~/\-/) { 
+        $up=$tss_start-$F[2];
+        $down=$tss_end-$F[1];
+        if($up>0) { $up=0; }
+        if($down<0) { $down=0; }
+    }
+    else {
+        $up=$F[1]-$tss_start;
+        $down=$F[2]-$tss_end;
+        if($up>0) { $up=0; }
+        if($down<0) { $down=0; }
+    } print "\t$up\t$down\n";'
 
     #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     #cat <(grep -w Y $OUTDIR/merge_distance/GENES_PROMOTER.BED) <(closestBed -a <(grep -vw Y $OUTDIR/merge_distance/GENES_PROMOTER.BED | bed2window -i stdin -w 0 | cut -f 1-6) -b <(cat $OUTDIR/ALLPEAKS.BED | perl -ane 'if($F[6]<0.2) { print $_; }' | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y1"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";') > $TMP
