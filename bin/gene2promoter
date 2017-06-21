@@ -201,7 +201,17 @@ else
         $down=$F[2]-$tss_end;
         if($up>0) { $up=0; }
         if($down<0) { $down=0; }
-    } print "\t$up\t$down\n";'
+    } print "\t$up\t$down\n";' | perl -ane '
+        if($F[9]<=0) {
+            @tss_coor=split(/[\:\-]/,$F[7]);
+            $F[1]=$tss_coor[1]-50;
+            $F[2]=$tss_coor[2]+50;
+            $F[9]=50;
+            $F[6]="N";
+        }
+        print "$F[0]";
+        foreach(@F[1..scalar(@F)-1]) { print "\t$_"; }
+        print "\n";'
 
     #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     #cat <(grep -w Y $OUTDIR/merge_distance/GENES_PROMOTER.BED) <(closestBed -a <(grep -vw Y $OUTDIR/merge_distance/GENES_PROMOTER.BED | bed2window -i stdin -w 0 | cut -f 1-6) -b <(cat $OUTDIR/ALLPEAKS.BED | perl -ane 'if($F[6]<0.2) { print $_; }' | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y1"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";') > $TMP
