@@ -178,8 +178,8 @@ else
     cut -f 2 $OUTDIR/merge_distance/SHUFFLE.BED.DIST > $OUTDIR/merge_distance/SHUFFLE.BED.DIST.$TMP
     DISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/merge_distance/PEAKS.BED.DIST.$TMP -j $OUTDIR/merge_distance/SHUFFLE.BED.DIST.$TMP -m median)
     >&2 echo $DISTANCE
-    #rm $OUTDIR/merge_distance/PEAKS.BED.DIST.$TMP
-    #rm $OUTDIR/merge_distance/SHUFFLE.BED.DIST.$TMP
+    rm $OUTDIR/merge_distance/PEAKS.BED.DIST.$TMP
+    rm $OUTDIR/merge_distance/SHUFFLE.BED.DIST.$TMP
   
     if [ "$DISTANCE" -gt 1000 ]; then
         DISTANCE=1000
