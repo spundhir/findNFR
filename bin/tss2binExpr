@@ -3,6 +3,7 @@
 
 GENOME="mm9"
 AVG=0
+REGION="promoter"
 
 #### usage ####
 usage() {
@@ -10,14 +11,16 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: tss2binExpr -i <file> -j <file(s)>"
+	echo "Usage: tss2binExpr -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input file containing genomic coordinates of TSS in BED format (can be stdin)]"
     echo "             [FORMAT: chr start end name score strand distance]"
-    echo "             [distance is optional, computed using gene2promoter)]"
-    echo " -j <file>   [input mapped reads in BAM format]"
-    echo "             [if multiple seperate by a comma]"
+    echo "             [distance by which core promoter is extended downstream to TSS, computed using gene2promoter)]"
+    echo " -j <file>   [configuration file]"
+    echo "             [FORMAT: tpm <absolute path to bam file>]"
     echo "[OPTIONS]"
+    echo " -c          [analyze for enhancer (default: promoter)]"
+    echo "[OPTIONS: bed2expr]"
     echo " -s <float>  [normalize expression by input size factor]"
     echo "             [if multiple, seperate them by a comma]"
     echo " -m          [normalize expression by counts per million mapped reads (RPM)]"
@@ -38,24 +41,25 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:s:mkde:g:v:rh ARG; do
+while getopts i:j:c:s:mkde:v:rg:h ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
-        j) INPUTBAMFILES=$OPTARG;;
+        j) CONFIGFILE=$OPTARG;;
+        c) REGION=$OPTARG;;
         s) INPUTSIZEFACTORS=$OPTARG;; 
         m) CPM=1;;
         k) FPKM=1;;
         d) REMOVE_DUPLICATE=1;;
         e) INPUTEXTENDS=$OPTARG;;
-        g) GENOME=$OPTARG;;
         v) AVG=$OPTARG;;
         r) SAME_STRAND=1;;
+        g) GENOME=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ -z "$INPUTBEDFILE" -o -z "$INPUTBAMFILES" -o "$HELP" ]; then
+if [ -z "$INPUTBEDFILE" -o ! -s "$CONFIGFILE" -o "$HELP" ]; then
 	usage
 fi
 
@@ -72,42 +76,6 @@ else
     usage
 fi
 
-## parse input bam files in an array
-oIFS=$IFS
-IFS=","
-BAMFILES=($INPUTBAMFILES)
-BAMFILES_COUNT=${#BAMFILES[@]}
-IFS=$oIFS
-
-## initialize size factors, if both size factors and total reads not provided
-if [ -z "$INPUTSIZEFACTORS" -a -z "$CPM" -a -z "$FPKM" ]; then
-    INPUTSIZEFACTORS=""
-    for(( i=0; i<$BAMFILES_COUNT; i++ )); do
-        INPUTSIZEFACTORS="$INPUTSIZEFACTORS,1"
-    done
-    INPUTSIZEFACTORS=`echo $INPUTSIZEFACTORS | perl -ane '$_=~s/^\,//g; print $_;'`;
-fi
-
-## initialize extend parameter, if not provided
-if [ -z "$INPUTEXTENDS" ]; then
-    INPUTEXTENDS=""
-    for(( i=0; i<$BAMFILES_COUNT; i++ )); do
-        INPUTEXTENDS="$INPUTEXTENDS,0"
-    done
-    INPUTEXTENDS=`echo $INPUTEXTENDS | perl -ane '$_=~s/^\,//g; print $_;'`;
-fi
-
-## parse extend parameter in an array
-IFS=","
-EXTENDS=($INPUTEXTENDS)
-EXTENDS_COUNT=${#EXTENDS[@]}
-IFS=$oIFS
-
-## parse bam files in an array
-IFS=","
-INPUTBAMFILES=$(echo $INPUTBAMFILES | sed 's/\,/ /g')
-IFS=$oIFS
-
 ## create temporary BED file if input is from stdin
 if [ "$INPUTBEDFILE" == "stdin" ]; then
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
@@ -117,14 +85,53 @@ if [ "$INPUTBEDFILE" == "stdin" ]; then
     INPUTBEDFILE=$TMP
 fi
 
-## parse input BED file
+## parse binary input parameters
+PARAM_BIN=""
+if [ ! -z "$INPUTSIZEFACTORS" ]; then PARAM_BIN="$PARAM_BIN -s $INPUTSIZEFACTORS"; fi
+if [ -z "$INPUTSIZEFACTORS" -a ! -z "$CPM" ]; then PARAM_BIN="$PARAM_BIN -m"; fi
+if [ -z "$INPUTSIZEFACTORS" -a -z "$CPM" -a ! -z "$FPKM" ]; then PARAM_BIN="$PARAM_BIN -k"; fi
+if [ ! -z "$REMOVE_DUPLICATE" ]; then PARAM_BIN="$PARAM_BIN -d"; fi
+if [ ! -z "$INPUTEXTENDS" ]; then PARAM_BIN="$PARAM_BIN -e $INPUTEXTENDS"; fi
+if [ ! -z "$SAME_STRAND" ]; then PARAM_BIN="$PARAM_BIN -r"; fi
+
+## parse input bam files
+INPUTBAMFILES=$(cat $CONFIGFILE | perl -ane '
+    if($_=~/^tpm/) {
+        $file.="$F[1],";
+    } END {
+        $file=~s/\,$//g;
+        print "$file\n";
+    }'
+)
+
+if [ -z "$INPUTBAMFILES" ]; then
+    echo
+    echo "ERROR: Cannot populate input BAM files. Check your configuration file"
+    echo
+    usage
+fi
+#echo "bed2expr -i stdin -j $INPUTBAMFILES -g $GENOME -v $AVG $PARAM_BIN"; exit
+
+## populate up and down window length of HFR
+if [ "$REGION" == "promoter" ]; then
+    WIN_DOWN=40
+    WIN_UP=90
+else
+    WIN_DOWN=50
+    WIN_UP=50
+fi
+
+#echo -e "WIN_UP: $WIN_UP; WIN_DOWN: $WIN_DOWN"; exit
+
+## parse input BED file and compute signal
 cat $INPUTBEDFILE | perl -ane '
+    if($F[6]!~/^[0-9]+$/) { $F[6]=50; }
     if($F[5]=~/\-/) { 
-        $hfr_start=$F[1]-40;
-        $hfr_end=$F[1]+90;
+        $hfr_start=$F[1]-'$WIN_DOWN';
+        $hfr_end=$F[1]+'$WIN_UP';
 
         $up_start=$hfr_end+1;
-        $up_end=$up_start+50;
+        $up_end=$up_start+100;
 
         $nfr_start=$F[1]-($F[6]-10);
         if($nfr_start < $hfr_start) {
@@ -134,13 +141,13 @@ cat $INPUTBEDFILE | perl -ane '
         }
 
         $down_end=$nfr_start-1;
-        $down_start=$down_end-50;
+        $down_start=$down_end-100;
     } else {
-        $hfr_start=$F[1]-90;
-        $hfr_end=$F[1]+40;
+        $hfr_start=$F[1]-'$WIN_UP';
+        $hfr_end=$F[1]+'$WIN_DOWN';
 
         $up_end=$hfr_start-1;
-        $up_start=$up_end-50;
+        $up_start=$up_end-100;
 
         $nfr_end=$F[1]+($F[6]-10);
         if($nfr_end > $hfr_end) {
@@ -150,11 +157,17 @@ cat $INPUTBEDFILE | perl -ane '
         }
 
         $down_start=$nfr_end+1;
-        $down_end=$down_start+50;
+        $down_end=$down_start+100;
     }
-    chomp($_);
-    print "$_\t$F[0]:$up_start-$up_end\t$F[0]:$hfr_start-$hfr_end\t$F[0]:$nfr_start-$nfr_end\t$F[0]:$down_start-$down_end\n";'
-
+    $line=$F[0]; foreach(@F[1..scalar(@F)-1]) { $line.="#$_"; }
+    print "$F[0]\t$up_start\t$up_end\tUP#$F[3]\t0\t$F[5]\t$line\n";
+    print "$F[0]\t$hfr_start\t$hfr_end\tHFR#$F[3]\t0\t$F[5]\t$line\n";
+    print "$F[0]\t$nfr_start\t$nfr_end\tNFR#$F[3]\t0\t$F[5]\t$line\n";
+    print "$F[0]\t$down_start\t$down_end\tDOWN#$F[3]\t0\t$F[5]\t$line\n";
+    #chomp($_);
+    #print "$_\t$F[0]:$up_start-$up_end\t$F[0]:$hfr_start-$hfr_end\t$F[0]:$nfr_start-$nfr_end\t$F[0]:$down_start-$down_end\n";' | bed2expr -i stdin -j $INPUTBAMFILES -g $GENOME -v $AVG $PARAM_BIN
+    
+## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
     rm $TMP
 fi
