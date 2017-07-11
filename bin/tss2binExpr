@@ -30,6 +30,7 @@ usage() {
     echo " -v <int>    [instead of giving expression for each replicate, output only the mean (deafult: 0)]"
     echo "             [assumes that consecutive input files are replicates 1 and 2, respectively]"
     echo " -r          [require same strandedness]"
+    echo " -n          [add 1 to all the raw expression counts - useful while taking log]"
     echo " -g <string> [genome (default: mm9)]"
 	echo " -h          [help]"
     echo "[NOTE]"
@@ -41,7 +42,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:c:s:mkde:v:rg:h ARG; do
+while getopts i:j:c:s:mkde:v:rng:h ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         j) CONFIGFILE=$OPTARG;;
@@ -53,6 +54,7 @@ while getopts i:j:c:s:mkde:v:rg:h ARG; do
         e) INPUTEXTENDS=$OPTARG;;
         v) AVG=$OPTARG;;
         r) SAME_STRAND=1;;
+        n) ADDONE=1;;
         g) GENOME=$OPTARG;;
 		h) HELP=1;;
 	esac
@@ -93,6 +95,7 @@ if [ -z "$INPUTSIZEFACTORS" -a -z "$CPM" -a ! -z "$FPKM" ]; then PARAM_BIN="$PAR
 if [ ! -z "$REMOVE_DUPLICATE" ]; then PARAM_BIN="$PARAM_BIN -d"; fi
 if [ ! -z "$INPUTEXTENDS" ]; then PARAM_BIN="$PARAM_BIN -e $INPUTEXTENDS"; fi
 if [ ! -z "$SAME_STRAND" ]; then PARAM_BIN="$PARAM_BIN -r"; fi
+if [ ! -z "$ADDONE" ]; then PARAM_BIN="$PARAM_BIN -n"; fi
 
 ## parse input bam files
 INPUTBAMFILES=$(cat $CONFIGFILE | perl -ane '
@@ -114,11 +117,13 @@ fi
 
 ## populate up and down window length of HFR
 if [ "$REGION" == "promoter" ]; then
-    WIN_DOWN=40
-    WIN_UP=90
+    WIN_DOWN=50
+    WIN_UP=100
+    WIN_FLANKING=200
 else
     WIN_DOWN=50
     WIN_UP=50
+    WIN_FLANKING=200
 fi
 
 #echo -e "WIN_UP: $WIN_UP; WIN_DOWN: $WIN_DOWN"; exit
@@ -131,39 +136,52 @@ cat $INPUTBEDFILE | perl -ane '
         $hfr_end=$F[1]+'$WIN_UP';
 
         $up_start=$hfr_end+1;
-        $up_end=$up_start+100;
+        $up_end=$up_start+'$WIN_FLANKING';
 
-        $nfr_start=$F[1]-($F[6]-10);
-        if($nfr_start < $hfr_start) {
-            $nfr_end=$hfr_start-1;
+        $down_end=$hfr_start-1;
+        $down_start=$down_end-'$WIN_FLANKING';
+
+        $nfr_start=$F[1]-($F[6]);
+        ## this means if nfr_start < 50 (WIN_DOWN) + 1 + 200 (WIN_FLANKING)
+        if($nfr_start < $down_start) {
+            $nfr_end=$down_start-1;
+            $extr_down_end=$nfr_start-1;
+            $extr_down_start=$extr_down_end-'$WIN_FLANKING';
         } else {
+            $nfr_start=$hfr_start;
             $nfr_end=$hfr_end;
+            $extr_down_start=$down_start;
+            $extr_down_end=$down_end;
         }
-
-        $down_end=$nfr_start-1;
-        $down_start=$down_end-100;
     } else {
         $hfr_start=$F[1]-'$WIN_UP';
         $hfr_end=$F[1]+'$WIN_DOWN';
 
         $up_end=$hfr_start-1;
-        $up_start=$up_end-100;
+        $up_start=$up_end-'$WIN_FLANKING';
 
-        $nfr_end=$F[1]+($F[6]-10);
-        if($nfr_end > $hfr_end) {
-            $nfr_start=$hfr_end+1;
+        $down_start=$hfr_end+1;
+        $down_end=$down_start+'$WIN_FLANKING';
+
+        $nfr_end=$F[1]+($F[6]);
+        ## this means if nfr_end > 50 (WIN_DOWN) + 1 + 200 (WIN_FLANKING)
+        if($nfr_end > $down_end) {
+            $nfr_start=$down_end+1;
+            $extr_down_start=$nfr_end+1;
+            $extr_down_end=$extr_down_start+'$WIN_FLANKING';
         } else {
             $nfr_start=$hfr_start;
+            $nfr_end=$hfr_end;
+            $extr_down_start=$down_start;
+            $extr_down_end=$down_end;
         }
-
-        $down_start=$nfr_end+1;
-        $down_end=$down_start+100;
     }
     $line=$F[0]; foreach(@F[1..scalar(@F)-1]) { $line.="#$_"; }
     print "$F[0]\t$up_start\t$up_end\tUP#$F[3]\t0\t$F[5]\t$line\n";
     print "$F[0]\t$hfr_start\t$hfr_end\tHFR#$F[3]\t0\t$F[5]\t$line\n";
-    print "$F[0]\t$nfr_start\t$nfr_end\tNFR#$F[3]\t0\t$F[5]\t$line\n";
     print "$F[0]\t$down_start\t$down_end\tDOWN#$F[3]\t0\t$F[5]\t$line\n";
+    print "$F[0]\t$nfr_start\t$nfr_end\tNFR#$F[3]\t0\t$F[5]\t$line\n";
+    print "$F[0]\t$extr_down_start\t$extr_down_end\tEXTR_DOWN#$F[3]\t0\t$F[5]\t$line\n";
     #chomp($_);
     #print "$_\t$F[0]:$up_start-$up_end\t$F[0]:$hfr_start-$hfr_end\t$F[0]:$nfr_start-$nfr_end\t$F[0]:$down_start-$down_end\n";' | bed2expr -i stdin -j $INPUTBAMFILES -g $GENOME -v $AVG $PARAM_BIN
     
