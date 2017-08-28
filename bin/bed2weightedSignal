@@ -37,18 +37,20 @@ usage() {
     echo " -g <string>   [genome (default: mm9)]"
     echo " -c <int>      [column containing score information in signal file; -j argument (default: 5)]"
     echo "               [if multiple, please separate them by a comma]"
+    echo " -v            [compute using overlap approach (default is closest approach)]"
 	echo " -h            [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:c:h ARG; do
+while getopts i:j:g:c:vh ARG; do
 	case "$ARG" in
 		i) REGIONFILE=$OPTARG;;
 		j) SIGNALFILE=$OPTARG;;
         g) GENOME=$OPTARG;;
         c) SCORE_COL=$OPTARG;;
+        v) OVERLAP_APPROACH=1;;
 		h) HELP=1;;
 	esac
 done
@@ -80,9 +82,6 @@ if [ "$REGIONFILE" == "stdin" ]; then
     REGIONFILE=$TMP
 fi
 
-## determine width of the input regions
-WIDTH=$(zless $REGIONFILE | perl -ane '$max=0; if($F[2]-$F[1] > $max) { $max=$F[2]-$F[1]; } END { print $max; }')
-
 ## reformat score columns based on number of fields in region file
 NCOL_REGION=$(zless $REGIONFILE | head -n 1 | perl -ane 'print scalar(@F);')
 NCOL_SIGNAL=$(zless $SIGNALFILE | head -n 1 | perl -ane 'print scalar(@F);')
@@ -92,7 +91,7 @@ SCORE_COLS=($SCORE_COL)
 IFS=$oIFS
 
 ## compute signal at each input region
-if [ "$WIDTH" -gt 2 ]; then
+if [ ! -z "$OVERLAP_APPROACH" ]; then
     SCORE_COL=$((${SCORE_COLS[0]}+$NCOL_REGION))
     for(( i=1; i<${#SCORE_COLS[@]}; i++)); do
         SCORE_COL="$SCORE_COL,$((${SCORE_COLS[$i]}+$NCOL_REGION))"

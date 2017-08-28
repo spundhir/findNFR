@@ -119,7 +119,10 @@ function wait_for_jobs_to_finish {
 >&2 echo -n "Create directory structure (`date`).. "
 if [ ! -d "$OUTDIR" ]; then
     mkdir -p $OUTDIR
-    mkdir -p $OUTDIR/logs/
+fi
+
+if [ ! -d "$OUTDIR/logs" ]; then
+    mkdir -p $OUTDIR/logs
 fi
 
 if [ ! -d "$OUTDIR/merge_distance" ]; then

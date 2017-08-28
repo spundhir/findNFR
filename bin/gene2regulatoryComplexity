@@ -229,14 +229,20 @@ while read LINE; do
     fi
 
     if [ ! -s "$OUTDIR/peaks/$ID/WS/WS_PROMOTER.BED" ]; then
-        bed2weightedSignal -i $OUTDIR/GENES_PROMOTER.BED -j $OUTDIR/peaks/$ID/PEAKS.BED -g $GENOME -c 5 | sort -k 4,4 > $OUTDIR/peaks/$ID/WS/WS_PROMOTER.BED
+        bed2weightedSignal -i $OUTDIR/GENES_PROMOTER.BED -j $OUTDIR/peaks/$ID/PEAKS.BED -g $GENOME -c 5 -v | sort -k 4,4 > $OUTDIR/peaks/$ID/WS/WS_PROMOTER.BED
     fi
     WS_PROMOTER_FILE="$WS_PROMOTER_FILE $OUTDIR/peaks/$ID/WS/WS_PROMOTER.BED"
 
     if [ ! -s "$OUTDIR/peaks/$ID/WS/WS_DISTAL.BED" ]; then
         TMP_SUB=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
         intersectBed -a $OUTDIR/peaks/$ID/PEAKS.BED -b $OUTDIR/GENES_PROMOTER.BED -v > $TMP_SUB
-        bed2window -i $OUTDIR/GENES_PROMOTER.BED -w 1 | bed2weightedSignal -i stdin -j $TMP_SUB -g $GENOME -c 5 | sort -k 4,4 > $OUTDIR/peaks/$ID/WS/WS_DISTAL.BED
+        
+        ## OBSOLETE: gene with broader promoter (more active) get less weighed signal if we measure peak distance from TSS
+        #bed2window -i $OUTDIR/GENES_PROMOTER.BED -w 1 | bed2weightedSignal -i stdin -j $TMP_SUB -g $GENOME -c 5 | sort -k 4,4 > $OUTDIR/peaks/$ID/WS/WS_DISTAL.BED
+
+        ## NEW: now we are measuring peak distance from gene promoter boundaries defined by gene2promoter script
+        bed2weightedSignal -i $OUTDIR/GENES_PROMOTER.BED -j $TMP_SUB -g $GENOME -c 5 | sort -k 4,4 > $OUTDIR/peaks/$ID/WS/WS_DISTAL.BED
+
         rm $TMP_SUB
     fi
     WS_DISTAL_FILE="$WS_DISTAL_FILE $OUTDIR/peaks/$ID/WS/WS_DISTAL.BED"
