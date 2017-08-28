@@ -119,6 +119,7 @@ function wait_for_jobs_to_finish {
 >&2 echo -n "Create directory structure (`date`).. "
 if [ ! -d "$OUTDIR" ]; then
     mkdir -p $OUTDIR
+    mkdir -p $OUTDIR/logs/
 fi
 
 if [ ! -d "$OUTDIR/merge_distance" ]; then
@@ -151,9 +152,9 @@ fi
 >&2 echo -n "Predict peaks on H3K4me3 data (`date`).. "
 if [ ! -s "$OUTDIR/PEAKS.BED" ]; then
     if [ -z "$CONTROLFILE" ]; then
-        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION &>/dev/null
+        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION &>$OUTDIR/logs/bam2peaks.log
     else
-        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE &>/dev/null
+        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE &>$OUTDIR/logs/bam2peaks.log
     fi
 fi
 >&2 echo "done"
