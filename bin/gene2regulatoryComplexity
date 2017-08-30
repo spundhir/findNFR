@@ -214,6 +214,12 @@ else
 fi
 echo "done"
 
+## create configuration file
+## gene2promoterEnvironment (bed2weightedSignal)
+## gene2enhancerEnvironment (enhancers2classify, bed2weightedSignal)
+## gene2genebodyEnvironment (bed2weightedSignal)
+## gene2chromatinInteractions
+
 echo -n "Compute weighted epigenetic signal for input genes - promoter, distal and gene body (`date`).. "
 WS_PROMOTER_FILE=""
 WS_DISTAL_FILE=""

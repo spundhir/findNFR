@@ -1,0 +1,142 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+gene2SpreadingIndex: predict extend of histone modification spreading at gene bodies as compared to their promoter
+Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+VERSION="0.01"
+GENOME="mm9"
+WINDOW=500
+AVG=0
+
+#### usage ####
+usage() {
+	echo Program: "gene2spreadingIndex (predict extend of histone modification spreading at gene bodies as compared to their promoter)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: $VERSION
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: gene2regulatoryComplexity -i <file> -j <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input genomic coordinates of genes in BED format]"
+    echo "             [format: chr start end name score strand]"
+    echo " -j <file>   [input mapped reads in BAM format]"
+    echo "             [if multiple, separate them by a comma]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo " -w <int>    [flank promoter with input number of bases (default: 500)]"
+    echo " -v <int>    [instead of giving SI for each replicate, output only the mean (deafult: 0)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:w:v:h ARG; do
+	case "$ARG" in
+		i) GENEFILE=$OPTARG;;
+        j) BAMFILE=$OPTARG;;
+        g) BLOCKHEIGHT=$OPTARG;;
+        w) WINDOW=$OPTARG;;
+        v) AVG=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+>&2 echo
+if [ "$HELP" ]; then
+    usage
+fi
+
+>&2 echo
+>&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
+## usage, if necessary file and directories are given/exist
+if [ -z "$GENEFILE" -o -z "$BAMFILE" ]; then
+    echo
+    echo "Error: one or more required paramter values not provided"
+    echo
+	usage
+fi
+>&2 echo "done"
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    echo
+    echo "computation for $GENOME is not available yet"
+    echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    echo
+    usage
+fi
+>&2 echo "done"
+
+## create temporary BED file if input is from stdin
+if [ "$GENEFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo "${LINE}"
+    done | cut -f 1-6 | sort -k 4,4 > $TMP
+    GENEFILE=$TMP
+else
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    zless $GENEFILE | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } print $_;' | cut -f 1-6 | sort -k 4,4 > $TMP
+    GENEFILE=$TMP
+fi
+
+## check if input gene file is in proper format
+NCOL=$(zless $GENEFILE | perl -ane 'print scalar(@F)."\n";' | sort -k 1r,1 | head -n 1)
+if [ "$NCOL" -lt "6" ]; then
+    echo
+    echo "input gene file is not in correct format"
+    echo
+    usage
+fi
+
+## parse input bam files in an array
+oIFS=$IFS
+IFS=","
+BAMFILES=($BAMFILE)
+BAMFILES_COUNT=${#BAMFILES[@]}
+IFS=$oIFS
+
+>&2 echo -n "Start  peaks on input BAM files (`date`).. "
+LAST_COL=$(perl -e '$col=6+'$BAMFILES_COUNT'; print "$col";')
+
+paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) | perl -ane 'chomp($_); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]"; for($i=0; $i<2; $i++) { $col_gb=(6+$i)+2; $col_p=(6+$i); $ratio=sprintf("%0.5f", $F[$col_gb]/$F[$col_p]); print "\t$ratio"; } print "\n";' | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $sum=0; $count=0; for($i=$field_count; $i<scalar(@F); $i++) { $sum+=$F[$i]; $count++; } printf("%0.5f\n", $sum/$count); } else { $_=~s/\s+$//g; print "$_\n"; }'
+
+>&2 echo "done"
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
+
+>&2 echo "All done.. bye"
