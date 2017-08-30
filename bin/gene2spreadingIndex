@@ -127,7 +127,7 @@ BAMFILES=($BAMFILE)
 BAMFILES_COUNT=${#BAMFILES[@]}
 IFS=$oIFS
 
->&2 echo -n "Start  peaks on input BAM files (`date`).. "
+>&2 echo -n "Start computing spreading index for genes using input BAM files (`date`).. "
 LAST_COL=$(perl -e '$col=6+'$BAMFILES_COUNT'; print "$col";')
 
 paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) | perl -ane 'chomp($_); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]"; for($i=0; $i<2; $i++) { $col_gb=(6+$i)+2; $col_p=(6+$i); $ratio=sprintf("%0.5f", $F[$col_gb]/$F[$col_p]); print "\t$ratio"; } print "\n";' | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $sum=0; $count=0; for($i=$field_count; $i<scalar(@F); $i++) { $sum+=$F[$i]; $count++; } printf("%0.5f\n", $sum/$count); } else { $_=~s/\s+$//g; print "$_\n"; }'
