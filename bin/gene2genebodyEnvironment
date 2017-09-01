@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 <<"copyright_info"
-gene2regulatoryComplexity: predict regulatory complexity of genes
+gene2promoterEnvironment: compute chromatin environment at promoters
 Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
 
 This program is free software: you can redistribute it and/or modify
@@ -20,73 +20,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 copyright_info
 
 VERSION="0.01"
-OUTDIR="peaks";
 GENOME="mm9"
-PROCESSOR=1
-
-MINCLUSTERHEIGHT=2
-MINBLOCKHEIGHT=2
-DISTANCE=70
-SCALE="0.6"
-BLOCKHEIGHT="abs"
-PVALUE="0.05"
-MERGEDISTANCE=0
-DISTRIBUTION="nbinom"
-
-WINDOW=1000
+SCORE_COL=5
 
 #### usage ####
 usage() {
-	echo Program: "gene2regulatoryComplexity (predict regulatory complexity of genes)"
+	echo Program: "gene2promoterEnvironment (compute chromatin environment at promoters)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: $VERSION
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: gene2regulatoryComplexity -i <file> -j <file> [OPTIONS]"
+	echo "Usage: gene2promoterEnvironment -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
-	echo " -i <file>   [input genomic coordinates of genes in BED format]"
-    echo "             [format: chr start end name score strand]"
-    echo " -j <file>   [configuration file containing list of BAM files used to compute regulatory complexity]"
-    echo "             [format: each line corresponds to absolute path of BAM files corresponding to one epigenetic mark, eg.]"
-    echo "             [        <ID><SPACE|TAB>h3k27me3_esc_Rep1.bam,h3k27me3_esc_Rep2.bam<SPACE|TAB>control_Rep1.bam]"
-    echo "             [        <ID><SPACE|TAB>h3k4me3_esc_Rep1.bam,h3k4me3_esc_Rep2.bam<SPACE|TAB>control_Rep1.bam]"
-    echo "             [        <ID><SPACE|TAB>h3k4me1_esc_Rep1.bam,h3k4me1_esc_Rep2.bam<SPACE|TAB>control_Rep1.bam]"
+	echo " -i <file>   [input genomic coordinates of promoters in BED format]"
+    echo " -j <file>   [configuration file containing list of histone peak files]"
+    echo "             [format: each line corresponds to absolute path of peak files corresponding to one epigenetic mark, eg.]"
+    echo "             [        <ID><SPACE|TAB>h3k27me3_peaks.bed]"
+    echo "             [        <ID><SPACE|TAB>h3k4me3_peaks.bed]"
+    echo "             [        <ID><SPACE|TAB>h3k4me1_peaks.bed]"
+    echo " -o <dir>    [output directory to store results]"
     echo "[OPTIONS]"
-    echo " -o <dir>    [output directory to store results (default: analysis)"
-    echo " -m <string> [genome (default: mm9)]"
-    echo " -p <int>    [number of processors to use (default: 1)]"
-    echo "[OPTIONS: bam2peaks]"
-    echo " -c <int>    [minimum number of read in the block group (default: 2)]"
-    echo " -e <int>    [minimum number of read in the block (default: 2)]"
-    echo " -x <int>    [maximum distance between the blocks (default: 70)]"
-    echo " -s <float>  [scale to define blocks (default: 0.6)]"
-    echo " -g <int>    [block height (abs or rel) (default: abs)]"
-    echo " -t <float>  [FDR at which to consider a peak as significant (default: 0.05)]"
-    echo " -v <int>    [merge peaks separated by input distance (default: 0)]"
-    echo " -d <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
-    echo "[OPTIONS: gene2promoter]"
-    echo " -w <int>    [assign h3k4me3 peak to a gene as promoter region, if within this distance to TSS (default: 1000 bp)]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo " -c <int>    [column containing score information in histone peak files (default: 5)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:o:m:p:c:e:x:s:g:t:v:d:w:h ARG; do
+while getopts i:j:o:g:c:h ARG; do
 	case "$ARG" in
-		i) GENEFILE=$OPTARG;;
+		i) PROMOTERFILE=$OPTARG;;
         j) CONFIGFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
-        m) GENOME=$OPTARG;;
-        p) PROCESSOR=$OPTARG;;
-        c) MINCLUSTERHEIGHT=$OPTARG;;
-        e) MINBLOCKHEIGHT=$OPTARG;;
-        x) DISTANCE=$OPTARG;;
-        s) SCALE=$OPTARG;;
-        g) BLOCKHEIGHT=$OPTARG;;
-        t) PVALUE=$OPTARG;;
-        v) MERGEDISTANCE=$OPTARG;;
-        d) DISTRIBUTION=$OPTARG;;
-        w) WINDOW=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        c) SCORE_COL=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -99,7 +66,7 @@ fi
 echo
 echo -n "Check, if all required parameters and files are provided (`date`).. "
 ## usage, if necessary file and directories are given/exist
-if [ -z "$GENEFILE" -o ! -f "$CONFIGFILE" ]; then
+if [ -z "$PROMOTERFILE" -o ! -f "$CONFIGFILE" ]; then
     echo
     echo "Error: one or more required paramter values not provided"
     echo
@@ -122,8 +89,6 @@ function wait_for_jobs_to_finish {
 echo -n "Create directory structure (`date`).. "
 if [ ! -d "$OUTDIR" ]; then
     mkdir -p $OUTDIR
-    mkdir -p $OUTDIR/peaks
-    mkdir -p $OUTDIR/chromatin_environment
 fi
 echo "done"
 
@@ -141,114 +106,32 @@ fi
 echo "done"
 
 ## create temporary BED file if input is from stdin
-if [ "$GENEFILE" == "stdin" ]; then
+if [ "$PROMOTERFILE" == "stdin" ]; then
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     while read LINE; do
         echo "${LINE}"
-    done | cut -f 1-6 | sort -k 4,4 > $OUTDIR/$TMP
-    GENEFILE=$OUTDIR/$TMP
+    done > $OUTDIR/$TMP
+    PROMOTERFILE=$OUTDIR/$TMP
 else
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    zless $GENEFILE | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } print $_;' | cut -f 1-6 | sort -k 4,4 > $OUTDIR/$TMP
-    GENEFILE=$OUTDIR/$TMP
+    zless $PROMOTERFILE | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } print $_;' > $OUTDIR/$TMP
+    PROMOTERFILE=$OUTDIR/$TMP
 fi
 
-## check if input gene file is in proper format
-NCOL=$(zless $GENEFILE | perl -ane 'print scalar(@F)."\n";' | sort -k 1r,1 | head -n 1)
-if [ "$NCOL" -lt 6 ]; then
-    echo
-    echo "input gene file is not in correct format"
-    echo
-    usage
-fi
-
-echo -n "Start predicting peaks on input BAM files (`date`).. "
-BAMFILEs=""
-REPLICATES=0
+echo -n "Compute chromatin environment at promoters (`date`).. "
+WS_FILE=""
 while read LINE; do
     TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/) { print "1"; } else { print "0" }')
     [ "$TPM" -eq "1" ] && continue;
 
     ID=$(echo $LINE | perl -ane 'print "$F[0]"')
-    BAMFILE=$(echo $LINE | perl -ane 'print "$F[1]"')
-    CONTROLFILE=$(echo $LINE | perl -ane 'print "$F[2]"')
-    BROAD=$(echo $ID | perl -ane 'if($_!~/^$/ && ($_=~/h3k27me3/i || $_=~/h3k36me3/i || $_=~/h3k9me3/i || $_=~/h3k4me1/i)) { print "1"; } elsif($_!~/^$/) { print "0" }')
-    if [ ! -s "$OUTDIR/peaks/$ID/PEAKS.BED" ]; then
-        if [ -z "$CONTROLFILE" ]; then
-            if [ "$BROAD" -eq 1 ]; then
-                bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -b
-            else
-                bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION
-            fi
-        else
-            if [ "$BROAD" -eq 1 ]; then
-                bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE -b
-            else
-                bam2peaks -i ${BAMFILE} -o $OUTDIR/peaks/$ID -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE
-            fi
-        fi
+    PEAKFILE=$(echo $LINE | perl -ane 'print "$F[1]"')
+
+    FILENAME=$ID_"WS.BED"
+    if [ ! -s "$OUTDIR/$FILENAME" ]; then
+        bed2weightedSignal -i $PROMOTERFILE -j $PEAKFILE -g $GENOME -c $SCORE_COL -v > $OUTDIR/$FILENAME
     fi
-
-    if [ ! -s "$OUTDIR/peaks/$ID/PEAKS.BED" ]; then
-        echo
-        echo "Peak file $OUTDIR/peaks/$ID/PEAKS.BED is not computed properly.. "
-        echo "exiting.. "
-        echo
-        exit
-    fi
-
-    REPLICATES=$(echo $BAMFILE | perl -an -F'/\,/' -e 'print scalar(@F);')
-    BAMFILEs="$BAMFILEs,$BAMFILE"
-done < $CONFIGFILE
-BAMFILEs=$(echo $BAMFILEs | perl -ane '$_=~s/^\,//; print $_;')
-echo "done"
-
-echo -n "Define gene promoter (`date`).. "
-if grep -qw h3k4me3 $CONFIGFILE; then
-    if [ ! -s "$OUTDIR/GENES_PROMOTER.BED" ]; then
-        BAMFILE=$(grep -w h3k4me3 $CONFIGFILE | cut -f 2 -d " ")
-        gene2promoter -i $GENEFILE -j $BAMFILE -o $OUTDIR/peaks/h3k4me3 -n $WINDOW | sort -k 4,4 > $OUTDIR/GENES_PROMOTER.BED
-    fi
-else
-    zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\tNA\n";' | sort -k 4,4 > $OUTDIR/GENES_PROMOTER.BED
-fi
-echo "done"
-
-## create configuration file
-echo -n "Create configuration file to compute chromatin environment of promoters, enhancers and gene body (`date`).. "
-while read LINE; do
-    TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/) { print "1"; } else { print "0" }')
-    [ "$TPM" -eq "1" ] && continue;
-
-    ID=$(echo $LINE | perl -ane 'print "$F[0]"')
-    echo -e "$ID\t$OUTDIR/peaks/$ID/PEAKS.BED"
-done < $CONFIGFILE > $OUTDIR/chromatin_environment/peaks.config
-echo "done"
-
-## gene2promoterEnvironment (bed2weightedSignal)
-gene2promoterEnvironment -i $OUTDIR/GENES_PROMOTER.BED -j $OUTDIR/chromatin_environment/peaks.config -o $OUTDIR/chromatin_environment/promoter -g $GENOME -c 5 > $OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED
-## gene2enhancerEnvironment (enhancers2classify, bed2weightedSignal)
-## gene2genebodyEnvironment (bed2weightedSignal)
-## gene2chromatinInteractions
-exit
-echo -n "Compute weighted epigenetic signal for input genes - promoter, distal and gene body (`date`).. "
-WS_PROMOTER_FILE=""
-WS_DISTAL_FILE=""
-WS_GENEBODY_FILE=""
-while read LINE; do
-    TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/) { print "1"; } else { print "0" }')
-    [ "$TPM" -eq "1" ] && continue;
-
-    ID=$(echo $LINE | perl -ane 'print "$F[0]"')
-
-    if [ ! -d "$OUTDIR/peaks/$ID/WS" ]; then
-        mkdir $OUTDIR/peaks/$ID/WS
-    fi
-
-    if [ ! -s "$OUTDIR/peaks/$ID/WS/WS_PROMOTER.BED" ]; then
-        bed2weightedSignal -i $OUTDIR/GENES_PROMOTER.BED -j $OUTDIR/peaks/$ID/PEAKS.BED -g $GENOME -c 5 -v | sort -k 4,4 > $OUTDIR/peaks/$ID/WS/WS_PROMOTER.BED
-    fi
-    WS_PROMOTER_FILE="$WS_PROMOTER_FILE $OUTDIR/peaks/$ID/WS/WS_PROMOTER.BED"
+    WS_FILE="$WS__FILE $FILENAME"
 
     if [ ! -s "$OUTDIR/peaks/$ID/WS/WS_DISTAL.BED" ]; then
         TMP_SUB=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
