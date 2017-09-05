@@ -1,0 +1,223 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+regions2classify: classify regions based on overlap with different histone modification peaks
+Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+VERSION="0.01"
+GENOME="mm9"
+SCORE_COL=5
+
+OUTDIR="chromhmm"
+CHROMHMMPATH="/home/pundhir/software/ChromHMM"
+PROCESSOR=1
+STATES=15
+
+#### usage ####
+usage() {
+	echo Program: "regions2classify (classify regions based on overlap with different histone modification peaks)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: $VERSION
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: regions2classify -i <file> -j <file> -k <path> [OPTIONS]"
+	echo "Options:"
+    echo " -i <file>   [configuration file containing list of histone peak files]"
+    echo "             [format: each line corresponds to absolute path of peak files corresponding to one epigenetic mark, eg.]"
+    echo "             [        <ID><SPACE|TAB>h3k27me3_peaks.bed]"
+    echo "             [        <ID><SPACE|TAB>h3k4me3_peaks.bed]"
+    echo "             [        <ID><SPACE|TAB>h3k4me1_peaks.bed]"
+    echo " -j <file>   [configuration file containing list of histone bam files]"
+    echo "             [format: each line corresponds to name of bam file for a single epigenetic mark, eg.]"
+    echo "             [        <CELL><TAB><ID><TAB>h3k27me3.bam]"
+    echo "             [        <CELL><TAB><ID><TAB>h3k4me3.bam]"
+    echo " -k <dir>    [absolute path to bam files provided in bam configuration file (-j)]"
+    echo "[OPTIONS]"
+    echo " -o <dir>    [output directory to store results (default: chromhmm)]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo " -c <int>    [column containing score information in histone peak files (default: 5)]"
+    echo "[OPTIONS: ChromHMM]"
+    echo " -t <dir>    [absolute path to ChromHMM jar file (default: /home/pundhir/software/ChromHMM)]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
+    echo " -s <int>    [number of ChromHMM states (default: 15)"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:k:o:g:c:t:p:s:h ARG; do
+	case "$ARG" in
+        i) PEAKCONFIGFILE=$OPTARG;;
+        j) BAMCONFIGFILE=$OPTARG;;
+        k) BAMPATH=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        c) SCORE_COL=$OPTARG;;
+        t) CHROMHMMPATH=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        s) STATES=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+if [ "$HELP" ]; then
+    usage
+fi
+
+>&2 echo
+>&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
+## usage, if necessary file and directories are given/exist
+if [ ! -f "$PEAKCONFIGFILE" -o ! -f "$BAMCONFIGFILE" -o ! -d "$BAMPATH" ]; then
+    echo
+    echo "Error: one or more required paramter values not provided"
+    echo
+	usage
+fi
+>&2 echo "done"
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    echo
+    echo "computation for $GENOME is not available yet"
+    echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    echo
+    usage
+fi
+>&2 echo "done"
+
+>&2 echo -n "Create output directory, if does not exist (`date`).. "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+    mkdir -p $OUTDIR/binary
+fi
+>&2 echo "done"
+
+ID=""
+PEAKFILE=""
+
+while read LINE; do
+    TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/ || $_!~/^h3k/) { print "1"; } else { print "0" }')
+    [ "$TPM" -eq "1" ] && continue;
+
+    ID="$ID,$(echo $LINE | perl -ane 'print "$F[0]"')"
+    PEAKFILE="$PEAKFILE,$(echo $LINE | perl -ane 'print "$F[1]"')"
+done < $PEAKCONFIGFILE
+
+ID=$(echo $ID | perl -ane '$_=~s/^\,//g; print $_;')
+PEAKFILE=$(echo $PEAKFILE | perl -ane '$_=~s/^\,//g; print $_;')
+
+>&2 echo -n "Compile all peaks using multiIntersectBed.sh (`date`).. "
+if [ ! -f "$OUTDIR/all_peaks.bed" ]; then
+    multiIntersectBed.sh -i $PEAKFILE -j $ID > $OUTDIR/all_peaks.bed
+fi
+>&2 echo "done"
+
+>&2 echo -n "Create ChromHMM binary files for input peaks (`date`).. "
+if [ ! $(ls $OUTDIR/binary/*binary* 2>/dev/null | wc -l) -gt 5 ]; then
+    java -mx1600M -jar $CHROMHMMPATH/ChromHMM.jar BinarizeBam $GENOME_FILE $BAMPATH $BAMCONFIGFILE $OUTDIR/binary &>$OUTDIR/chromhmm_binarizebam.log
+fi
+>&2 echo "done"
+
+>&2 echo -n "Segment genome using ChromHMM (`date`).. "
+CELL=$(head -n 1 $BAMCONFIGFILE | cut -f 1)
+SEGMENTFILE="$OUTDIR/$CELL""_$STATES""_segments.bed"
+if [ ! -f "$SEGMENTFILE" ]; then
+    unset DISPLAY
+    java -mx1600M -jar $CHROMHMMPATH/ChromHMM.jar LearnModel -p 5 -nobrowser $OUTDIR/binary $OUTDIR $STATES $GENOME &>$OUTDIR/chromhmm_learnmodel.log
+    ## using more processors throws memory error
+fi
+>&2 echo "done"
+
+>&2 echo -n "Classify input peaks based on their overlap with genome segments (`date`).. "
+if [ ! -f "$OUTDIR/all_peaks.bed.class" ]; then
+    intersectBed -a $OUTDIR/all_peaks.bed -b $SEGMENTFILE -wao | intersectBed2uniq -i stdin -v | perl -ane '
+        if($_=~/^\s*$/) { next; }
+        else { 
+            $class="other";
+            if($F[4]=~/h3k4me3/) {
+                $class="promoter_primed";
+                if($F[4]=~/h3k27me3/) { $class="promoter_bivalent"; }
+                elsif($F[4]=~/h3k27ac/) { $class="promoter_active"; }
+            }
+            elsif($F[4]=~/h3k4me1/) {
+                $class="enhancer_primed";
+                if($F[4]=~/h3k27me3/) { $class="enhancer_poised"; }
+                elsif($F[4]=~/h3k27ac/) { $class="enhancer_active"; }
+            }
+            elsif($F[4]=~/h3k27me3/) { $class="repressed_polycomb"; }
+            elsif($F[4]=~/h3k9me3/) { $class="repressed_heterochromatin"; }
+            elsif($F[4]=~/h3k36me3/) { $class="transcribed"; }
+            elsif($F[4]=~/h3k27ac/) { $class="active"; }
+        } 
+        #$class=$F[4];
+        print "$F[0]\t$F[1]\t$F[2]\t$class\t".($F[scalar(@F)-2])."\t.\n"; ' > $OUTDIR/all_peaks.bed.class
+
+        cat $OUTDIR/all_peaks.bed.class | cut -f 4,5 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 3,3 -k 1rn,1 | perl -ane 'if(!$seen{$F[2]}) { print $_; $seen{$F[2]}=1; }' > $OUTDIR/all_peaks.bed.classDefinition
+
+        ## UPDATE CLASS BASED ON GENOME SEGMENTATION
+        cat $OUTDIR/all_peaks.bed.class | perl -ane '
+            BEGIN {
+                open(INFILE, "'$OUTDIR'/all_peaks.bed.classDefinition");
+                %class_deffinition=();
+                foreach(<INFILE>) {
+                    @t=split(/\s+/,$_);
+                    $class_definition{$t[2]}=$t[1];
+                }
+            }
+            $F[3]=$class_definition{$F[4]};
+            print "$F[0]";
+            foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $OUTDIR/all_peaks.bed.class.tmp
+
+            mv $OUTDIR/all_peaks.bed.class.tmp $OUTDIR/all_peaks.bed.class
+fi
+>&2 echo "done"
+
+>&2 echo -n "Compute total signal for all peak regions (`date`).. "
+SCORE_COL=$(echo $SCORE_COL | perl -ane '$sum=$_+6; print $sum;')
+HEADER="chr\tstart\tend\tclass\tsegment\tstrand"
+COMMAND="paste $OUTDIR/all_peaks.bed.class"
+
+while read LINE; do
+    TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/) { print "1"; } else { print "0" }')
+    [ "$TPM" -eq "1" ] && continue;
+
+    ID=$(echo $LINE | perl -ane 'print $F[0];')
+    FILE=$(echo $LINE | perl -ane 'print $F[1];')
+
+    HEADER="$HEADER\t$ID"
+    COMMAND="$COMMAND <(intersectBed -a $OUTDIR/all_peaks.bed.class -b $FILE -wao | intersectBed2uniq -i stdin -c $SCORE_COL -o sum -n 6 | perl -ane '\$score=\$F[scalar(@F)-1]; if(\$score<0) { \$score=0; } print \"\$score\n\";')" 
+done < $PEAKCONFIGFILE
+
+echo -e $HEADER
+eval $COMMAND
+>&2 echo "done"

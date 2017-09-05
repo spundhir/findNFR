@@ -22,6 +22,9 @@ copyright_info
 VERSION="0.01"
 GENOME="mm9"
 SCORE_COL=5
+CHROMHMMPATH="/home/pundhir/software/ChromHMM"
+PROCESSOR=1
+STATES=15
 
 #### usage ####
 usage() {
@@ -29,34 +32,48 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: $VERSION
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: gene2enhancerEnvironment -i <file> -j <file> -o <dir> [OPTIONS]"
+	echo "Usage: gene2enhancerEnvironment -i <file> -j <file> -k <dir> -l <file> -o <dir> [OPTIONS]"
 	echo "Options:"
-	echo " -i <file>   [input genomic coordinates of promoters in BED format]"
-    echo " -j <file>   [configuration file containing list of histone peak files]"
+    echo " -i <file>   [configuration file containing list of histone peak files]"
     echo "             [format: each line corresponds to absolute path of peak files corresponding to one epigenetic mark, eg.]"
     echo "             [        <ID><SPACE|TAB>h3k27me3_peaks.bed]"
     echo "             [        <ID><SPACE|TAB>h3k4me3_peaks.bed]"
     echo "             [        <ID><SPACE|TAB>h3k4me1_peaks.bed]"
+    echo " -j <file>   [configuration file containing list of histone bam files]"
+    echo "             [format: each line corresponds to name of bam file for a single epigenetic mark, eg.]"
+    echo "             [        <CELL><TAB><ID><TAB>h3k27me3.bam]"
+    echo "             [        <CELL><TAB><ID><TAB>h3k4me3.bam]"
+    echo " -k <dir>    [absolute path to bam files provided in bam configuration file (-k)]"
+	echo " -l <file>   [input genomic coordinates of promoters in BED format (can be stdin)]"
     echo " -o <dir>    [output directory to store results]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
     echo " -c <int>    [column containing score information in histone peak files (default: 5)]"
     echo " -e <file>   [input genomic coordinates of enhancers in BED format]"
     echo "             [if provided, peaks overlapping enhancers will be used for analysis]"
+    echo "[OPTIONS: ChromHMM]"
+    echo " -t <dir>    [absolute path to ChromHMM jar file (default: /home/pundhir/software/ChromHMM)]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
+    echo " -s <int>    [number of ChromHMM states (default: 15)"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:o:g:c:e:h ARG; do
+while getopts i:j:k:l:o:g:c:e:t:p:s:h ARG; do
 	case "$ARG" in
-		i) PROMOTERFILE=$OPTARG;;
-        j) CONFIGFILE=$OPTARG;;
+        i) PEAKCONFIGFILE=$OPTARG;;
+        j) BAMCONFIGFILE=$OPTARG;;
+        k) BAMPATH=$OPTARG;;
+		l) PROMOTERFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         g) GENOME=$OPTARG;;
         c) SCORE_COL=$OPTARG;;
         e) ENHANCERFILE=$OPTARG;;
+        t) CHROMHMMPATH=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        s) STATES=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -69,7 +86,7 @@ fi
 echo
 echo -n "Check, if all required parameters and files are provided (`date`).. "
 ## usage, if necessary file and directories are given/exist
-if [ -z "$PROMOTERFILE" -o ! -f "$CONFIGFILE" ]; then
+if [ ! -f "$PEAKCONFIGFILE" -o ! -f "$BAMCONFIGFILE" -o ! -d "$BAMPATH" -o -z "$PROMOTERFILE" ]; then
     echo
     echo "Error: one or more required paramter values not provided"
     echo
@@ -121,6 +138,12 @@ else
     PROMOTERFILE=$OUTDIR/$TMP
 fi
 
+## classify peaks into genome segments using ChromHMM
+if [ ! -f "$OUTDIR/REGIONS.BED" ]; then
+    regions2classify -i $PEAKCONFIGFILE -j $BAMCONFIGFILE -k $BAMPATH -o $OUTDIR/chromhmm -g $GENOME -c $SCORE_COL -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/REGIONS.BED
+fi
+
+exit
 echo -n "Compute chromatin environment at promoters (`date`).. "
 WS_FILE=""
 while read LINE; do

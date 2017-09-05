@@ -35,6 +35,9 @@ DISTRIBUTION="nbinom"
 
 WINDOW=1000
 
+CHROMHMMPATH="/home/pundhir/software/ChromHMM"
+STATES=15
+
 #### usage ####
 usage() {
 	echo Program: "gene2regulatoryComplexity (predict regulatory complexity of genes)"
@@ -65,13 +68,18 @@ usage() {
     echo " -d <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
     echo "[OPTIONS: gene2promoter]"
     echo " -w <int>    [assign h3k4me3 peak to a gene as promoter region, if within this distance to TSS (default: 1000 bp)]"
+    echo "[OPTIONS: gene2enhancerEnvironment]"
+    echo " -r <dir>    [absolute path to ChromHMM jar file (default: /home/pundhir/software/ChromHMM)]"
+    echo " -a <int>    [number of ChromHMM states (default: 15)"
+    echo " -l <file>   [input genomic coordinates of enhancers in BED format]"
+    echo "             [if provided, peaks overlapping enhancers will be used for analysis]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:o:m:p:c:e:x:s:g:t:v:d:w:h ARG; do
+while getopts i:j:o:m:p:c:e:x:s:g:t:v:d:w:r:a:l:h ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
         j) CONFIGFILE=$OPTARG;;
@@ -87,6 +95,9 @@ while getopts i:j:o:m:p:c:e:x:s:g:t:v:d:w:h ARG; do
         v) MERGEDISTANCE=$OPTARG;;
         d) DISTRIBUTION=$OPTARG;;
         w) WINDOW=$OPTARG;;
+        r) CHROMHMMPATH=$OPTARG;;
+        a) STATES=$OPTARG;;
+        l) ENHANCERFILE=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -214,7 +225,7 @@ else
 fi
 echo "done"
 
-## create configuration file
+## create configuration files
 echo -n "Create configuration file to compute chromatin environment of promoters, enhancers and gene body (`date`).. "
 while read LINE; do
     TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/) { print "1"; } else { print "0" }')
@@ -223,11 +234,27 @@ while read LINE; do
     ID=$(echo $LINE | perl -ane 'print "$F[0]"')
     echo -e "$ID\t$OUTDIR/peaks/$ID/PEAKS.BED"
 done < $CONFIGFILE > $OUTDIR/chromatin_environment/peaks.config
+
+while read LINE; do
+    TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/ || $_!~/^h3k/) { print "1"; } else { print "0" }')
+    [ "$TPM" -eq "1" ] && continue;
+
+    ID=$(echo $LINE | perl -ane 'print "$F[0]"')
+    FILE=$(echo $LINE | perl -ane '$F[1]=~s/^.*\///g; print $F[1];')
+    BAMPATH=$(echo $LINE | perl -ane '$F[1]=~s/\/[^\/]+$//g; print $F[1];')
+    echo -e "cell\t$ID\t$FILE"
+done < $CONFIGFILE > $OUTDIR/chromatin_environment/bam.config
 echo "done"
 
 ## gene2promoterEnvironment (bed2weightedSignal)
 gene2promoterEnvironment -i $OUTDIR/GENES_PROMOTER.BED -j $OUTDIR/chromatin_environment/peaks.config -o $OUTDIR/chromatin_environment/promoter -g $GENOME -c 5 > $OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED
-## gene2enhancerEnvironment (enhancers2classify, bed2weightedSignal)
+
+## gene2enhancerEnvironment (regions2classify, bed2weightedSignal)
+if [ -z "$ENHANCERFILE" ]; then
+    gene2enhancerEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l $OUTDIR/GENES_PROMOTER.BED -o $OUTDIR/chromatin_environment/enhancer -g $GENOME -c 5 -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED 
+else
+    gene2enhancerEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l $OUTDIR/GENES_PROMOTER.BED -o $OUTDIR/chromatin_environment/enhancer -g $GENOME -c 5 -e $ENHANCERFILE -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED
+fi
 ## gene2genebodyEnvironment (bed2weightedSignal)
 ## gene2chromatinInteractions
 exit
