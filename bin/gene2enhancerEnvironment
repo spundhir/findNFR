@@ -138,9 +138,21 @@ else
     PROMOTERFILE=$OUTDIR/$TMP
 fi
 
-## classify peaks into genome segments using ChromHMM
-if [ ! -f "$OUTDIR/REGIONS.BED" ]; then
-    regions2classify -i $PEAKCONFIGFILE -j $BAMCONFIGFILE -k $BAMPATH -o $OUTDIR/chromhmm -g $GENOME -c $SCORE_COL -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/REGIONS.BED
+## annotate peaks using genome segments from ChromHMM
+if [ ! -f "$OUTDIR/ANNOTATEDPEAKS.BED" ]; then
+    regions2classify -i $PEAKCONFIGFILE -j $BAMCONFIGFILE -k $BAMPATH -o $OUTDIR/chromhmm -g $GENOME -c $SCORE_COL -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/ANNOTATEDPEAKS.BED
+fi
+
+## assign annotated peaks to genes and compute weighted signal
+COL=$(zless $OUTDIR/ANNOTATEDPEAKS.BED | grep -v start | head -n 1 | perl -ane '$col="7"; for($i=8; $i<=scalar(@F); $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
+
+if [ -f "$ENHANCERFILE" ]; then
+    TMP_SUB=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    intersectBed -a <(zless $OUTDIR/ANNOTATEDPEAKS.BED | grep -v start) -b $ENHANCERFILE -u > $TMP_SUB
+    bed2weightedSignal -i $PROMOTERFILE -j $TMP_SUB -g $GENOME -c $COL -s 4
+    rm $TMP_SUB
+else
+    bed2weightedSignal -i $PROMOTERFILE -j $OUTDIR/ANNOTATEDPEAKS.BED -g $GENOME -c $COL -s 4
 fi
 
 exit
