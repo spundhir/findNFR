@@ -3,7 +3,7 @@ suppressPackageStartupMessages(library("optparse"))
 
 ## parse command line arguments
 option_list <- list(
-	make_option(c("-i", "--inFile"), help="input file containing score values (can be stdin)"),
+	make_option(c("-i", "--inFile"), help="input file containing score values (can be stdin) (format: tab separated <coor><segment><scores>distance>)"),
     make_option(c("-s", "--scoreCol"), help="column in input file that contains score information. If multiple, separate them by a comma"),
     make_option(c("-d", "--distanceCol"), help="column in input file that contains distance information"),
     make_option(c("-t", "--segmentCol"), help="column in input file that contains genome segment information compted by ChromHMM")

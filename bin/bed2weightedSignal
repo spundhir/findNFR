@@ -117,7 +117,6 @@ COMMENT
     TMP_ANNOTATEDPROMOTERFILE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     cat $PROMOTERFILE | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$TMP_CLOSESTBED' -m 1`; if($match=~/^$/) { chomp($_); print "$_"; for($i=0; $i<'$N'; $i++) { print "\tNA"; } print "\n"; } else { chomp($match); print "$match\n"; }' > $TMP_ANNOTATEDPROMOTERFILE
     
-    TMP_ANNOTATEDPROMOTERFILE="uCDOM0LUN4pdl403xZNVJ34Pr4nOzLIC"
     if [ ! -z "$SEGMENT_COL" ]; then
         SEGMENT_COL=$(($NCOL_PROMOTER+1))
         SCORE_COL=$(($NCOL_PROMOTER+2))
@@ -133,10 +132,14 @@ COMMENT
 
     #echo -e "$SCORE_COL\t$DISTANCE_COL\t$SEGMENT_COL"
 
-    $FINDNFRPATH/share/R/bed2weightedSignal.R -i $TMP_ANNOTATEDPROMOTERFILE -s $SCORE_COL -d $DISTANCE_COL -t $SEGMENT_COL
+    if [ ! -z "$SEGMENT_COL" ]; then
+        $FINDNFRPATH/share/R/bed2weightedSignal.R -i $TMP_ANNOTATEDPROMOTERFILE -s $SCORE_COL -d $DISTANCE_COL -t $SEGMENT_COL
+    else
+        $FINDNFRPATH/share/R/bed2weightedSignal.R -i $TMP_ANNOTATEDPROMOTERFILE -s $SCORE_COL -d $DISTANCE_COL
+    fi
 
-    #rm $TMP_CLOSESTBED
-    #rm $TMP_ANNOTATEDPROMOTERFILE
+    rm $TMP_CLOSESTBED
+    rm $TMP_ANNOTATEDPROMOTERFILE
 fi
 
 ## remove temporary file, if exists

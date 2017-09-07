@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 <<"copyright_info"
-regions2classify: classify regions based on overlap with different histone modification peaks
+regions2classify: annotate peaks using genome segments defined by ChromHMM
 Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
 
 This program is free software: you can redistribute it and/or modify
@@ -30,7 +30,7 @@ STATES=15
 
 #### usage ####
 usage() {
-	echo Program: "regions2classify (classify regions based on overlap with different histone modification peaks)"
+	echo Program: "regions2classify (annotate peaks using genome segments defined by ChromHMM)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: $VERSION
 	echo Contact: pundhir@binf.ku.dk

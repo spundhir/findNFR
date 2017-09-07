@@ -247,17 +247,33 @@ done < $CONFIGFILE > $OUTDIR/chromatin_environment/bam.config
 echo "done"
 
 ## gene2promoterEnvironment (bed2weightedSignal)
-gene2promoterEnvironment -i $OUTDIR/GENES_PROMOTER.BED -j $OUTDIR/chromatin_environment/peaks.config -o $OUTDIR/chromatin_environment/promoter -g $GENOME -c 5 > $OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED
+echo -n "Compute promoter environment (`date`).. "
+if [ ! -f "$OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED" ]; then
+    gene2promoterEnvironment -i $OUTDIR/GENES_PROMOTER.BED -j $OUTDIR/chromatin_environment/peaks.config -o $OUTDIR/chromatin_environment/promoter -g $GENOME -c 5 > $OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED
+fi
+echo "done"
 
 ## gene2enhancerEnvironment (regions2classify, bed2weightedSignal)
-if [ -z "$ENHANCERFILE" ]; then
+echo -n "Compute enhancer environment (`date`).. "
+if [ -z "$ENHANCERFILE" -a ! -f "$OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED" ]; then
     gene2enhancerEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l $OUTDIR/GENES_PROMOTER.BED -o $OUTDIR/chromatin_environment/enhancer -g $GENOME -c 5 -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED 
-else
+elif [ ! -f "$OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED" ]; then
     gene2enhancerEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l $OUTDIR/GENES_PROMOTER.BED -o $OUTDIR/chromatin_environment/enhancer -g $GENOME -c 5 -e $ENHANCERFILE -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED
 fi
-## gene2genebodyEnvironment (bed2weightedSignal)
-## gene2chromatinInteractions
-exit
+echo "done"
+
+## gene2chromatinInteractions (to-do)
+
+echo -n "Compile all the results together in one file (`date`).. "
+NCOL_PROMOTER=$(zless $OUTDIR/GENES_PROMOTER.BED | head -n 1 | perl -ane 'print scalar(@F);')
+NCOL_PROMOTER_ENVIRONMENT=$(zless $OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED | head -n 1 | perl -ane 'print scalar(@F);')
+NCOL_ENHANCER_ENVIRONMENT=$(zless $OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED | head -n 1 | perl -ane 'print scalar(@F);')
+
+paste <(cut -f 1-$NCOL_PROMOTER $OUTDIR/GENES_PROMOTER.BED) <(cut -f $(($NCOL_PROMOTER+1))-$NCOL_PROMOTER_ENVIRONMENT $OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED) <(cut -f $(($NCOL_PROMOTER+1))-$NCOL_ENHANCER_ENVIRONMENT $OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED) > $OUTDIR/GENES_PROMOTER.BED.RC
+echo "done"
+
+## OLD
+<<"COMMENT"
 echo -n "Compute weighted epigenetic signal for input genes - promoter, distal and gene body (`date`).. "
 WS_PROMOTER_FILE=""
 WS_DISTAL_FILE=""
@@ -347,6 +363,7 @@ paste $WS_GENEBODY_FILE | cut -f $WS_GENEBODY_COLUMNS >> $OUTDIR/RC_GENEBODY.BED
 
 paste $OUTDIR/RC_PROMOTER.BED <(cut -f 11-$((WS_PROMOTER_FILES_COUNT+10)) $OUTDIR/RC_DISTAL.BED) <(cut -f 7-$((WS_PROMOTER_FILES_COUNT+6)) $OUTDIR/RC_GENEBODY.BED) > $OUTDIR/RC.BED
 echo "done"
+COMMENT
 
 <<"COMMENT"
 echo -n "Compute regulatory complexity of input genes using histone reads overlapping to gene promoters (`date`).. "
