@@ -68,7 +68,7 @@ usage() {
     echo " -d <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
     echo "[OPTIONS: gene2promoter]"
     echo " -w <int>    [assign h3k4me3 peak to a gene as promoter region, if within this distance to TSS (default: 1000 bp)]"
-    echo "[OPTIONS: gene2enhancerEnvironment]"
+    echo "[OPTIONS: gene2distalEnvironment]"
     echo " -r <dir>    [absolute path to ChromHMM jar file (default: /home/pundhir/software/ChromHMM)]"
     echo " -a <int>    [number of ChromHMM states (default: 15)"
     echo " -l <file>   [input genomic coordinates of enhancers in BED format]"
@@ -226,7 +226,7 @@ fi
 echo "done"
 
 ## create configuration files
-echo -n "Create configuration file to compute chromatin environment of promoters, enhancers and gene body (`date`).. "
+echo -n "Create configuration file to compute chromatin environment at promoters, distal and gene body (`date`).. "
 while read LINE; do
     TPM=$(echo $LINE | perl -ane 'if($F[0]=~/tpm/ || $_=~/^$/) { print "1"; } else { print "0" }')
     [ "$TPM" -eq "1" ] && continue;
@@ -253,12 +253,12 @@ if [ ! -f "$OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED" ]; then
 fi
 echo "done"
 
-## gene2enhancerEnvironment (regions2classify, bed2weightedSignal)
-echo -n "Compute enhancer environment (`date`).. "
-if [ -z "$ENHANCERFILE" -a ! -f "$OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED" ]; then
-    gene2enhancerEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l $OUTDIR/GENES_PROMOTER.BED -o $OUTDIR/chromatin_environment/enhancer -g $GENOME -c 5 -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED 
-elif [ ! -f "$OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED" ]; then
-    gene2enhancerEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l $OUTDIR/GENES_PROMOTER.BED -o $OUTDIR/chromatin_environment/enhancer -g $GENOME -c 5 -e $ENHANCERFILE -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED
+## gene2distalEnvironment (regions2classify, bed2weightedSignal)
+echo -n "Compute distal environment (`date`).. "
+if [ -z "$ENHANCERFILE" -a ! -f "$OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED" ]; then
+    gene2distalEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l $OUTDIR/GENES_PROMOTER.BED -o $OUTDIR/chromatin_environment/distal -g $GENOME -c 5 -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED 
+elif [ ! -f "$OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED" ]; then
+    gene2distalEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l $OUTDIR/GENES_PROMOTER.BED -o $OUTDIR/chromatin_environment/distal -g $GENOME -c 5 -e $ENHANCERFILE -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED
 fi
 echo "done"
 
@@ -267,9 +267,19 @@ echo "done"
 echo -n "Compile all the results together in one file (`date`).. "
 NCOL_PROMOTER=$(zless $OUTDIR/GENES_PROMOTER.BED | head -n 1 | perl -ane 'print scalar(@F);')
 NCOL_PROMOTER_ENVIRONMENT=$(zless $OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED | head -n 1 | perl -ane 'print scalar(@F);')
-NCOL_ENHANCER_ENVIRONMENT=$(zless $OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED | head -n 1 | perl -ane 'print scalar(@F);')
+NCOL_DISTAL_ENVIRONMENT=$(zless $OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED | head -n 1 | perl -ane 'print scalar(@F);')
 
-paste <(cut -f 1-$NCOL_PROMOTER $OUTDIR/GENES_PROMOTER.BED) <(cut -f $(($NCOL_PROMOTER+1))-$NCOL_PROMOTER_ENVIRONMENT $OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED) <(cut -f $(($NCOL_PROMOTER+1))-$NCOL_ENHANCER_ENVIRONMENT $OUTDIR/chromatin_environment/ENHANCER_ENVIRONMENT.BED) > $OUTDIR/GENES_PROMOTER.BED.RC
+paste <(cut -f 1-$NCOL_PROMOTER $OUTDIR/GENES_PROMOTER.BED) <(cut -f $(($NCOL_PROMOTER+1))-$NCOL_PROMOTER_ENVIRONMENT $OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED) <(cut -f $(($NCOL_PROMOTER+1))-$NCOL_DISTAL_ENVIRONMENT $OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED) > $OUTDIR/GENES_PROMOTER.BED.RC
+echo "done"
+
+echo -n "Define enhancers (`date`).. "
+if grep -qw h3k4me1 $CONFIGFILE; then
+    if [ ! -s "$OUTDIR/ENHANCERS.BED" ]; then
+        grep -v start $OUTDIR/chromatin_environment/distal/DISTALPEAKS.BED | grep enhancer | bed2nfr -i stdin -j $OUTDIR/peaks/h3k4me1/PEAKS.BED -g $GENOME | perl -ane '$i++; print "$F[0]\t$F[1]\t$F[2]\t$F[3]_$i\t0\t.\t".$F[scalar(@F)-2]."\t".$F[scalar(@F)-1]."\n";' | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 | perl -ane '$key="$F[0]_$F[1]_$F[2]"; if(!$seen{$key}) { print $_; $seen{$key}=1; }' > $OUTDIR/ENHANCERS.BED
+    fi
+else
+    grep -v start $OUTDIR/chromatin_environment/distal/DISTALPEAKS.BED | grep enhancer | perl -ane '$i++; print "$F[0]\t$F[1]\t$F[2]\t$F[3]_$i\t0\t.\tNA\tNA\n";' > $OUTDIR/ENHANCERS.BED
+fi
 echo "done"
 
 ## OLD

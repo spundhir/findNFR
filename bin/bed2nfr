@@ -30,7 +30,8 @@ usage() {
 	echo "Usage: bed2nfr -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input genomic coordinates of regions of interest in BED format (can be stdin)]"
-    echo " -j <file>   [input genomic coordinates of accessible or histone modified chromatin]"
+    echo " -j <file>   [input genomic coordinates of accessible or histone modified chromatin as peaks]"
+    echo "             [FORMAT: chr start end name score strand]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
     echo " -a          [define using chromatin accessibility data (default: histone modification)]"
@@ -40,10 +41,10 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:g:a:h ARG; do
+while getopts i:j:g:ah ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
-        j) CHROMATINFILE=$OPTARG;;
+        j) PEAKFILE=$OPTARG;;
         g) GENOME=$OPTARG;;
         a) ACCESSIBLE=1;;
 		h) HELP=1;;
@@ -58,7 +59,7 @@ fi
 >&2 echo
 >&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
 ## usage, if necessary file and directories are given/exist
-if [ -z "$GENEFILE" -o -z "$CHROMATINFILE" ]; then
+if [ -z "$GENEFILE" -o -z "$PEAKFILE" ]; then
     >&2 echo
     >&2 echo "Error: one or more required paramter values not provided"
     >&2 echo
@@ -100,20 +101,60 @@ if [ "$GENEFILE" == "stdin" ]; then
         echo ${LINE}
     done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
     GENEFILE=$TMP
+else
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    zless $GENEFILE > $TMP
+    GENEFILE=$TMP
 fi
 
 NCOL_GENEFILE=$(zless $GENEFILE | head -n 1 | perl -ane 'print scalar(@F);')
+NCOL_PEAKFILE=$(zless $PEAKFILE | head -n 1 | perl -ane 'print scalar(@F);')
 
-#closestBed -a <(sortBed -i ~/project/genome_annotations/refseqGenes_mm9_tss.bed) -b <(sortBed -i analysis/esc/peaks/h3k4me3/PEAKS.BED | cut -f 1-3) -D ref -k 2 | sort -k 4,4 -k 10n,10  | perl -ane '$id="$F[0]_$F[1]_$F[2]_$F[3]_$F[5]"; if(!$nfr{$id}) { $nfr{$id}{start}="NA"; $nfr{$id}{startPeak}="NA"; if(abs($F[9]) < 500) { $nfr{$id}{start}=$F[8]; $nfr{$id}{startPeak}="$F[6]_$F[7]_$F[8]"; } } else { $nfr{$id}{end}="NA"; $nfr{$id}{endPeak}="NA"; if(abs($F[9]) < 500) { $nfr{$id}{end}=$F[7]; $nfr{$id}{endPeak}="$F[6]_$F[7]_$F[8]"; } print "$F[0]\t$nfr{$id}{start}\t$nfr{$id}{end}\t$id\t$nfr{$id}{startPeak}\t$nfr{$id}{endPeak}\n"; }' | perl -ane '$status="both"; if($F[1]=~/NA/ && $F[2]=~/NA/) { @t=split(/\_/,$F[3]); $F[1]=$t[1]-50; $F[2]=$t[1]+50; $status="none"; } elsif($F[1]=~/NA/) { @t=split(/\_/,$F[5]); $F[1]=$t[1]; $F[2]=$t[2]; $status="one"; } elsif($F[2]=~/NA/) { @t=split(/\_/,$F[4]); $F[1]=$t[1]; $F[2]=$t[2]; $status="one"; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$status\n"; '
+## check if peak file is in correct format
+if [ "$NCOL_PEAKFILE" -lt 6 ]; then
+    echo
+    echo "Peak file should be in format: chr start end name score strand"
+    usage
+fi
 
+## start analysis
 if [ ! -z "$ACCESSIBLE" ]; then
-    closestBed -a <(zless $GENEFILE | bed2window -i stdin -w 1 | sortBed -i stdin) -b <(sortBed -i $CHROMATINFILE) -d -t first | perl -ane 'if($F[scalar(@F)-1]<=50) { print "$F[0]\t$F['$((NCOL_GENEFILE+1))']\t$F['$((NCOL_GENEFILE+2))']"; foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; } print "\n"; } else { $mid=sprintf("%d", ($F[1]+$F[2])/2); $start=$mid; $end=$mid+1; print "$F[0]\t$start\t$end"; foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; } print "\n"; }'
+    intersectBed -a <(zless $GENEFILE | sortBed -i stdin) -b <(zless $PEAKFILE | sortBed -i stdin) -wao | sort -k 1,1 -k 2n,2 -k 3n,3 -k $(($NCOL_GENEFILE+5))rg,$(($NCOL_GENEFILE+5)) | perl -ane '
+        $ncol='$NCOL_GENEFILE';
+        $key="$F[0]_$F[1]_$F[2]"; 
+        if(!$seen{$key}) {
+            if($F[$ncol+1]>0 && $F[$ncol+2]>0) { $start=$F[$ncol+1]; $end=$F[$ncol+2]; $class="Y"; }
+            else { $start=$F[1]; $end=$F[2]; $class="N"; }
+            $seen{$key}=1;
+            print "$F[0]\t$start\t$end\t"; foreach(@F[3..($ncol-1)]) { print "$_\t"; } print "$class\n";
+        }'
 else
-    #paste <(closestBed -a <(sortBed -i ~/project/genome_annotations/refseqGenes_mm9_tss.bed) -b <(sortBed -i analysis/esc/peaks/h3k4me3/PEAKS.BED | cut -f 1-3) -D ref -fu -t first) <(closestBed -a <(sortBed -i ~/project/genome_annotations/refseqGenes_mm9_tss.bed) -b <(sortBed -i analysis/esc/peaks/h3k4me3/PEAKS.BED | cut -f 1-3) -D ref -fd -t first) | perl -ane 'if(($F[9]!=-1 && abs($F[9]) < 1000) || ($F[19]!=-1 && abs($F[19]) < 1000)) { $start=$F[1]-100; if($F[9]!=-1 && abs($F[9]) < 1000) { $start=$F[8]; } $end=$F[1]+100; if($F[19]!=-1 && abs($F[19]) < 1000) { $end=$F[17]; } chomp($_); print "$_\t$F[0]\t$start\t$end\n"; }' | less
+    closestBed -a <(intersectBed -a <(zless $GENEFILE | sortBed -i stdin) -b <(zless $PEAKFILE | sortBed -i stdin) -wao | sort -k 1,1 -k 2n,2 -k 3n,3 -k $(($NCOL_GENEFILE+5))rg,$(($NCOL_GENEFILE+5)) | perl -ane '
+        $ncol='$NCOL_GENEFILE';
+        $key="$F[0]_$F[1]_$F[2]"; 
+        if(!$seen{$key}) {
+            if($F[$ncol+1]>0 && $F[$ncol+2]>0) { $start=$F[$ncol+1]; $end=$F[$ncol+2]; $class="Y"; }
+            else { $start=$F[1]; $end=$F[2]; $class="N"; }
+            $seen{$key}=1;
+            print "$F[0]\t$start\t$end\t"; foreach(@F[3..($ncol-1)]) { print "$_\t"; } print "$class\n";
+        }') -b <(zless $PEAKFILE | sortBed -i stdin) -D ref -t first -io | perl -ane '
+            $ncol='$NCOL_GENEFILE'+1;
+            if($F[scalar(@F)-1] < 500 && $F[scalar(@F)-1]>0) { $start=$F[2]; $end=$F[$ncol+1]; $class="$F[$ncol-1]_Y"; }
+            elsif($F[scalar(@F)-1] > -500 && $F[scalar(@F)-1]<0) { $start=$F[$ncol+2]; $end=$F[1]; $class="Y_$F[$ncol-1]"; }
+            else { $start=$F[1]; $end=$F[2]; $class="N"; }
+            $width=$end-$start;
+            print "$F[0]\t$start\t$end\t"; foreach(@F[3..($ncol-2)]) { print "$_\t"; } print "$class\t$width\n";'
 fi
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
     rm $TMP
 fi
+
+## OLD 
+#closestBed -a <(sortBed -i ~/project/genome_annotations/refseqGenes_mm9_tss.bed) -b <(sortBed -i analysis/esc/peaks/h3k4me3/PEAKS.BED | cut -f 1-3) -D ref -k 2 | sort -k 4,4 -k 10n,10  | perl -ane '$id="$F[0]_$F[1]_$F[2]_$F[3]_$F[5]"; if(!$nfr{$id}) { $nfr{$id}{start}="NA"; $nfr{$id}{startPeak}="NA"; if(abs($F[9]) < 500) { $nfr{$id}{start}=$F[8]; $nfr{$id}{startPeak}="$F[6]_$F[7]_$F[8]"; } } else { $nfr{$id}{end}="NA"; $nfr{$id}{endPeak}="NA"; if(abs($F[9]) < 500) { $nfr{$id}{end}=$F[7]; $nfr{$id}{endPeak}="$F[6]_$F[7]_$F[8]"; } print "$F[0]\t$nfr{$id}{start}\t$nfr{$id}{end}\t$id\t$nfr{$id}{startPeak}\t$nfr{$id}{endPeak}\n"; }' | perl -ane '$status="both"; if($F[1]=~/NA/ && $F[2]=~/NA/) { @t=split(/\_/,$F[3]); $F[1]=$t[1]-50; $F[2]=$t[1]+50; $status="none"; } elsif($F[1]=~/NA/) { @t=split(/\_/,$F[5]); $F[1]=$t[1]; $F[2]=$t[2]; $status="one"; } elsif($F[2]=~/NA/) { @t=split(/\_/,$F[4]); $F[1]=$t[1]; $F[2]=$t[2]; $status="one"; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$status\n"; '
+    
+#closestBed -a <(zless $GENEFILE | bed2window -i stdin -w 1 | sortBed -i stdin) -b <(sortBed -i $PEAKFILE) -d -t first | perl -ane 'if($F[scalar(@F)-1]<=50) { print "$F[0]\t$F['$((NCOL_GENEFILE+1))']\t$F['$((NCOL_GENEFILE+2))']"; foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; } print "\n"; } else { $mid=sprintf("%d", ($F[1]+$F[2])/2); $start=$mid; $end=$mid+1; print "$F[0]\t$start\t$end"; foreach(@F[3..'$((NCOL_GENEFILE-1))']) { print "\t$_"; } print "\n"; }'
+
+#paste <(closestBed -a <(sortBed -i ~/project/genome_annotations/refseqGenes_mm9_tss.bed) -b <(sortBed -i analysis/esc/peaks/h3k4me3/PEAKS.BED | cut -f 1-3) -D ref -fu -t first) <(closestBed -a <(sortBed -i ~/project/genome_annotations/refseqGenes_mm9_tss.bed) -b <(sortBed -i analysis/esc/peaks/h3k4me3/PEAKS.BED | cut -f 1-3) -D ref -fd -t first) | perl -ane 'if(($F[9]!=-1 && abs($F[9]) < 1000) || ($F[19]!=-1 && abs($F[19]) < 1000)) { $start=$F[1]-100; if($F[9]!=-1 && abs($F[9]) < 1000) { $start=$F[8]; } $end=$F[1]+100; if($F[19]!=-1 && abs($F[19]) < 1000) { $end=$F[17]; } chomp($_); print "$_\t$F[0]\t$start\t$end\n"; }' | less
 

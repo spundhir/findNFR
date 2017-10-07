@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 <<"copyright_info"
-gene2enhancerEnvironment: compute distal chromatin environment of genes
+gene2distalEnvironment: compute distal chromatin environment of genes
 Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
 
 This program is free software: you can redistribute it and/or modify
@@ -28,11 +28,11 @@ STATES=15
 
 #### usage ####
 usage() {
-	echo Program: "gene2enhancerEnvironment (compute distal chromatin environment of genes)"
+	echo Program: "gene2distalEnvironment (compute distal chromatin environment of genes)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: $VERSION
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: gene2enhancerEnvironment -i <file> -j <file> -k <dir> -l <file> -o <dir> [OPTIONS]"
+	echo "Usage: gene2distalEnvironment -i <file> -j <file> -k <dir> -l <file> -o <dir> [OPTIONS]"
 	echo "Options:"
     echo " -i <file>   [configuration file containing list of histone peak files]"
     echo "             [format: each line corresponds to absolute path of peak files corresponding to one epigenetic mark, eg.]"
@@ -140,22 +140,22 @@ fi
 
 ## annotate peaks using genome segments defined by ChromHMM
 >&2 echo -n "Annotated peaks using genome segments defined by ChromHMM (`date`).. "
-if [ ! -f "$OUTDIR/ANNOTATEDPEAKS.BED" ]; then
-    regions2classify -i $PEAKCONFIGFILE -j $BAMCONFIGFILE -k $BAMPATH -o $OUTDIR/chromhmm -g $GENOME -c $SCORE_COL -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/ANNOTATEDPEAKS.BED
+if [ ! -f "$OUTDIR/DISTALPEAKS.BED" ]; then
+    regions2classify -i $PEAKCONFIGFILE -j $BAMCONFIGFILE -k $BAMPATH -o $OUTDIR/chromhmm -g $GENOME -c $SCORE_COL -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/DISTALPEAKS.BED
 fi
 >&2 echo "done"
 
 ## assign annotated peaks to genes and compute weighted signal
 >&2 echo -n "Assign annotated peaks to genes and compute weighted signal (`date`).. "
-COL=$(zless $OUTDIR/ANNOTATEDPEAKS.BED | grep -v start | head -n 1 | perl -ane '$col="7"; for($i=8; $i<=scalar(@F); $i++) { $col.=",$i"; } print $col;')
+COL=$(zless $OUTDIR/DISTALPEAKS.BED | grep -v start | head -n 1 | perl -ane '$col="7"; for($i=8; $i<=scalar(@F); $i++) { $col.=",$i"; } print $col;')
 
 if [ -f "$ENHANCERFILE" ]; then
     TMP_SUB=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    intersectBed -a <(zless $OUTDIR/ANNOTATEDPEAKS.BED | grep -v start) -b $ENHANCERFILE -u > $TMP_SUB
+    intersectBed -a <(zless $OUTDIR/DISTALPEAKS.BED | grep -v start) -b $ENHANCERFILE -u > $TMP_SUB
     bed2weightedSignal -i $PROMOTERFILE -j $TMP_SUB -g $GENOME -c $COL -s 4
     rm $TMP_SUB
 else
-    bed2weightedSignal -i $PROMOTERFILE -j $OUTDIR/ANNOTATEDPEAKS.BED -g $GENOME -c $COL -s 4
+    bed2weightedSignal -i $PROMOTERFILE -j $OUTDIR/DISTALPEAKS.BED -g $GENOME -c $COL -s 4
 fi
 >&2 echo "done"
 
