@@ -33,7 +33,8 @@ PVALUE="0.05"
 MERGEDISTANCE=0
 DISTRIBUTION="nbinom"
 
-DISTANCE=500
+## empirically estimated based on median width of p300 peaks
+PEAKDISTANCE=300
 
 #### usage ####
 usage() {
@@ -76,7 +77,7 @@ while getopts i:j:o:m:p:k:n:c:e:x:s:g:t:v:d:h ARG; do
         m) GENOME=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
         k) CONTROLFILE=$OPTARG;;
-        n) DISTANCE=$OPTARG;;
+        n) PEAKDISTANCE=$OPTARG;;
         c) MINCLUSTERHEIGHT=$OPTARG;;
         e) MINBLOCKHEIGHT=$OPTARG;;
         x) DISTANCE=$OPTARG;;
@@ -181,20 +182,20 @@ else
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     cut -f 2 $OUTDIR/PEAKS.BED.DIST > $OUTDIR/PEAKS.BED.DIST.$TMP
     cut -f 2 $OUTDIR/SHUFFLE.BED.DIST > $OUTDIR/SHUFFLE.BED.DIST.$TMP
-    DISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/PEAKS.BED.DIST.$TMP -j $OUTDIR/SHUFFLE.BED.DIST.$TMP -m median)
-    >&2 echo $DISTANCE
+    MERGEDISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/PEAKS.BED.DIST.$TMP -j $OUTDIR/SHUFFLE.BED.DIST.$TMP -m median)
+    >&2 echo $MERGEDISTANCE
     rm $OUTDIR/PEAKS.BED.DIST.$TMP
     rm $OUTDIR/SHUFFLE.BED.DIST.$TMP
   
-    if [ "$DISTANCE" -gt 1000 ]; then
-        DISTANCE=1000
+    if [ "$MERGEDISTANCE" -gt 1000 ]; then
+        MERGEDISTANCE=1000
     fi
 
-    bedtools merge -i <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -d $DISTANCE > $OUTDIR/PEAKS.BED.MERGED
+    bedtools merge -i <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -d $MERGEDISTANCE > $OUTDIR/PEAKS.BED.MERGED
 
-    zless $OUTDIR/p300/PEAKS.BED | bed2window -i stdin -w 0 -t | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/P300_MID.BED
+    zless $OUTDIR/p300/PEAKS.BED | bed2window -i stdin -w 0 | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/P300_MID.BED
 
-    closestBed -a <(sortBed -i $OUTDIR/P300_MID.BED) -b $OUTDIR/PEAKS.BED.MERGED -d -t first | perl -ane '$enhancer_chr=$F[0]; $enhancer_start=$F[1]; $enhancer_end=$F[2]; if($F[scalar(@F)-1] < '$DISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$enhancer_chr:$enhancer_start-$enhancer_end";
+    closestBed -a <(sortBed -i $OUTDIR/P300_MID.BED) -b $OUTDIR/PEAKS.BED.MERGED -d -t first | perl -ane '$enhancer_chr=$F[0]; $enhancer_start=$F[1]; $enhancer_end=$F[2]; if($F[scalar(@F)-1] < '$PEAKDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$enhancer_chr:$enhancer_start-$enhancer_end";
     if($F[5]=~/\-/) { 
         $up=$enhancer_start-$F[2];
         $down=$enhancer_end-$F[1];
@@ -219,7 +220,7 @@ else
         print "\n";'
 
     #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    #cat <(grep -w Y $OUTDIR/define_promoter/GENES_PROMOTER.BED) <(closestBed -a <(grep -vw Y $OUTDIR/define_promoter/GENES_PROMOTER.BED | bed2window -i stdin -w 0 | cut -f 1-6) -b <(cat $OUTDIR/ALLPEAKS.BED | perl -ane 'if($F[6]<0.2) { print $_; }' | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$DISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y1"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";') > $TMP
+    #cat <(grep -w Y $OUTDIR/define_promoter/GENES_PROMOTER.BED) <(closestBed -a <(grep -vw Y $OUTDIR/define_promoter/GENES_PROMOTER.BED | bed2window -i stdin -w 0 | cut -f 1-6) -b <(cat $OUTDIR/ALLPEAKS.BED | perl -ane 'if($F[6]<0.2) { print $_; }' | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PEAKDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y1"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";') > $TMP
     #mv $TMP $OUTDIR/define_promoter/GENES_PROMOTER.BED
 fi
 >&2 echo "done"
