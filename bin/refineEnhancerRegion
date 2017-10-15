@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 <<"copyright_info"
-p3002enhancers: predict enhancers using P300 and h3k4me3 modification
+refineEnhancerRegion: refine enhancer regions using enhancer mid point (P300) and h3k4me1 modification data
 Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
 
 This program is free software: you can redistribute it and/or modify
@@ -38,13 +38,16 @@ PEAKDISTANCE=300
 
 #### usage ####
 usage() {
-	echo Program: "p3002enhancers (predict enhancers using P300 and h3k4me3 modification)"
+	echo Program: "refineEnhancerRegion (refine enhancer regions using enhancer mid point (P300) and h3k4me1 modification data)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: $VERSION
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: p3002enhancers -i <file> -j <file> [OPTIONS]"
+	echo "Usage: refineEnhancerRegion -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
-	echo " -i <file>   [input P300 data in BAM format]"
+	echo " -i <file>   [input genomic coordinates of enhancer mid point in BED format]"
+    echo "             [format: chr start end name score strand]"
+    echo "             [OR]"
+    echo "             [input P300 data in BAM format]"
     echo "             [if multiple, please separate them by a comma]"
     echo " -j <file>   [input h3k4me1 modification data in BAM format]"
     echo "             [if multiple, please separate them by a comma]"
@@ -54,6 +57,7 @@ usage() {
     echo " -p <int>    [number of processors to use (default: 1)]"
     echo " -k <file>   [IgG control file in BAM format]"
     echo " -n <int>    [assign h3k4me1 peak to enhancer, if within this distance (default: 500)]"
+    echo " -l <file>   [p300 data in BAM format (will be used to trim enhancer width)]"
     echo "[OPTIONS: bam2peaks]"
     echo " -c <int>    [minimum number of read in the block group (default: 2)]"
     echo " -e <int>    [minimum number of read in the block (default: 2)]"
@@ -69,15 +73,16 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:o:m:p:k:n:c:e:x:s:g:t:v:d:h ARG; do
+while getopts i:j:o:m:p:k:n:l:c:e:x:s:g:t:v:d:h ARG; do
 	case "$ARG" in
-		i) P300FILE=$OPTARG;;
+		i) ENHANCERFILE=$OPTARG;;
         j) HISTONEFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         m) GENOME=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
         k) CONTROLFILE=$OPTARG;;
         n) PEAKDISTANCE=$OPTARG;;
+        l) P300FILE=$OPTARG;;
         c) MINCLUSTERHEIGHT=$OPTARG;;
         e) MINBLOCKHEIGHT=$OPTARG;;
         x) DISTANCE=$OPTARG;;
@@ -98,7 +103,7 @@ fi
 >&2 echo
 >&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
 ## usage, if necessary file and directories are given/exist
-if [ -z "$P300FILE" -o -z "$HISTONEFILE" ]; then
+if [ -z "$ENHANCERFILE" -o -z "$HISTONEFILE" ]; then
     >&2 echo
     >&2 echo "Error: one or more required paramter values not provided"
     >&2 echo
@@ -125,8 +130,8 @@ fi
 
 if [ ! -d "$OUTDIR/logs" ]; then
     mkdir -p $OUTDIR/logs
-    mkdir -p $OUTDIR/p300
     mkdir -p $OUTDIR/h3k4me1
+    mkdir -p $OUTDIR/secondary_files
 fi
 
 >&2 echo "done"
@@ -144,15 +149,27 @@ if [ ! -f "$GENOME_FILE" ]; then
 fi
 >&2 echo "done"
 
->&2 echo -n "Predict peaks on p300 data (`date`).. "
-if [ ! -s "$OUTDIR/p300/PEAKS.BED" ]; then
-    if [ -z "$CONTROLFILE" ]; then
-        bam2peaks -i $P300FILE -o $OUTDIR/p300 -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION &>$OUTDIR/logs/bam2peaks_p300.log
-    else
-        bam2peaks -i $P300FILE -o $OUTDIR/p300 -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE &>$OUTDIR/logs/bam2peaks_p300.log
+if [ "$(samtools view $ENHANCERFILE -H 2>/dev/null | wc -l)" -gt 0 ]; then
+    >&2 echo -n "Predict enhancers using p300 data (`date`).. "
+    if [ ! -d "$OUTDIR/p300" ]; then
+        mkdir -p $OUTDIR/p300
     fi
+
+    if [ ! -s "$OUTDIR/p300/PEAKS.BED" ]; then
+        if [ -z "$CONTROLFILE" ]; then
+            bam2peaks -i $ENHANCERFILE -o $OUTDIR/p300 -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION &>$OUTDIR/logs/bam2peaks_p300.log
+        else
+            bam2peaks -i $ENHANCERFILE -o $OUTDIR/p300 -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE &>$OUTDIR/logs/bam2peaks_p300.log
+        fi
+    fi
+
+    zless $OUTDIR/p300/PEAKS.BED | bed2window -i stdin -w 0 | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/secondary_files/ENHANCERS_MID.BED
+    >&2 echo "done"
+else
+    >&2 echo -n "Trim enhancers to mid point (`date`).. "
+    zless $ENHANCERFILE | bed2window -i stdin -w 0 | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/secondary_files/ENHANCERS_MID.BED
+    >&2 echo "done"
 fi
->&2 echo "done"
 
 >&2 echo -n "Predict peaks on H3K4me1 data (`date`).. "
 if [ ! -s "$OUTDIR/h3k4me1/PEAKS.BED" ]; then
@@ -165,40 +182,38 @@ fi
 >&2 echo "done"
 
 >&2 echo -n "Determine optimal distance between peaks to merge (`date`).. "
-if [ ! -s "$OUTDIR/p300/PEAKS.BED" -o ! -s "$OUTDIR/h3k4me1/PEAKS.BED" ]; then
+if [ ! -s "$OUTDIR/secondary_files/ENHANCERS_MID.BED" -o ! -s "$OUTDIR/h3k4me1/PEAKS.BED" ]; then
     >&2 echo
-    >&2 echo "P300 or H3K4me1 Peak file is not computed properly.. "
+    >&2 echo "Enhancer or H3K4me1 peak file is not computed properly.. "
     >&2 echo "exiting.. "
     >&2 echo
     exit
 else
     NCOL=$(head -n 1 $OUTDIR/h3k4me1/PEAKS.BED | perl -ane 'print scalar(@F);')
-    closestBed -a <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -b <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/PEAKS.BED.DIST
+    closestBed -a <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -b <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/secondary_files/PEAKS.BED.DIST
 
-    bed2shuffle -i $OUTDIR/h3k4me1/PEAKS.BED -g $GENOME > $OUTDIR/SHUFFLE.BED
+    bed2shuffle -i $OUTDIR/h3k4me1/PEAKS.BED -g $GENOME > $OUTDIR/secondary_files/SHUFFLE.BED
 
-    closestBed -a <(sortBed -i $OUTDIR/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/SHUFFLE.BED.DIST
+    closestBed -a <(sortBed -i $OUTDIR/secondary_files/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/secondary_files/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/secondary_files/SHUFFLE.BED.DIST
 
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    cut -f 2 $OUTDIR/PEAKS.BED.DIST > $OUTDIR/PEAKS.BED.DIST.$TMP
-    cut -f 2 $OUTDIR/SHUFFLE.BED.DIST > $OUTDIR/SHUFFLE.BED.DIST.$TMP
-    MERGEDISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/PEAKS.BED.DIST.$TMP -j $OUTDIR/SHUFFLE.BED.DIST.$TMP -m median)
+    cut -f 2 $OUTDIR/secondary_files/PEAKS.BED.DIST > $OUTDIR/secondary_files/PEAKS.BED.DIST.$TMP
+    cut -f 2 $OUTDIR/secondary_files/SHUFFLE.BED.DIST > $OUTDIR/secondary_files/SHUFFLE.BED.DIST.$TMP
+    MERGEDISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/secondary_files/PEAKS.BED.DIST.$TMP -j $OUTDIR/secondary_files/SHUFFLE.BED.DIST.$TMP -m median)
     >&2 echo $MERGEDISTANCE
-    rm $OUTDIR/PEAKS.BED.DIST.$TMP
-    rm $OUTDIR/SHUFFLE.BED.DIST.$TMP
+    rm $OUTDIR/secondary_files/PEAKS.BED.DIST.$TMP
+    rm $OUTDIR/secondary_files/SHUFFLE.BED.DIST.$TMP
   
     if [ "$MERGEDISTANCE" -gt 1000 ]; then
         MERGEDISTANCE=1000
     fi
 
-    bedtools merge -i <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -d $MERGEDISTANCE > $OUTDIR/PEAKS.BED.MERGED
+    bedtools merge -i <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -d $MERGEDISTANCE > $OUTDIR/secondary_files/PEAKS.BED.MERGED
 
-    zless $OUTDIR/p300/PEAKS.BED | bed2window -i stdin -w 0 | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/P300_MID.BED
-
-    #multiIntersectBed.sh -i $OUTDIR/PEAKS.BED.MERGED,$OUTDIR/P300_MID.BED -j h3k4me1,p300 | grep -v p300 | cut -f 1-3 | sortBed -i stdin > $OUTDIR/PEAKS.BED.MERGED.$TMP
+    #multiIntersectBed.sh -i $OUTDIR/PEAKS.BED.MERGED,$OUTDIR/ENHANCERS_MID.BED -j h3k4me1,p300 | grep -v p300 | cut -f 1-3 | sortBed -i stdin > $OUTDIR/PEAKS.BED.MERGED.$TMP
     #mv $OUTDIR/PEAKS.BED.MERGED.$TMP $OUTDIR/PEAKS.BED.MERGED
 
-    closestBed -a <(sortBed -i $OUTDIR/P300_MID.BED) -b $OUTDIR/PEAKS.BED.MERGED -d -t first | perl -ane '$enhancer_chr=$F[0]; $enhancer_start=$F[1]; $enhancer_end=$F[2]; if($F[scalar(@F)-1] < '$PEAKDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$enhancer_chr:$enhancer_start-$enhancer_end";
+    closestBed -a <(sortBed -i $OUTDIR/secondary_files/ENHANCERS_MID.BED) -b $OUTDIR/secondary_files/PEAKS.BED.MERGED -d -t first | perl -ane '$enhancer_chr=$F[0]; $enhancer_start=$F[1]; $enhancer_end=$F[2]; if($F[scalar(@F)-1] < '$PEAKDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$enhancer_chr:$enhancer_start-$enhancer_end";
     if($F[5]=~/\-/) { 
         $up=$enhancer_start-$F[2];
         $down=$enhancer_end-$F[1];
@@ -222,10 +237,36 @@ else
         foreach(@F[1..scalar(@F)-1]) { print "\t$_"; }
         print "\n";' | perl -ane '@t=split(/[\:\-]+/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[0]:$F[1]-$F[2]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\n";' > $OUTDIR/$TMP
 
-        closestBed -a <(sortBed -i $OUTDIR/$TMP) -b <(sortBed -i $OUTDIR/P300_MID.BED) -D ref -fu -t first -io | perl -ane 'print "$F[0]"; foreach(@F[1..9]) { print "\t$_"; } print "\t$F[scalar(@F)-1]\n";' | perl -ane 'if($F[10]<0 && $F[10]>$F[8]) { $F[8]="$F[10]"; } print "$F[0]"; foreach(@F[1..9]) { print "\t$_"; } print "\n";' > $OUTDIR/$TMP.$TMP
+        if [ ! -z "$P300FILE" ]; then
+            >&2 echo -n "Predict peaks on p300 data (`date`).. "
+            if [ ! -d "$OUTDIR/p300" ]; then
+                mkdir -p $OUTDIR/p300
+            fi
+
+            if [ ! -s "$OUTDIR/p300/PEAKS.BED" ]; then
+                if [ -z "$CONTROLFILE" ]; then
+                    bam2peaks -i $P300FILE -o $OUTDIR/p300 -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION &>$OUTDIR/logs/bam2peaks_p300.log
+                else
+                    bam2peaks -i $P300RFILE -o $OUTDIR/p300 -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE &>$OUTDIR/logs/bam2peaks_p300.log
+                fi
+            fi
+
+            zless $OUTDIR/p300/PEAKS.BED | bed2window -i stdin -w 0 | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/secondary_files/ALLENHANCERS_MID.BED
+            >&2 echo "done"
+        else
+            scp $OUTDIR/secondary_files/ENHANCERS_MID.BED $OUTDIR/secondary_files/ALLENHANCERS_MID.BED
+        fi
+
+        ## trim upstream h3k4me1 peak boundary, if overlaps with proximal enhancer/p300 region
+        closestBed -a <(sortBed -i $OUTDIR/$TMP) -b <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS_MID.BED) -D ref -fu -t first -io | perl -ane 'print "$F[0]"; foreach(@F[1..9]) { print "\t$_"; } print "\t$F[scalar(@F)-1]\n";' | perl -ane 'if($F[10]<0 && $F[10]>$F[8]) { $F[8]="$F[10]"; } print "$F[0]"; foreach(@F[1..9]) { print "\t$_"; } print "\n";' > $OUTDIR/$TMP.$TMP
         mv $OUTDIR/$TMP.$TMP $OUTDIR/$TMP
 
-        closestBed -a <(sortBed -i $OUTDIR/$TMP) -b <(sortBed -i $OUTDIR/P300_MID.BED) -D ref -fd -t first -io | perl -ane 'print "$F[0]"; foreach(@F[1..9]) { print "\t$_"; } print "\t$F[scalar(@F)-1]\n";' | perl -ane 'if($F[10]>0 && $F[10]<$F[9]) { $F[9]="$F[10]"; } print "$F[0]"; foreach(@F[1..9]) { print "\t$_"; } print "\n";'
+        ## trim downstream h3k4me1 peak boundary, if overlaps with proximal enhancer/p300 region
+        closestBed -a <(sortBed -i $OUTDIR/$TMP) -b <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS_MID.BED) -D ref -fd -t first -io | perl -ane 'print "$F[0]"; foreach(@F[1..9]) { print "\t$_"; } print "\t$F[scalar(@F)-1]\n";' | perl -ane 'if($F[10]>0 && $F[10]<$F[9]) { $F[9]="$F[10]"; } print "$F[0]"; foreach(@F[1..9]) { print "\t$_"; } print "\n";' > $OUTDIR/$TMP.$TMP
+        mv $OUTDIR/$TMP.$TMP $OUTDIR/$TMP
+
+        ## provide strand information to enhancers such that downstream to enhancer have broadest h3k4me1 peak
+        perl -ane 'if(abs($F[8])>$F[9]) { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t-\t$F[6]\t-$F[9]\t".abs($F[8])."\n"; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t+\t$F[6]\t$F[8]\t".abs($F[9])."\n"; }' $OUTDIR/$TMP
 
         rm $OUTDIR/$TMP
 

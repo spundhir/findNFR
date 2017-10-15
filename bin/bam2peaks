@@ -474,7 +474,7 @@ echo "done"
 
 echo -n "Remove peaks overlapping with blacklisted regions (`date`).. "
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-intersectBed -a $OUTDIR/ALLPEAKS.BED -b $GENOME_BLACKLIST -v > $TMP
+intersectBed -a $OUTDIR/ALLPEAKS.BED -b $GENOME_BLACKLIST -v | sort -k 4,4 > $TMP
 mv $TMP $OUTDIR/ALLPEAKS.BED
 grep -w Y $OUTDIR/ALLPEAKS.BED > $OUTDIR/PEAKS.BED
 echo "done"
@@ -535,8 +535,8 @@ fi
 echo "done"
 
 echo -n "Delete copied input BAM files (`date`).. "
-#rm $OUTDIR/bw_files/*.bam
-#rm $OUTDIR/bw_files/*.bam.bai
+rm $OUTDIR/bw_files/*.bam
+rm $OUTDIR/bw_files/*.bam.bai
 echo "done"
 
 echo "All done. Bye"

@@ -40,6 +40,7 @@ scale01 <- function(x){(x-min(x))/(max(x)-min(x))}
 opt$scoreCol <- as.numeric(opt$scoreCol)
 
 ## compute rank
+set.seed(1)
 data$rank <- rank(data[,c(opt$scoreCol)], ties.method = "random")
 
 rank_col <- ncol(data)
@@ -52,6 +53,9 @@ data$percentileRank <- apply(data, 1, function(x) 100*((as.numeric(x[rank_col])-
 #data$percentileRank <- apply(data, 1, function(x) perc.rank(data[,opt$scoreCol], x[opt$scoreCol]))
 
 ## write output
-write.table(data[order(-data$percentileRank),], "", sep="\t", row.names = F, col.names = F, quote = F)
+## sort data
+#write.table(data[order(-data$percentileRank),], "", sep="\t", row.names = F, col.names = F, quote = F)
+## unsorted data
+write.table(data, "", sep="\t", row.names = F, col.names = F, quote = F)
 
 q()
