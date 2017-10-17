@@ -61,7 +61,7 @@ fi
 CHR=(`zless $BEDFILE | cut -f 1 | grep -v "_" | sort | uniq`)
 
 for chr in "${CHR[@]}"; do
-    zgrep -E "^$chr\s+" $BEDFILE | bedtools shuffle -i - -g $GENOME_FILE -seed 1 -noOverlapping -chrom
+    zgrep -E "^$chr\s+" $BEDFILE | bedtools shuffle -i - -g $GENOME_FILE -seed 1 -noOverlapping -chrom -excl $BEDFILE
 done
 
 ## remove temporary file, if exists

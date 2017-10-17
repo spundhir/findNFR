@@ -133,7 +133,13 @@ function wait_for_jobs_to_finish {
 echo -n "Create directory structure (`date`).. "
 if [ ! -d "$OUTDIR" ]; then
     mkdir -p $OUTDIR
+fi
+
+if [ ! -d "$OUTDIR/peaks" ]; then
     mkdir -p $OUTDIR/peaks
+fi
+
+if [ ! -d "$OUTDIR/chromatin_environment" ]; then
     mkdir -p $OUTDIR/chromatin_environment
 fi
 echo "done"
