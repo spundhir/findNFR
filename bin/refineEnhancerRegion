@@ -34,7 +34,7 @@ MERGEDISTANCE=0
 DISTRIBUTION="nbinom"
 
 ## empirically estimated based on median width of p300 peaks
-PEAKDISTANCE=500
+PEAKDISTANCE=400
 
 #### usage ####
 usage() {
@@ -56,7 +56,7 @@ usage() {
     echo " -m <string> [genome (default: mm9)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
     echo " -k <file>   [IgG control file in BAM format]"
-    echo " -n <int>    [assign h3k4me1 peak to enhancer, if within this distance (default: 500)]"
+    echo " -n <int>    [assign h3k4me1 peak to enhancer, if within this distance (default: 400)]"
     echo "[OPTIONS: bam2peaks]"
     echo " -c <int>    [minimum number of read in the block group (default: 2)]"
     echo " -e <int>    [minimum number of read in the block (default: 2)]"
@@ -167,11 +167,11 @@ fi
 
 >&2 echo -n "Define list of all enhancer regions to refine (`date`).. "
 if [ ! -z "$ENHANCERFILE" -a ! -z "$P300FILE" ]; then
-    cat <(zless $ENHANCERFILE | bed2window -i stdin -w 0 | bed2window -i stdin -w 1 -r | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]_ENHANCER\t$F[4]\t$F[5]\n"; }') <(intersectBed -a <(zless $OUTDIR/p300/PEAKS.BED | bed2window -i stdin -w 300 | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]_P300\t$F[4]\t$F[5]\n"; }') -b $ENHANCERFILE -v | bed2window -i stdin -w 0 | bed2window -i stdin -w 1 -r) > $OUTDIR/secondary_files/ALLENHANCERS.BED
+    cat <(zless $ENHANCERFILE | bed2window -i stdin -w 0 | bed2window -i stdin -w 1 -r | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]_ENHANCER\t$F[4]\t$F[5]\n"; }') <(intersectBed -a <(zless $OUTDIR/p300/PEAKS.BED | bed2window -i stdin -w $PEAKDISTANCE | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]_P300\t$F[4]\t$F[5]\n"; }') -b $ENHANCERFILE -v | bed2window -i stdin -w 0 | bed2window -i stdin -w 1 -r) > $OUTDIR/secondary_files/ALLENHANCERS.BED
 elif [ ! -z "$ENHANCERFILE" ]; then
-   zless $ENHANCERFILE | bed2window -i stdin -w 0 | bed2window -i stdin -w 1 -r | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]_ENHANCER\t$F[4]\t$F[5]\n"; }' > $OUTDIR/secondary_files/ALLENHANCERS.BED 
+   zless $ENHANCERFILE | bed2window -i stdin -w 0 | bed2window -i stdin -w 1 -r | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]_ENHANCER\t$F[4]\t$F[5]\n"; }' > $OUTDIR/secondary_files/ALLENHANCERS.BED
 else
-    zless $OUTDIR/p300/PEAKS.BED | bed2window -i stdin -w 300 | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]_P300\t$F[4]\t$F[5]\n"; }' > $OUTDIR/secondary_files/ALLENHANCERS.BED 
+    zless $OUTDIR/p300/PEAKS.BED | bed2window -i stdin -w $PEAKDISTANCE | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]_P300\t$F[4]\t$F[5]\n"; }' > $OUTDIR/secondary_files/ALLENHANCERS.BED 
 fi
 >&2 echo "done"
 
@@ -216,7 +216,7 @@ else
     >&2 echo done
 
     >&2 echo -n "Define up- and downstream h3k4me1 peaks to each enhancer (`date`).. "
-    paste <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/PEAKS.BED.MERGED) -D ref -fu -t first | cut -f 7-10) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/PEAKS.BED.MERGED) -D ref -fd -t first | cut -f 7-10) | perl -ane 'if(abs($F[9]) < '$PEAKDISTANCE') { $up=$F[1]-$F[7]; $up_coor=$F[7]; } else { $up=50; $up_coor=$F[1]-50; } if(abs($F[13]) < '$PEAKDISTANCE') { $down=$F[12]-$F[2]; $down_coor=$F[12]; } else { $down=50; $down_coor=$F[2]+50; } $defined="N"; if(abs($F[9]) < '$PEAKDISTANCE' || abs($F[13]) < '$PEAKDISTANCE') { $defined="Y"; }  @name=split(/\_/, $F[3]); if($up > $down) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t-\t$defined\t-$down\t$up\n"; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t+\t$defined\t-$up\t$down\n"; }' > $OUTDIR/ENHANCERS.BED
+    paste <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/PEAKS.BED.MERGED) -D ref -fu -t first | cut -f 7-10) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/PEAKS.BED.MERGED) -D ref -fd -t first | cut -f 7-10) | perl -ane 'if(abs($F[9]) < '$PEAKDISTANCE' && $F[9] < 0) { $up=$F[1]-$F[7]; $up_coor=$F[7]; } else { $up=50; $up_coor=$F[1]-50; } if(abs($F[13]) < '$PEAKDISTANCE' && $F[13] > 0) { $down=$F[12]-$F[2]; $down_coor=$F[12]; } else { $down=50; $down_coor=$F[2]+50; } $defined="N"; if(abs($F[9]) < '$PEAKDISTANCE' || abs($F[13]) < '$PEAKDISTANCE') { $defined="Y"; }  @name=split(/\_/, $F[3]); if($up > $down) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t-\t$defined\t-$down\t$up\n"; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t+\t$defined\t-$up\t$down\n"; }' > $OUTDIR/ENHANCERS.BED
     >&2 echo done
 
     echo "track name=\"Refined enhancer regions\" description=\"Refined enhancer regions\" itemRgb=\"On\"" > $OUTDIR/ENHANCERS.BED.UCSC

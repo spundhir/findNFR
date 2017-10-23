@@ -121,8 +121,8 @@ if [ "$REGION" == "promoter" ]; then
     WIN_UP=100
     WIN_FLANKING=200
 else
-    WIN_DOWN=50
-    WIN_UP=50
+    WIN_DOWN=100
+    WIN_UP=100
     WIN_FLANKING=200
 fi
 
@@ -177,11 +177,11 @@ cat $INPUTBEDFILE | perl -ane '
         }
     }
     $line=$F[0]; foreach(@F[1..scalar(@F)-1]) { $line.="#$_"; }
-    print "$F[0]\t$up_start\t$up_end\tUP#$F[3]\t0\t$F[5]\t$line\n";
-    print "$F[0]\t$hfr_start\t$hfr_end\tHFR#$F[3]\t0\t$F[5]\t$line\n";
-    print "$F[0]\t$down_start\t$down_end\tDOWN#$F[3]\t0\t$F[5]\t$line\n";
-    print "$F[0]\t$nfr_start\t$nfr_end\tNFR#$F[3]\t0\t$F[5]\t$line\n";
-    print "$F[0]\t$extr_down_start\t$extr_down_end\tEXTR_DOWN#$F[3]\t0\t$F[5]\t$line\n";
+    print "$F[0]\t$up_start\t$up_end\tUP#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region up-stream to HFR
+    print "$F[0]\t$hfr_start\t$hfr_end\tHFR#$F[3]\t0\t$F[5]\t$line\n"; ## Promoters: 150 bp nucleosome free region + also devoid of histone modified nucleosomes (HFR)
+    print "$F[0]\t$down_start\t$down_end\tDOWN#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region down-stream to HFR
+    print "$F[0]\t$nfr_start\t$nfr_end\tNFR#$F[3]\t0\t$F[5]\t$line\n"; ## region of varying width containing histone modified nucleosomes (NFR)
+    print "$F[0]\t$extr_down_start\t$extr_down_end\tEXTR_DOWN#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region down-stream to NFR
     #chomp($_);
     #print "$_\t$F[0]:$up_start-$up_end\t$F[0]:$hfr_start-$hfr_end\t$F[0]:$nfr_start-$nfr_end\t$F[0]:$down_start-$down_end\n";' | bed2expr -i stdin -j $INPUTBAMFILES -g $GENOME -v $AVG $PARAM_BIN
     
