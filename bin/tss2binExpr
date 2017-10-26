@@ -141,12 +141,20 @@ cat $INPUTBEDFILE | perl -ane '
         $down_end=$hfr_start-1;
         $down_start=$down_end-'$WIN_FLANKING';
 
-        $nfr_start=$F[1]-($F[6]);
-        ## this means if nfr_start < 50 (WIN_DOWN) + 1 + 200 (WIN_FLANKING)
-        if($nfr_start < $down_start) {
+        $start=$F[1]-($F[6]);
+        ## this means if start < 50 (WIN_DOWN) + 1 + 200 (WIN_FLANKING)
+        if($start < $down_start && $down_start - $start >= '$WIN_FLANKING'*2) {
+            $extr_down_end=($start-1)+'$WIN_FLANKING';
+            $extr_down_start=$start-1;
+            $nfr_start=$extr_down_end+1;
             $nfr_end=$down_start-1;
-            $extr_down_end=$nfr_start-1;
-            $extr_down_start=$extr_down_end-'$WIN_FLANKING';
+            if($nfr_end < $nfr_start) { $nfr_start=$extr_down_start; $nfr_end=$extr_down_end; }
+        } elsif($start < $down_start && $down_start - $start >= '$WIN_FLANKING') {
+            $extr_down_end=($start-1)+'$WIN_FLANKING';
+            $extr_down_start=$start-1;
+            $nfr_start=$extr_down_end+1;
+            $nfr_end=$down_start-1;
+            if($nfr_end < $nfr_start) { $nfr_start=$extr_down_start; $nfr_end=$extr_down_end; }
         } else {
             $nfr_start=$hfr_start;
             $nfr_end=$hfr_end;
@@ -163,12 +171,20 @@ cat $INPUTBEDFILE | perl -ane '
         $down_start=$hfr_end+1;
         $down_end=$down_start+'$WIN_FLANKING';
 
-        $nfr_end=$F[1]+($F[6]);
-        ## this means if nfr_end > 50 (WIN_DOWN) + 1 + 200 (WIN_FLANKING)
-        if($nfr_end > $down_end) {
+        $end=$F[1]+($F[6]);
+        ## this means if end > 50 (WIN_DOWN) + 1 + 200 (WIN_FLANKING)
+        if($end > $down_end && $end - $down_end >= '$WIN_FLANKING'*2) {
+            $extr_down_end=$end+1;
+            $extr_down_start=$extr_down_end-'$WIN_FLANKING';
             $nfr_start=$down_end+1;
-            $extr_down_start=$nfr_end+1;
-            $extr_down_end=$extr_down_start+'$WIN_FLANKING';
+            $nfr_end=$extr_down_start-1;
+            if($nfr_end < $nfr_start) { $nfr_start=$extr_down_start; $nfr_end=$extr_down_end; }
+        } elsif($end > $down_end && $end - $down_end >= '$WIN_FLANKING') {
+            $extr_down_end=$end+1;
+            $extr_down_start=$extr_down_end-'$WIN_FLANKING';
+            $nfr_start=$down_end+1;
+            $nfr_end=$extr_down_start-1;
+            if($nfr_end < $nfr_start) { $nfr_start=$extr_down_start; $nfr_end=$extr_down_end; }
         } else {
             $nfr_start=$hfr_start;
             $nfr_end=$hfr_end;
@@ -183,7 +199,7 @@ cat $INPUTBEDFILE | perl -ane '
     print "$F[0]\t$nfr_start\t$nfr_end\tNFR#$F[3]\t0\t$F[5]\t$line\n"; ## region of varying width containing histone modified nucleosomes (NFR)
     print "$F[0]\t$extr_down_start\t$extr_down_end\tEXTR_DOWN#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region down-stream to NFR
     #chomp($_);
-    #print "$_\t$F[0]:$up_start-$up_end\t$F[0]:$hfr_start-$hfr_end\t$F[0]:$nfr_start-$nfr_end\t$F[0]:$down_start-$down_end\n";' | bed2expr -i stdin -j $INPUTBAMFILES -g $GENOME -v $AVG $PARAM_BIN
+    #print "$_\t$F[0]:$up_start-$up_end\t$F[0]:$hfr_start-$hfr_end\t$F[0]:$nfr_start-$nfr_end\t$F[0]:$down_start-$down_end\n";'| bed2expr -i stdin -j $INPUTBAMFILES -g $GENOME -v $AVG $PARAM_BIN
     
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then

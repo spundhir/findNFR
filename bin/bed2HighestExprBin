@@ -1,0 +1,113 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+bed2HighestExprBin: determine bin within input coordinate that has highest expression
+Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+WINSIZE=200
+STEPSIZE=200
+GENOME="mm9"
+
+#### usage ####
+usage() {
+    echo
+	echo Program: "bed2HighestExprBin (determine bin within input coordinate that has highest expression)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2HighestExprBin -i <file> -j <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input genomic coordinates in BED format (can be stdin)]"
+    echo "             [FORMAT: chr start end name score strand (**name should be UNIQUE**)]"
+	echo " -j <file>   [input mapped reads in BAM format]"
+    echo "             [if multiple seperate them by a comma]"
+    echo "[OPTIONS]"
+    echo " -w <int>    [window size]"
+    echo " -s <int>    [step size]"
+    echo " -d          [remove duplicate reads]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:w:s:dg:h ARG; do
+	case "$ARG" in
+		i) BEDFILE=$OPTARG;;
+		j) BAMFILE=$OPTARG;;
+        w) WINSIZE=$OPTARG;;
+        s) STEPSIZE=$OPTARG;;
+        d) REMOVE_DUPLICATE=1;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BEDFILE" -o -z "$BAMFILE" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+## populating files based on input genome
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    echo
+    echo "computation for $GENOME is not feasible yet"
+    echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    echo
+    usage
+fi
+
+<<"COMMENT"
+COMMENT
+
+## create temporary BED file if input is from stdin
+if [ "$BEDFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    BEDFILE=$TMP
+fi
+
+## divide input regions into bins, compute read count and determine bin with highest read count
+if [ ! -z "$REMOVE_DUPLICATE" ]; then
+    zless $BEDFILE | bedtools makewindows -b stdin -w $WINSIZE -s $STEPSIZE -i src |  perl -ane '$width=$F[2]-$F[1]; if($width>='$WINSIZE') { print "$_"; }' | bed2expr -i stdin -j $BAMFILE -g $GENOME -d -m
+else
+    zless $BEDFILE | bedtools makewindows -b stdin -w $WINSIZE -s $STEPSIZE -i src | perl -ane '$width=$F[2]-$F[1]; if($width>='$WINSIZE') { print "$_"; }' | bed2expr -i stdin -j $BAMFILE -g $GENOME -m
+fi | perl -ane '$F[3]=~s/\_.*//g; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\n";' | sort -k 4,4 -k 5rn,5 | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }'
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
