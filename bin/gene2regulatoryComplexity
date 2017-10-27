@@ -255,16 +255,16 @@ echo "done"
 ## gene2promoterEnvironment (bed2weightedSignal)
 echo -n "Compute promoter environment (`date`).. "
 if [ ! -f "$OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED" ]; then
-    gene2promoterEnvironment -i $OUTDIR/GENES_PROMOTER.BED -j $OUTDIR/chromatin_environment/peaks.config -o $OUTDIR/chromatin_environment/promoter -g $GENOME -c 5 > $OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED
+    cat $OUTDIR/GENES_PROMOTER.BED | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[1]\t$F[8]\t$F[9]\n";' | gene2promoterEnvironment -i stdin -j $OUTDIR/chromatin_environment/peaks.config -o $OUTDIR/chromatin_environment/promoter -g $GENOME -c 5 > $OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED
 fi
 echo "done"
 
 ## gene2distalEnvironment (regions2classify, bed2weightedSignal)
 echo -n "Compute distal environment (`date`).. "
 if [ -z "$ENHANCERFILE" -a ! -f "$OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED" ]; then
-    gene2distalEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l $OUTDIR/GENES_PROMOTER.BED -o $OUTDIR/chromatin_environment/distal -g $GENOME -c 5 -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED 
+    cat $OUTDIR/GENES_PROMOTER.BED | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[1]\t$F[8]\t$F[9]\n";' | gene2distalEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l stdin -o $OUTDIR/chromatin_environment/distal -g $GENOME -c 5 -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED 
 elif [ ! -f "$OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED" ]; then
-    gene2distalEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l $OUTDIR/GENES_PROMOTER.BED -o $OUTDIR/chromatin_environment/distal -g $GENOME -c 5 -e $ENHANCERFILE -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED
+    cat $OUTDIR/GENES_PROMOTER.BED | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[1]\t$F[8]\t$F[9]\n";' | gene2distalEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l stdin -o $OUTDIR/chromatin_environment/distal -g $GENOME -c 5 -e $ENHANCERFILE -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED
 fi
 echo "done"
 

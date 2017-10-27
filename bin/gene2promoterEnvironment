@@ -31,7 +31,7 @@ usage() {
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: gene2promoterEnvironment -i <file> -j <file> -o <dir> [OPTIONS]"
 	echo "Options:"
-	echo " -i <file>   [input genomic coordinates of promoters in BED format]"
+	echo " -i <file>   [input genomic coordinates of promoters in BED format (can be stdin)]"
     echo " -j <file>   [configuration file containing list of histone peak files]"
     echo "             [format: each line corresponds to absolute path of peak files corresponding to one epigenetic mark, eg.]"
     echo "             [        <ID><SPACE|TAB>h3k27me3_peaks.bed]"

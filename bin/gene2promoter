@@ -231,7 +231,7 @@ else
         >&2 echo "done"
     else
         zless $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP
-    fi
+    fi | perl -ane '@tss=split(/[\:\-]/,$F[7]); print "$tss[0]\t$tss[1]\t".($tss[2]+1)."\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";'
 
     ## remove temporary file
     rm $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP
