@@ -20,6 +20,7 @@ usage() {
     echo "             [FORMAT: tpm <absolute path to bam file>]"
     echo "[OPTIONS]"
     echo " -c          [analyze for enhancer (default: promoter)]"
+    echo " -r <file>   [input BAM file to refine 3' boundary of promoter, eg. chd4 ChIP-seq data]"
     echo "[OPTIONS: bed2expr]"
     echo " -s <float>  [normalize expression by input size factor]"
     echo "             [if multiple, seperate them by a comma]"
@@ -29,7 +30,7 @@ usage() {
     echo " -e <int>    [extend 3' end of reads by input number of bases (useful for ChIP-seq data)]"
     echo " -v <int>    [instead of giving expression for each replicate, output only the mean (deafult: 0)]"
     echo "             [assumes that consecutive input files are replicates 1 and 2, respectively]"
-    echo " -r          [require same strandedness]"
+    echo " -t          [require same strandedness]"
     echo " -n          [add 1 to all the raw expression counts - useful while taking log]"
     echo " -g <string> [genome (default: mm9)]"
 	echo " -h          [help]"
@@ -42,18 +43,19 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:c:s:mkde:v:rng:h ARG; do
+while getopts i:j:c:r:s:mkde:v:tng:h ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         j) CONFIGFILE=$OPTARG;;
         c) REGION=$OPTARG;;
+        r) REFINE=$OPTARG;;
         s) INPUTSIZEFACTORS=$OPTARG;; 
         m) CPM=1;;
         k) FPKM=1;;
         d) REMOVE_DUPLICATE=1;;
         e) INPUTEXTENDS=$OPTARG;;
         v) AVG=$OPTARG;;
-        r) SAME_STRAND=1;;
+        t) SAME_STRAND=1;;
         n) ADDONE=1;;
         g) GENOME=$OPTARG;;
 		h) HELP=1;;
@@ -127,6 +129,18 @@ else
 fi
 
 #echo -e "WIN_UP: $WIN_UP; WIN_DOWN: $WIN_DOWN"; exit
+## refine 3' boundary of promoter
+if [ ! -z "$REFINE" ]; then
+    >&2 echo -n "Refine 3' boundary of promoter (`date`).. "
+    REFINED_3p=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    zless $INPUTBEDFILE | perl -ane 'if($F[9]>450) { print $_; }' | perl -ane 'if($F[5]=~/\-/) { $end=$F[1]-250; $start=$F[1]-$F[9]; } else { $start=$F[1]+250; $end=$F[1]+$F[9]; } print "$F[0]\t$start\t$end\t$F[3]\t$F[4]\t$F[5]\n";' | bed2HighestExprBin -i stdin -j $REFINE -w 200 -s 200 -d -g $GENOME > $REFINED_3p
+
+    zless <(zless $REFINED_3p | perl -ane 'if($F[9]<=450) { print $_; }') <(join -j 4 $INPUTBEDFILE $REFINED_3p | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$F[10]\t$F[11]\t$F[12]\n";' | perl -ane 'if($F[5]=~/\-/) { $distance_3p=$F[1]-$F[11]; } else { $distance_3p=$F[12]-$F[1]; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$distance_3p\n";') | sort -k 4,4 > $REFINED_3p.bed
+
+    rm $REFINED_3p
+    mv $REFINED_3p.bed $INPUTBEDFILE
+    >&2 echo "done"
+fi
 
 ## parse input BED file and compute signal
 cat $INPUTBEDFILE | perl -ane '

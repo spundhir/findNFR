@@ -195,25 +195,25 @@ else
     bedtools merge -i <(sortBed -i $OUTDIR/PEAKS.BED) -d $DISTANCE > $OUTDIR/define_promoter/PEAKS.BED.MERGED
     >&2 echo "done"
 
-    zless $GENEFILE | bed2window -i stdin -w 0 -t | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/define_promoter/GENES_TSS.BED
+    zless $GENEFILE | bed2window -i stdin -w 0 -t | bed2window -i stdin -w 1 -r | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/define_promoter/GENES_TSS.BED
 
-    closestBed -a <(sortBed -i $OUTDIR/define_promoter/GENES_TSS.BED) -b $OUTDIR/define_promoter/PEAKS.BED.MERGED -d -t first | perl -ane '$tss_chr=$F[0]; $tss_start=$F[1]; $tss_end=$F[2]; if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$tss_chr:$tss_start-$tss_end";
+    closestBed -a <(sortBed -i $OUTDIR/define_promoter/GENES_TSS.BED) -b $OUTDIR/define_promoter/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$F[0]:$start-$end";
     if($F[5]=~/\-/) { 
-        $up=$tss_start-$F[2];
-        $down=$tss_end-$F[1];
+        $up=$F[1]-$end;
+        $down=$F[1]-$start;
         if($up>0) { $up=0; }
         if($down<0) { $down=0; }
     }
     else {
-        $up=$F[1]-$tss_start;
-        $down=$F[2]-$tss_end;
+        $up=$start-$F[1];
+        $down=$end-$F[1];
         if($up>0) { $up=0; }
         if($down<0) { $down=0; }
     } print "\t$up\t$down\n";' | perl -ane '
         if($F[9]<=0) {
-            @tss_coor=split(/[\:\-]/,$F[7]);
-            $F[1]=$tss_coor[1]-50;
-            $F[2]=$tss_coor[2]+50;
+            $start=$F[1]-50;
+            $end=$F[1]+50;
+            $F[7]="$F[0]:$start-$end";
             $F[9]=50;
             $F[6]="N";
         }
@@ -223,15 +223,16 @@ else
 
     if [ ! -z "$REFINE" ]; then
         >&2 echo -n "Refine 3' boundary of promoter (`date`).. "
-        zless $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP | perl -ane 'if($F[9]>450) { print $_; }' | perl -ane '@tss=split(/[\:\-]+/,$F[7]); if($F[5]=~/\-/) { $end=$tss[1]-250; $start=$tss[1]-$F[9]; } else { $start=$tss[1]+250; $end=$tss[1]+$F[9]; } print "$F[0]\t$start\t$end\t$F[3]\t$F[4]\t$F[5]\n";' | bed2HighestExprBin -i stdin -j $REFINE -w 200 -s 200 -d -g $GENOME > $OUTDIR/define_promoter/GENES_PROMOTER.BED.HighestExprBin$TMP
+        zless $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP | perl -ane 'if($F[9]>450) { print $_; }' | perl -ane 'if($F[5]=~/\-/) { $end=$F[1]-250; $start=$F[1]-$F[9]; } else { $start=$F[1]+250; $end=$F[1]+$F[9]; } print "$F[0]\t$start\t$end\t$F[3]\t$F[4]\t$F[5]\n";' | bed2HighestExprBin -i stdin -j $REFINE -w 200 -s 200 -d -g $GENOME > $OUTDIR/define_promoter/GENES_PROMOTER.BED.HighestExprBin$TMP
 
-        zless <(zless $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP | perl -ane 'if($F[9]<=450) { print $_; }') <(join -j 4 $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP $OUTDIR/define_promoter/GENES_PROMOTER.BED.HighestExprBin$TMP | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$F[10]\t$F[11]\t$F[12]\n";' | perl -ane '@tss=split(/[\:\-]+/,$F[7]); if($F[5]=~/\-/) { $distance_3p=$tss[1]-$F[11]; } else { $distance_3p=$F[12]-$tss[1]; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$distance_3p\n";') | sort -k 4,4
+        zless <(zless $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP | perl -ane 'if($F[9]<=450) { print $_; }') <(join -j 4 $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP $OUTDIR/define_promoter/GENES_PROMOTER.BED.HighestExprBin$TMP | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$F[10]\t$F[11]\t$F[12]\n";' | perl -ane 'if($F[5]=~/\-/) { $distance_3p=$F[1]-$F[11]; } else { $distance_3p=$F[12]-$F[1]; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$distance_3p\n";') | sort -k 4,4
 
         rm $OUTDIR/define_promoter/GENES_PROMOTER.BED.HighestExprBin$TMP
         >&2 echo "done"
     else
         zless $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP
-    fi | perl -ane '@tss=split(/[\:\-]/,$F[7]); print "$tss[0]\t$tss[1]\t".($tss[2]+1)."\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";'
+    fi
+    #| perl -ane '@tss=split(/[\:\-]/,$F[7]); print "$tss[0]\t$tss[1]\t".($tss[2]+1)."\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";'
 
     ## remove temporary file
     rm $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP
