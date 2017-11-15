@@ -52,11 +52,13 @@ usage() {
     echo " -j <file>   [input h3k4me1 modification data in BAM format]"
     echo "             [if multiple, please separate them by a comma]"
     echo "[OPTIONS]"
+    echo " -q <file>   [input h3k4me3 modification data in BAM format]"
+    echo "             [if multiple, please separate them by a comma]"
     echo " -o <dir>    [output directory to store results (default: enhancers)"
     echo " -m <string> [genome (default: mm9)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
     echo " -k <file>   [IgG control file in BAM format]"
-    echo " -n <int>    [assign h3k4me1 peak to enhancer, if within this distance (default: 400)]"
+    echo " -n <int>    [assign h3k4me1/h3k4me3 peak to enhancer, if within this distance (default: 400)]"
     echo "[OPTIONS: bam2peaks]"
     echo " -c <int>    [minimum number of read in the block group (default: 2)]"
     echo " -e <int>    [minimum number of read in the block (default: 2)]"
@@ -72,11 +74,12 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:l:j:o:m:p:k:n:c:e:x:s:g:t:v:d:h ARG; do
+while getopts i:l:j:q:o:m:p:k:n:c:e:x:s:g:t:v:d:h ARG; do
 	case "$ARG" in
 		i) ENHANCERFILE=$OPTARG;;
         l) P300FILE=$OPTARG;;
-        j) HISTONEFILE=$OPTARG;;
+        j) H3K4ME1FILE=$OPTARG;;
+        q) H3K4ME3FILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         m) GENOME=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
@@ -102,7 +105,7 @@ fi
 >&2 echo
 >&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
 ## usage, if necessary file and directories are given/exist
-if [ -z "$ENHANCERFILE" -a -z "$P300FILE" -o -z "$HISTONEFILE" ]; then
+if [ -z "$ENHANCERFILE" -a -z "$P300FILE" -o -z "$H3K4ME1FILE" ]; then
     >&2 echo
     >&2 echo "Error: one or more required paramter values not provided"
     >&2 echo
@@ -130,7 +133,7 @@ fi
 if [ ! -d "$OUTDIR/logs" ]; then
     mkdir -p $OUTDIR/logs
     mkdir -p $OUTDIR/h3k4me1
-    mkdir -p $OUTDIR/secondary_files
+    mkdir -p $OUTDIR/secondary_files/h3k4me1
 fi
 
 >&2 echo "done"
@@ -178,9 +181,9 @@ fi
 >&2 echo -n "Predict peaks on H3K4me1 data (`date`).. "
 if [ ! -s "$OUTDIR/h3k4me1/PEAKS.BED" ]; then
     if [ -z "$CONTROLFILE" ]; then
-        bam2peaks -i $HISTONEFILE -o $OUTDIR/h3k4me1 -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION &>$OUTDIR/logs/bam2peaks_h3k4me1.log
+        bam2peaks -i $H3K4ME1FILE -o $OUTDIR/h3k4me1 -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION &>$OUTDIR/logs/bam2peaks_h3k4me1.log
     else
-        bam2peaks -i $HISTONEFILE -o $OUTDIR/h3k4me1 -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE &>$OUTDIR/logs/bam2peaks_h3k4me1.log
+        bam2peaks -i $H3K4ME1FILE -o $OUTDIR/h3k4me1 -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE &>$OUTDIR/logs/bam2peaks_h3k4me1.log
     fi
 fi
 >&2 echo "done"
@@ -194,32 +197,91 @@ if [ ! -s "$OUTDIR/secondary_files/ALLENHANCERS.BED" -o ! -s "$OUTDIR/h3k4me1/PE
 else
     >&2 echo -n "Determine optimal h3k4me1 peaks by merging closely spaced peaks (`date`).. "
     NCOL=$(head -n 1 $OUTDIR/h3k4me1/PEAKS.BED | perl -ane 'print scalar(@F);')
-    closestBed -a <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -b <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/secondary_files/PEAKS.BED.DIST
+    closestBed -a <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -b <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.DIST
 
-    bed2shuffle -i $OUTDIR/h3k4me1/PEAKS.BED -g $GENOME > $OUTDIR/secondary_files/SHUFFLE.BED
+    bed2shuffle -i $OUTDIR/h3k4me1/PEAKS.BED -g $GENOME > $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED
 
-    closestBed -a <(sortBed -i $OUTDIR/secondary_files/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/secondary_files/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/secondary_files/SHUFFLE.BED.DIST
+    closestBed -a <(sortBed -i $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED.DIST
 
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    cut -f 2 $OUTDIR/secondary_files/PEAKS.BED.DIST > $OUTDIR/secondary_files/PEAKS.BED.DIST.$TMP
-    cut -f 2 $OUTDIR/secondary_files/SHUFFLE.BED.DIST > $OUTDIR/secondary_files/SHUFFLE.BED.DIST.$TMP
-    MERGEDISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/secondary_files/PEAKS.BED.DIST.$TMP -j $OUTDIR/secondary_files/SHUFFLE.BED.DIST.$TMP -m median)
+    cut -f 2 $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.DIST > $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.DIST.$TMP
+    cut -f 2 $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED.DIST > $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED.DIST.$TMP
+    MERGEDISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.DIST.$TMP -j $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED.DIST.$TMP -m median)
     >&2 echo $MERGEDISTANCE
-    rm $OUTDIR/secondary_files/PEAKS.BED.DIST.$TMP
-    rm $OUTDIR/secondary_files/SHUFFLE.BED.DIST.$TMP
+    rm $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.DIST.$TMP
+    rm $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED.DIST.$TMP
   
     if [ "$MERGEDISTANCE" -gt 1000 ]; then
         MERGEDISTANCE=1000
     fi
 
-    multiIntersectBed -i <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED | bed2window -i stdin -w 100) <(bedtools merge -i <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -d $MERGEDISTANCE) -names enhancers h3k4me1 | grep -v enhancers | cut -f 1-3 > $OUTDIR/secondary_files/PEAKS.BED.MERGED 
+    multiIntersectBed -i <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED | bed2window -i stdin -w 100) <(bedtools merge -i <(sortBed -i $OUTDIR/h3k4me1/PEAKS.BED) -d $MERGEDISTANCE) -names enhancers h3k4me1 | grep -v enhancers | cut -f 1-3 > $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.MERGED 
     >&2 echo done
 
     >&2 echo -n "Define up- and downstream h3k4me1 peaks to each enhancer (`date`).. "
-    paste <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/PEAKS.BED.MERGED) -D ref -fu -t first | cut -f 7-10) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/PEAKS.BED.MERGED) -D ref -fd -t first | cut -f 7-10) | perl -ane 'if(abs($F[9]) < '$PEAKDISTANCE' && $F[9] < 0) { $up=$F[1]-$F[7]; $up_coor=$F[7]; } else { $up=50; $up_coor=$F[1]-50; } if(abs($F[13]) < '$PEAKDISTANCE' && $F[13] > 0) { $down=$F[12]-$F[2]; $down_coor=$F[12]; } else { $down=50; $down_coor=$F[2]+50; } $defined="N"; if(abs($F[9]) < '$PEAKDISTANCE' || abs($F[13]) < '$PEAKDISTANCE') { $defined="Y"; }  @name=split(/\_/, $F[3]); if($up > $down) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t-\t$defined\t-$down\t$up\n"; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t+\t$defined\t-$up\t$down\n"; }' > $OUTDIR/ENHANCERS.BED
+    paste <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.MERGED) -D ref -fu -t first | cut -f 7-10) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.MERGED) -D ref -fd -t first | cut -f 7-10) | perl -ane 'if(abs($F[9]) < '$PEAKDISTANCE' && $F[9] < 0) { $up=$F[1]-$F[7]; $up_coor=$F[7]; } else { $up=50; $up_coor=$F[1]-50; } if(abs($F[13]) < '$PEAKDISTANCE' && $F[13] > 0) { $down=$F[12]-$F[2]; $down_coor=$F[12]; } else { $down=50; $down_coor=$F[2]+50; } $defined="N"; if(abs($F[9]) < '$PEAKDISTANCE' || abs($F[13]) < '$PEAKDISTANCE') { $defined="Y"; }  @name=split(/\_/, $F[3]); if($up > $down) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t-\t$defined\t-$down\t$up\n"; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t+\t$defined\t-$up\t$down\n"; }' > $OUTDIR/secondary_files/h3k4me1/ENHANCERS_H3K4ME1.BED
+    >&2 echo done
+fi
+
+if [ ! -z "$H3K4ME3FILE" ]; then
+    >&2 echo -n "Predict peaks on H3K4me3 data (`date`).. "
+
+    mkdir -p $OUTDIR/secondary_files/h3k4me3
+    if [ ! -s "$OUTDIR/h3k4me3/PEAKS.BED" ]; then
+        if [ -z "$CONTROLFILE" ]; then
+            bam2peaks -i $H3K4ME3FILE -o $OUTDIR/h3k4me3 -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION &>$OUTDIR/logs/bam2peaks_h3k4me3.log
+        else
+            bam2peaks -i $H3K4ME3FILE -o $OUTDIR/h3k4me3 -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE &>$OUTDIR/logs/bam2peaks_h3k4me3.log
+        fi
+    fi
+    >&2 echo "done"
+
+    if [ ! -s "$OUTDIR/h3k4me3/PEAKS.BED" ]; then
+        >&2 echo
+        >&2 echo "Enhancer or H3K4me3 peak file is not computed properly.. "
+        >&2 echo "exiting.. "
+        >&2 echo
+        exit
+    else
+        >&2 echo -n "Determine optimal h3k4me3 peaks by merging closely spaced peaks (`date`).. "
+        NCOL=$(head -n 1 $OUTDIR/h3k4me3/PEAKS.BED | perl -ane 'print scalar(@F);')
+        closestBed -a <(sortBed -i $OUTDIR/h3k4me3/PEAKS.BED) -b <(sortBed -i $OUTDIR/h3k4me3/PEAKS.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.DIST
+
+        bed2shuffle -i $OUTDIR/h3k4me3/PEAKS.BED -g $GENOME > $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED
+
+        closestBed -a <(sortBed -i $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED.DIST
+
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        cut -f 2 $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.DIST > $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.DIST.$TMP
+        cut -f 2 $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED.DIST > $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED.DIST.$TMP
+        MERGEDISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.DIST.$TMP -j $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED.DIST.$TMP -m median)
+        >&2 echo $MERGEDISTANCE
+        rm $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.DIST.$TMP
+        rm $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED.DIST.$TMP
+      
+        if [ "$MERGEDISTANCE" -gt 1000 ]; then
+            MERGEDISTANCE=1000
+        fi
+
+        multiIntersectBed -i <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED | bed2window -i stdin -w 100) <(bedtools merge -i <(sortBed -i $OUTDIR/h3k4me3/PEAKS.BED) -d $MERGEDISTANCE) -names enhancers h3k4me3 | grep -v enhancers | cut -f 1-3 > $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.MERGED 
+        >&2 echo done
+
+        >&2 echo -n "Define up- and downstream h3k4me3 peaks to each enhancer (`date`).. "
+        paste <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.MERGED) -D ref -fu -t first | cut -f 7-10) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.MERGED) -D ref -fd -t first | cut -f 7-10) | perl -ane 'if(abs($F[9]) < '$PEAKDISTANCE' && $F[9] < 0) { $up=$F[1]-$F[7]; $up_coor=$F[7]; } else { $up=50; $up_coor=$F[1]-50; } if(abs($F[13]) < '$PEAKDISTANCE' && $F[13] > 0) { $down=$F[12]-$F[2]; $down_coor=$F[12]; } else { $down=50; $down_coor=$F[2]+50; } $defined="N"; if(abs($F[9]) < '$PEAKDISTANCE' || abs($F[13]) < '$PEAKDISTANCE') { $defined="Y"; }  @name=split(/\_/, $F[3]); if($up > $down) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t-\t$defined\t-$down\t$up\n"; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t+\t$defined\t-$up\t$down\n"; }' > $OUTDIR/secondary_files/h3k4me3/ENHANCERS_H3K4ME3.BED
+        >&2 echo done
+    fi
     >&2 echo done
 
-    echo "track name=\"Refined enhancer regions\" description=\"Refined enhancer regions\" itemRgb=\"On\"" > $OUTDIR/ENHANCERS.BED.UCSC
-    zless $OUTDIR/ENHANCERS.BED | perl -ane 'if($F[5]=~/\-/) { $fbStart=$F[1]-$F[8]; $fbEnd=$F[1]-1; $sbStart=$F[2]+1; $sbEnd=$F[2]+abs($F[7]); } else { $fbStart=$F[1]-abs($F[7]); $fbEnd=$F[1]-1; $sbStart=$F[2]+1; $sbEnd=$F[2]+$F[8]; } if($fbEnd < $fbStart) { $fbEnd=$fbStart; } if($sbEnd < $sbStart) { $sbEnd=$sbStart; } print "$F[0]\t$fbStart\t$fbEnd\t$F[3]_$F[6]\t$F[4]\t$F[5]\t$fbStart\t$fbEnd\t0,255,0\n"; print "$F[0]\t$F[1]\t$F[2]\t$F[3]_$F[6]\t$F[4]\t$F[5]\t$F[1]\t$F[2]\t255,0,0\n"; print "$F[0]\t$sbStart\t$sbEnd\t$F[3]_$F[6]\t$F[4]\t$F[5]\t$sbStart\t$sbEnd\t0,255,0\n";' >> $OUTDIR/ENHANCERS.BED.UCSC
+    >&2 echo -n "Optimize enhancer boundary using h3k4me3 data (`date`).. "
+
+    >&2 echo done
+
+else
+    scp $OUTDIR/secondary_files/h3k4me1/ENHANCERS_H3K4ME1.BED $OUTDIR/ENHANCERS.BED
 fi
->&2 echo "done"
+
+## create UCSC file
+echo "track name=\"Refined enhancer regions\" description=\"Refined enhancer regions\" itemRgb=\"On\"" > $OUTDIR/ENHANCERS.BED.UCSC
+zless $OUTDIR/ENHANCERS.BED | perl -ane 'if($F[5]=~/\-/) { $fbStart=$F[1]-$F[8]; $fbEnd=$F[1]-1; $sbStart=$F[2]+1; $sbEnd=$F[2]+abs($F[7]); } else { $fbStart=$F[1]-abs($F[7]); $fbEnd=$F[1]-1; $sbStart=$F[2]+1; $sbEnd=$F[2]+$F[8]; } if($fbEnd < $fbStart) { $fbEnd=$fbStart; } if($sbEnd < $sbStart) { $sbEnd=$sbStart; } print "$F[0]\t$fbStart\t$fbEnd\t$F[3]_$F[6]\t$F[4]\t$F[5]\t$fbStart\t$fbEnd\t0,255,0\n"; print "$F[0]\t$F[1]\t$F[2]\t$F[3]_$F[6]\t$F[4]\t$F[5]\t$F[1]\t$F[2]\t255,0,0\n"; print "$F[0]\t$sbStart\t$sbEnd\t$F[3]_$F[6]\t$F[4]\t$F[5]\t$sbStart\t$sbEnd\t0,255,0\n";' >> $OUTDIR/ENHANCERS.BED.UCSC
+
+>&2 echo "All done. Bye"
