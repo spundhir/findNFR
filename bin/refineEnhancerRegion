@@ -219,7 +219,7 @@ else
     >&2 echo done
 
     >&2 echo -n "Define up- and downstream h3k4me1 peaks to each enhancer (`date`).. "
-    paste <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.MERGED) -D ref -fu -t first | cut -f 7-10) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.MERGED) -D ref -fd -t first | cut -f 7-10) | perl -ane 'if(abs($F[9]) < '$PEAKDISTANCE' && $F[9] < 0) { $up=$F[1]-$F[7]; $up_coor=$F[7]; } else { $up=50; $up_coor=$F[1]-50; } if(abs($F[13]) < '$PEAKDISTANCE' && $F[13] > 0) { $down=$F[12]-$F[2]; $down_coor=$F[12]; } else { $down=50; $down_coor=$F[2]+50; } $defined="N"; if(abs($F[9]) < '$PEAKDISTANCE' || abs($F[13]) < '$PEAKDISTANCE') { $defined="Y"; }  @name=split(/\_/, $F[3]); if($up > $down) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t-\t$defined\t-$down\t$up\n"; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t+\t$defined\t-$up\t$down\n"; }' > $OUTDIR/secondary_files/h3k4me1/ENHANCERS_H3K4ME1.BED
+    paste <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.MERGED) -D ref -fu -t first | cut -f 7-10) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.MERGED) -D ref -fd -t first | cut -f 7-10) | perl -ane 'if(abs($F[9]) < '$PEAKDISTANCE' && $F[9] < 0) { $up=$F[1]-$F[7]; $up_coor=$F[7]; } else { $up=50; $up_coor=$F[1]-50; } if(abs($F[13]) < '$PEAKDISTANCE' && $F[13] > 0) { $down=$F[12]-$F[2]; $down_coor=$F[12]; } else { $down=50; $down_coor=$F[2]+50; } $defined="N"; if(abs($F[9]) < '$PEAKDISTANCE' || abs($F[13]) < '$PEAKDISTANCE') { $defined="Yme1"; }  @name=split(/\_/, $F[3]); if($up > $down) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t-\t$defined\t+$down\t$up\n"; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t-\t$defined\t-$up\t$down\n"; }' > $OUTDIR/secondary_files/h3k4me1/ENHANCERS_H3K4ME1.BED
     >&2 echo done
 fi
 
@@ -267,13 +267,17 @@ if [ ! -z "$H3K4ME3FILE" ]; then
         >&2 echo done
 
         >&2 echo -n "Define up- and downstream h3k4me3 peaks to each enhancer (`date`).. "
-        paste <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.MERGED) -D ref -fu -t first | cut -f 7-10) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.MERGED) -D ref -fd -t first | cut -f 7-10) | perl -ane 'if(abs($F[9]) < '$PEAKDISTANCE' && $F[9] < 0) { $up=$F[1]-$F[7]; $up_coor=$F[7]; } else { $up=50; $up_coor=$F[1]-50; } if(abs($F[13]) < '$PEAKDISTANCE' && $F[13] > 0) { $down=$F[12]-$F[2]; $down_coor=$F[12]; } else { $down=50; $down_coor=$F[2]+50; } $defined="N"; if(abs($F[9]) < '$PEAKDISTANCE' || abs($F[13]) < '$PEAKDISTANCE') { $defined="Y"; }  @name=split(/\_/, $F[3]); if($up > $down) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t-\t$defined\t-$down\t$up\n"; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t+\t$defined\t-$up\t$down\n"; }' > $OUTDIR/secondary_files/h3k4me3/ENHANCERS_H3K4ME3.BED
+        paste <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.MERGED) -D ref -fu -t first | cut -f 7-10) <(closestBed -a  <(sortBed -i $OUTDIR/secondary_files/ALLENHANCERS.BED) -b <(sortBed -i $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.MERGED) -D ref -fd -t first | cut -f 7-10) | perl -ane 'if(abs($F[9]) < '$PEAKDISTANCE' && $F[9] < 0) { $up=$F[1]-$F[7]; $up_coor=$F[7]; } else { $up=50; $up_coor=$F[1]-50; } if(abs($F[13]) < '$PEAKDISTANCE' && $F[13] > 0) { $down=$F[12]-$F[2]; $down_coor=$F[12]; } else { $down=50; $down_coor=$F[2]+50; } $defined="N"; if(abs($F[9]) < '$PEAKDISTANCE' || abs($F[13]) < '$PEAKDISTANCE') { $defined="Yme3"; }  @name=split(/\_/, $F[3]); if($up > $down) { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t-\t$defined\t-$down\t$up\n"; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[0]:$up_coor-$down_coor"."_".$name[scalar(@name)-1]."\t$F[4]\t+\t$defined\t-$up\t$down\n"; }' > $OUTDIR/secondary_files/h3k4me3/ENHANCERS_H3K4ME3.BED
         >&2 echo done
     fi
     >&2 echo done
 
     >&2 echo -n "Optimize enhancer boundary using h3k4me3 data (`date`).. "
-
+    intersectBed -a $OUTDIR/secondary_files/h3k4me1/ENHANCERS_H3K4ME1.BED -b $OUTDIR/secondary_files/h3k4me3/ENHANCERS_H3K4ME3.BED -wao | perl -ane '
+        if($F[8]>50 && $F[17]<=50) { $F[6]="Yme1"; }
+        elsif($F[8]<=50 && $F[17]>50) { $F[6]="Yme3"; $F[5]=$F[14]; $F[8]=$F[17]; }
+        elsif($F[8]>50 && $F[17]>50) { $F[6]="Yme1-Yme3"; $F[5]=$F[17]; $F[8]=$F[17]; }
+        print "$F[0]"; foreach(@F[1..8]) { print "\t$_"; } print "\n";' 
     >&2 echo done
 
 else
