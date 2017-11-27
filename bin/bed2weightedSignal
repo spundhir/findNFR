@@ -38,14 +38,16 @@ usage() {
     echo " -c <int>      [column containing score information in peak file; -j argument (default: 5)]"
     echo "               [if multiple, please separate them by a comma]"
     echo " -s <int>      [column containing genome segment information computed by ChromHMM (Optional)]"
+    echo "[OPTIONS: Approach]"
     echo " -v            [compute using overlap approach (default is closest approach)]"
+    echo " -y            [compute using both overlap and closest approach (default is closest approach)]"
 	echo " -h            [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:c:s:vh ARG; do
+while getopts i:j:g:c:s:vyh ARG; do
 	case "$ARG" in
 		i) PROMOTERFILE=$OPTARG;;
 		j) PEAKFILE=$OPTARG;;
@@ -53,6 +55,7 @@ while getopts i:j:g:c:s:vh ARG; do
         c) SCORE_COL=$OPTARG;;
         s) SEGMENT_COL=$OPTARG;;
         v) OVERLAP_APPROACH=1;;
+        y) OVERLAP_CLOSEST_APPROACH=1;;
 		h) HELP=1;;
 	esac
 done
@@ -106,22 +109,34 @@ else
 <<"COMMENT"
 COMMENT
     TMP_CLOSESTBED=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    if [ ! -z "$SEGMENT_COL" ]; then
-        closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first -io | closestBed2uniq -i stdin -c $SEGMENT_COL,$SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
-        N=$((${SCORE_COLS[$i]}+2))
+    if [ ! -z "$OVERLAP_CLOSEST_APPROACH" ]; then
+        if [ ! -z "$SEGMENT_COL" ]; then
+            closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first | closestBed2uniq -i stdin -c $SEGMENT_COL,$SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
+            N=$((${#SCORE_COLS[@]}+2))
+        else
+            closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first | closestBed2uniq -i stdin -c $SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
+            N=$((${#SCORE_COLS[@]}+1))
+        fi
     else
-        closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
-        N=$((${SCORE_COLS[$i]}+1))
+        if [ ! -z "$SEGMENT_COL" ]; then
+            closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first -io | closestBed2uniq -i stdin -c $SEGMENT_COL,$SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
+            N=$((${#SCORE_COLS[@]}+2))
+        else
+            closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
+            N=$((${#SCORE_COLS[@]}+1))
+        fi
     fi
 
     TMP_ANNOTATEDPROMOTERFILE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    cat $PROMOTERFILE | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$TMP_CLOSESTBED' -m 1`; if($match=~/^$/) { chomp($_); print "$_"; for($i=0; $i<'$N'; $i++) { print "\tNA"; } print "\n"; } else { chomp($match); print "$match\n"; }' > $TMP_ANNOTATEDPROMOTERFILE
+    if [ ! -s "$TMP_ANNOTATEDPROMOTERFILE" ]; then
+        cat $PROMOTERFILE | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$TMP_CLOSESTBED' -m 1`; if($match=~/^$/) { chomp($_); print "$_"; for($i=0; $i<'$N'; $i++) { print "\tNA"; } print "\n"; } else { chomp($match); print "$match\n"; }' > $TMP_ANNOTATEDPROMOTERFILE
+    fi
     
     if [ ! -z "$SEGMENT_COL" ]; then
         SEGMENT_COL=$(($NCOL_PROMOTER+1))
         SCORE_COL=$(($NCOL_PROMOTER+2))
     else
-        SCORE_COL=$(($NCOL_PROMOTER+2))
+        SCORE_COL=$(($NCOL_PROMOTER+1))
     fi
     j=$SCORE_COL
     for(( i=1; i<${#SCORE_COLS[@]}; i++)); do
@@ -130,7 +145,7 @@ COMMENT
     done
     DISTANCE_COL=$(zless $TMP_ANNOTATEDPROMOTERFILE | head -n 1 | perl -ane 'print scalar(@F);')
 
-    #echo -e "$SCORE_COL\t$DISTANCE_COL\t$SEGMENT_COL"
+    #echo -e "$SCORE_COL\t$DISTANCE_COL\t$SEGMENT_COL";
 
     if [ ! -z "$SEGMENT_COL" ]; then
         $FINDNFRPATH/share/R/bed2weightedSignal.R -i $TMP_ANNOTATEDPROMOTERFILE -s $SCORE_COL -d $DISTANCE_COL -t $SEGMENT_COL
