@@ -37,7 +37,7 @@ usage() {
     echo " -g <string>   [genome (default: mm9)]"
     echo " -c <int>      [column containing score information in peak file; -j argument (default: 5)]"
     echo "               [if multiple, please separate them by a comma]"
-    echo " -s <int>      [column containing genome segment information computed by ChromHMM]"
+    echo " -s <int>      [column containing genome segment information computed by ChromHMM (Optional)]"
     echo " -v            [compute using overlap approach (default is closest approach)]"
 	echo " -h            [help]"
 	echo

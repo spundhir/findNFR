@@ -64,6 +64,7 @@ usage() {
     echo " -z <file>   [input h3k27me3 modification data in BAM format]"
     echo "             [if multiple, please separate them by a comma]"
     echo " -y <file>   [input genomic coordinates of genes in BED format (requires h3k4me3 data)]"
+    echo "             [format: chr start end name score strand]"
     echo " -w <int>    [assign h3k4me3 peak to a gene as promoter region, if within this distance to TSS (default: 1000 bp)]"
     echo "[OPTIONS: bam2peaks]"
     echo " -c <int>    [minimum number of read in the block group (default: 2)]"
@@ -355,11 +356,10 @@ if [ ! -z "$GENEFILE" -a ! -z "$H3K4ME3FILE" ]; then
 
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     gene2promoter -i $GENEFILE -j $H3K4ME3FILE -o $OUTDIR/h3k4me3 -n $WINDOW | sort -k 4,4 > $OUTDIR/h3k4me3/GENES_PROMOTER.BED
+
     cat <(intersectBed -a <(zless $OUTDIR/ENHANCERS.BED | perl -ane '@id=split(/[\:\-\_]+/,$F[3]); print "$id[0]\t$id[1]\t$id[2]\t$F[0]:$F[1]-$F[2]_$id[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\n";' | sortBed -i stdin) -b <(zless $OUTDIR/h3k4me3/GENES_PROMOTER.BED | perl -ane '@coor=split(/[\:\-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]\n";' | sortBed -i stdin) -v | perl -ane '@id=split(/[\:\-\_]+/,$F[3]); print "$id[0]\t$id[1]\t$id[2]\t$F[0]:$F[1]-$F[2]_$id[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\n";') <(intersectBed -a <(zless $OUTDIR/ENHANCERS.BED | perl -ane '@id=split(/[\:\-\_]+/,$F[3]); if($F[6]=~/^Yme1-Yme3$/) { $F[6]="$F[6]_P"; } print "$id[0]\t$id[1]\t$id[2]\t$F[0]:$F[1]-$F[2]_$id[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\n";' | sortBed -i stdin) -b <(zless $OUTDIR/h3k4me3/GENES_PROMOTER.BED | perl -ane '@coor=split(/[\:\-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]\n";' | sortBed -i stdin) -u | perl -ane '@id=split(/[\:\-\_]+/,$F[3]); print "$id[0]\t$id[1]\t$id[2]\t$F[0]:$F[1]-$F[2]_$id[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\n";') | sortBed -i stdin > $OUTDIR/ENHANCERS.BED.$TMP
     mv $OUTDIR/ENHANCERS.BED.$TMP $OUTDIR/ENHANCERS.BED
     >&2 echo done
-
-    
 fi
 
 ## create UCSC file

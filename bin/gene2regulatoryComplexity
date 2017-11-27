@@ -278,6 +278,8 @@ NCOL_DISTAL_ENVIRONMENT=$(zless $OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT
 paste <(cut -f 1-$NCOL_PROMOTER $OUTDIR/GENES_PROMOTER.BED) <(cut -f $(($NCOL_PROMOTER+1))-$NCOL_PROMOTER_ENVIRONMENT $OUTDIR/chromatin_environment/PROMOTER_ENVIRONMENT.BED) <(cut -f $(($NCOL_PROMOTER+1))-$NCOL_DISTAL_ENVIRONMENT $OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED) > $OUTDIR/GENES_PROMOTER.BED.RC
 echo "done"
 
+## THIS DOES NOT WORK
+<<"COMMENT"
 echo -n "Define enhancers (`date`).. "
 if grep -qw h3k4me1 $CONFIGFILE; then
     if [ ! -s "$OUTDIR/ENHANCERS.BED" ]; then
@@ -287,6 +289,7 @@ else
     grep -v start $OUTDIR/chromatin_environment/distal/DISTALPEAKS.BED | grep enhancer | perl -ane '$i++; print "$F[0]\t$F[1]\t$F[2]\t$F[3]_$i\t0\t.\tNA\tNA\n";' > $OUTDIR/ENHANCERS.BED
 fi
 echo "done"
+COMMENT
 
 ## OLD
 <<"COMMENT"
