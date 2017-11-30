@@ -163,27 +163,24 @@ cat $INPUTBEDFILE | perl -ane '
 
         $start=$F[1]-($F[6]);
         ## this means if start < 50 (WIN_DOWN) + 1 + 200 (WIN_FLANKING)
-        if($start < $down_start) {
-            $nfr_start=$start;
+        if($start < $down_start && $down_start - $start >= '$WIN_FLANKING'*2) {
+            $extr_down_end=($start-1)+'$WIN_FLANKING';
+            $extr_down_start=$start-1;
+            $nfr_start=$extr_down_start;
             $nfr_end=$down_start-1;
-            if($nfr_end < $nfr_start) { $nfr_start=$hfr_start; $nfr_end=$hfr_end; }
-            $extr_down_start=($start-1)-'$WIN_FLANKING';
-            $extr_down_end=$start-1;
+            if($nfr_end < $nfr_start) { $nfr_start=$extr_down_start; $nfr_end=$extr_down_end; }
+        } elsif($start < $down_start && $down_start - $start >= '$WIN_FLANKING') {
+            $extr_down_end=($start-1)+'$WIN_FLANKING';
+            $extr_down_start=$start-1;
+            $nfr_start=$extr_down_start;
+            $nfr_end=$down_start-1;
+            if($nfr_end < $nfr_start) { $nfr_start=$extr_down_start; $nfr_end=$extr_down_end; }
         } else {
             $nfr_start=$hfr_start;
             $nfr_end=$hfr_end;
-            $extr_down_start=($down_start-1)-'$WIN_FLANKING';
-            $extr_down_end=$down_start-1;
+            $extr_down_start=$down_start;
+            $extr_down_end=$down_end;
         }
-
-        $extr_up_end=($up_end+1)+'$WIN_FLANKING';
-        $extr_up_start=$up_end+1;
-
-        $extr_extr_up_end=($extr_up_end+1)+'$WIN_FLANKING';
-        $extr_extr_up_start=$extr_up_end+1;
-
-        $extr_extr_down_start=($extr_down_start-1)-'$WIN_FLANKING';
-        $extr_extr_down_end=$extr_down_start-1;
     } else {
         $hfr_start=$F[1]-'$WIN_UP';
         $hfr_end=$F[1]+'$WIN_DOWN';
@@ -196,36 +193,31 @@ cat $INPUTBEDFILE | perl -ane '
 
         $end=$F[1]+($F[6]);
         ## this means if end > 50 (WIN_DOWN) + 1 + 200 (WIN_FLANKING)
-        if($end > $down_end) {
+        if($end > $down_end && $end - $down_end >= '$WIN_FLANKING'*2) {
+            $extr_down_end=$end+1;
+            $extr_down_start=$extr_down_end-'$WIN_FLANKING';
             $nfr_start=$down_end+1;
-            $nfr_end=$end;
-            if($nfr_end < $nfr_start) { $nfr_start=$hfr_start; $nfr_end=$hfr_end; }
-            $extr_down_start=$end+1;
-            $extr_down_end=($end+1)+'$WIN_FLANKING';
+            $nfr_end=$extr_down_end;
+            if($nfr_end < $nfr_start) { $nfr_start=$extr_down_start; $nfr_end=$extr_down_end; }
+        } elsif($end > $down_end && $end - $down_end >= '$WIN_FLANKING') {
+            $extr_down_end=$end+1;
+            $extr_down_start=$extr_down_end-'$WIN_FLANKING';
+            $nfr_start=$down_end+1;
+            $nfr_end=$extr_down_end;
+            if($nfr_end < $nfr_start) { $nfr_start=$extr_down_start; $nfr_end=$extr_down_end; }
         } else {
             $nfr_start=$hfr_start;
             $nfr_end=$hfr_end;
-            $extr_down_start=$down_end+1;
-            $extr_down_end=($down_end+1)+'$WIN_FLANKING';
+            $extr_down_start=$down_start;
+            $extr_down_end=$down_end;
         }
-        $extr_up_start=($up_start-1)-'$WIN_FLANKING';
-        $extr_up_end=($up_start-1);
-
-        $extr_extr_up_start=($extr_up_start-1)-'$WIN_FLANKING';
-        $extr_extr_up_end=($extr_up_start-1);
-
-        $extr_extr_down_start=$extr_down_end+1;
-        $extr_extr_down_end=($extr_down_end+1)+'$WIN_FLANKING';
     }
     $line=$F[0]; foreach(@F[1..scalar(@F)-1]) { $line.="#$_"; }
-    print "$F[0]\t$extr_extr_up_start\t$extr_extr_up_end\tEXTR_EXTR_UP#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region up-stream to EXTR_UP
-    print "$F[0]\t$extr_up_start\t$extr_up_end\tEXTR_UP#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region up-stream to UP
     print "$F[0]\t$up_start\t$up_end\tUP#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region up-stream to HFR
     print "$F[0]\t$hfr_start\t$hfr_end\tHFR#$F[3]\t0\t$F[5]\t$line\n"; ## Promoters: 150 bp nucleosome free region + also devoid of histone modified nucleosomes (HFR)
     print "$F[0]\t$down_start\t$down_end\tDOWN#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region down-stream to HFR
     print "$F[0]\t$nfr_start\t$nfr_end\tNFR#$F[3]\t0\t$F[5]\t$line\n"; ## region of varying width containing histone modified nucleosomes (NFR)
     print "$F[0]\t$extr_down_start\t$extr_down_end\tEXTR_DOWN#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region down-stream to NFR
-    print "$F[0]\t$extr_extr_down_start\t$extr_extr_down_end\tEXTR_EXTR_DOWN#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region down-stream to DOWN
     #chomp($_);
     #print "$_\t$F[0]:$up_start-$up_end\t$F[0]:$hfr_start-$hfr_end\t$F[0]:$nfr_start-$nfr_end\t$F[0]:$down_start-$down_end\n";' | bed2expr -i stdin -j $INPUTBAMFILES -g $GENOME -v $AVG $PARAM_BIN
     
