@@ -47,7 +47,7 @@ usage() {
 	echo "Options:"
 	echo " -i <file>   [input genomic coordinates of enhancer mid point in BED format]"
     echo "             [format: chr start end name score strand]"
-    echo "             [AND/OR]"
+    echo "             **AND/OR**"
     echo " -l <file>   [input P300 data in BAM format]"
     echo "             [if multiple, please separate them by a comma]"
     echo " -j <file>   [input h3k4me1 modification data in BAM format]"
