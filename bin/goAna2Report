@@ -1,0 +1,54 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+#### usage ####
+usage() {
+echo Program: "goAna2Report (create gene report from GO analysis output)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: goAna2Report -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file containing GO results (can be stdin)]"
+    echo "[OPTIONS]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:h ARG; do
+	case "$ARG" in
+		i) GORESULTS=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$GORESULTS" -o "$HELP" ]; then
+	usage
+fi
+
+## determine, if the input genes are from a file or stdin
+if [ "$GORESULTS" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do echo -e ${LINE}; done > $TMP
+    GORESULTS=$TMP
+fi
+
+echo -e "gene\tgo_class\tgene_class"
+zless $GORESULTS | cut -f 1,4,12 | grep -wv Description | perl -an -F'/\t+/' -e '
+    @gene=split(/\//,$F[2]);
+    foreach(@gene) {
+        if($_=~/^$/) { next; }
+        chomp($_);
+        if(defined($geneInfo{$_})) { $geneInfo{$_}.=",$F[1]"; }
+        else { $geneInfo{$_}.="$F[1]"; $clusterInfo{$_}="$F[0]"; }
+    }
+    END {
+        foreach(keys(%geneInfo)) {
+            print "$_\t$geneInfo{$_}\t$clusterInfo{$_}\n";
+        }
+    }' | sort -k 2,2 -k 3n,3 | perl -an -F'/\t+/' -e '$F[1]=~s/\,.*//g; print "$F[0]\t$F[1]\t$F[2]";' | sort -k 2,2
+    ## more concise report on which go class contains most genes
+    #cut -f 2,3 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1
