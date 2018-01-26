@@ -17,7 +17,7 @@ usage() {
     echo "             [FORMAT: chr start end name score strand distance]"
     echo "             [distance by which core promoter is extended downstream to TSS, computed using gene2promoter)]"
     echo " -j <file>   [configuration file]"
-    echo "             [FORMAT: tpm <absolute path to bam file>]"
+    echo "             [FORMAT: tpm_profile <absolute path to bam file>]"
     echo "[OPTIONS]"
     echo " -c          [analyze for enhancer (default: promoter)]"
     echo " -r <file>   [input BAM file (eg. chd4 ChIP-seq data) to refine DISTANCE (eg. 3' boundary of promoter)]"
@@ -105,7 +105,7 @@ if [ ! -z "$ADDONE" ]; then PARAM_BIN="$PARAM_BIN -n"; fi
 
 ## parse input bam files
 INPUTBAMFILES=$(cat $CONFIGFILE | perl -ane '
-    if($_=~/^tpm/) {
+    if($_=~/^tpm_profile/) {
         $file.="$F[1],";
     } END {
         $file=~s/\,$//g;
