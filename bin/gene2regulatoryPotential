@@ -93,7 +93,7 @@ else
     bed2weightedSignal -i $GENE_FILE -j $ENHANCER_FILE -g $GENOME -y | cut -f $(($NCOL_GENE_FILE+1)),$(($NCOL_GENE_FILE+2)) > $TMP_ENHANCER.RC
     COMMAND="$COMMAND $TMP_ENHANCER.RC"
 fi
-#echo $COMMAND
+#echo $COMMAND; exit
 eval $COMMAND
 
 ## remove temporary file
