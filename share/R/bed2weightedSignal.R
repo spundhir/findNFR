@@ -63,6 +63,16 @@ compute_total_signal <- function(signal) {
     return(total_signal)
 }
 
+## function to compute signal count
+compute_count_signal <- function(signal) {
+    if(is.na(signal)) {
+        count_signal <- 0
+    } else {
+        count_signal <- length(unlist(strsplit(as.character(signal), ",")))
+    }
+    return(count_signal)
+}
+
 #opt$scoreCol <- as.numeric(opt$scoreCol)
 opt$distanceCol <- as.numeric(opt$distanceCol)
 
@@ -85,6 +95,13 @@ for(i in unlist(strsplit(opt$scoreCol, ","))) {
     i <- as.numeric(i)
     ## MU is set to 2kb
     df[,j] <- apply(df, 1, function(x) compute_weighted_signal(x[i], x[opt$distanceCol], 2))
+    j=j+1
+}
+
+j=ncol(df)+1
+for(i in unlist(strsplit(opt$scoreCol, ","))) {
+    i <- as.numeric(i)
+    df[,j] <- apply(df, 1, function(x) compute_count_signal(x[i]))
     j=j+1
 }
 

@@ -3,6 +3,7 @@
 
 GENOME="mm9"
 AVG=0
+CONFIG_FILTER="tpm"
 
 #### usage ####
 usage() {
@@ -30,6 +31,7 @@ usage() {
     echo " -r          [require same strandedness]"
     echo " -n          [add 1 to all the raw expression counts - useful while taking log]"
     echo " -g <string> [genome (default: mm9)]"
+    echo " -f <string> [filter bam files from configuration file based on input indentifier (default: tpm)]"
 	echo " -h          [help]"
     echo "[NOTE]"
     echo " In case of error: Could not open input BAM files, refer to:"
@@ -40,7 +42,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:s:mkde:v:rng:h ARG; do
+while getopts i:j:s:mkde:v:rng:f:h ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         j) INPUTBAMFILES=$OPTARG;;
@@ -53,6 +55,7 @@ while getopts i:j:s:mkde:v:rng:h ARG; do
         r) SAME_STRAND=1;;
         n) ADDONE=1;;
         g) GENOME=$OPTARG;;
+        f) CONFIG_FILTER=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -80,7 +83,7 @@ INPUT=$(echo $INPUTBAMFILES | perl -ane '$_=~s/\,.*//g; print $_;')
 if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
     ## read configuration file
     INPUT=$(cat $INPUTBAMFILES | perl -ane '
-        if($_=~/^tpm/) {
+        if($_=~/^'$CONFIG_FILTER'/) {
             $file.="$F[1],";
         } END {
             $file=~s/\,$//g;

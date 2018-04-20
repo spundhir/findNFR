@@ -123,7 +123,7 @@ if [ -z "$MOST_OVERLAPPING" ]; then
                         foreach(@t) { if ($_ > $max) { $max=$_; } }
                         $line.="\t$max";
                     } else {
-                        $line.=sprintf("\t%d", $gene{$prev_key}{$_});
+                        $line.=sprintf("\t%0.6f", $gene{$prev_key}{$_});
                     }
                     $j++;
                 }
@@ -169,7 +169,7 @@ if [ -z "$MOST_OVERLAPPING" ]; then
                     foreach(@t) { if ($_ > $max) { $max=$_; } }
                     $line.="\t$max";
                 } else {
-                    $line.=sprintf("\t%d", $gene{$prev_key}{$_});
+                    $line.=sprintf("\t%0.6f", $gene{$prev_key}{$_});
                 }
             }
             $line=~s/\s+$//g;
