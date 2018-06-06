@@ -40,19 +40,21 @@ usage() {
     echo " -g <string> [genome (default: mm9)]"
     echo " -w <int>    [flank promoter with input number of bases (default: 500)]"
     echo " -v <int>    [instead of giving SI for each replicate, output only the mean (deafult: 0)]"
+    echo " -u          [compute pol2 pausing instead]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:w:v:h ARG; do
+while getopts i:j:g:w:v:uh ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
         g) BLOCKHEIGHT=$OPTARG;;
         w) WINDOW=$OPTARG;;
         v) AVG=$OPTARG;;
+        u) POL2PAUSING=1;;
 		h) HELP=1;;
 	esac
 done
@@ -130,8 +132,15 @@ IFS=$oIFS
 >&2 echo -n "Start computing spreading index for genes using input BAM files (`date`).. "
 LAST_COL=$(perl -e '$col=6+'$BAMFILES_COUNT'; print "$col";')
 
-paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) | perl -ane 'chomp($_); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]"; for($i=0; $i<2; $i++) { $col_gb=(6+$i)+2; $col_p=(6+$i); $ratio=sprintf("%0.5f", $F[$col_gb]/$F[$col_p]); print "\t$ratio"; } print "\n";' | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $sum=0; $count=0; for($i=$field_count; $i<scalar(@F); $i++) { $sum+=$F[$i]; $count++; } printf("%0.5f\n", $sum/$count); } else { $_=~s/\s+$//g; print "$_\n"; }'
+#echo "paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL)"; exit
 
+#paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) | perl -ane 'chomp($_); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]"; for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $col_gb=(6+$i)+'$BAMFILES_COUNT'; $col_p=(6+$i); $ratio=sprintf("%0.5f", $F[$col_gb]/$F[$col_p]); print "\t$ratio\t$F[$col_gb]\t$F[$col_p]"; } print "\n";' 
+
+if [ -z "$POL2PAUSING" ]; then
+    paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) | perl -ane 'chomp($_); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]"; for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $col_gb=(6+$i)+'$BAMFILES_COUNT'; $col_p=(6+$i); $ratio=sprintf("%0.5f", $F[$col_p]/$F[$col_gb]); print "\t$ratio"; } print "\n";' | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $sum=0; $count=0; for($i=$field_count; $i<scalar(@F); $i++) { $sum+=$F[$i]; $count++; } printf("%0.5f\n", $sum/$count); } else { $_=~s/\s+$//g; print "$_\n"; }'
+else
+    paste <(zless $GENEFILE) <(zless $GENEFILE | perl -ane 'if($F[5]=~/^\-$/) { $start=$F[2]-150; $end=$F[2]+50; } else { $end=$F[1]+150; $start=$F[1]-50; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) <(zless $GENEFILE | perl -ane 'if($F[5]=~/^\-$/) { $end=$F[2]-250; $start=$end-2250; } else { $start=$F[1]+250; $end=$start+2250; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) | perl -ane 'chomp($_); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]"; for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $col_gb=(6+$i)+'$BAMFILES_COUNT'; $col_p=(6+$i); $ratio=sprintf("%0.5f", $F[$col_p]/$F[$col_gb]); print "\t$ratio"; } print "\n";' | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $sum=0; $count=0; for($i=$field_count; $i<scalar(@F); $i++) { $sum+=$F[$i]; $count++; } printf("%0.5f\n", $sum/$count); } else { $_=~s/\s+$//g; print "$_\n"; }'  
+fi
 >&2 echo "done"
 
 ## remove temporary file, if exists
