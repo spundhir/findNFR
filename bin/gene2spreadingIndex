@@ -22,7 +22,7 @@ copyright_info
 VERSION="0.01"
 GENOME="mm9"
 WINDOW=500
-AVG=0
+PVAL=0.05
 
 #### usage ####
 usage() {
@@ -39,22 +39,20 @@ usage() {
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
     echo " -w <int>    [flank promoter with input number of bases (default: 500)]"
-    echo " -v <int>    [instead of giving SI for each replicate, output only the mean (deafult: 0)]"
-    echo " -u          [compute pol2 pausing instead]"
+    echo " -p <float>  [p-value at which to consider an event as significant (default: 0.05)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:w:v:uh ARG; do
+while getopts i:j:g:w:p:h ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
         g) BLOCKHEIGHT=$OPTARG;;
         w) WINDOW=$OPTARG;;
-        v) AVG=$OPTARG;;
-        u) POL2PAUSING=1;;
+        p) PVAL=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -105,11 +103,11 @@ if [ "$GENEFILE" == "stdin" ]; then
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     while read LINE; do
         echo "${LINE}"
-    done | cut -f 1-6 | sort -k 4,4 > $TMP
+    done > $TMP
     GENEFILE=$TMP
 else
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    zless $GENEFILE | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } print $_;' | cut -f 1-6 | sort -k 4,4 > $TMP
+    zless $GENEFILE | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } print $_;' > $TMP
     GENEFILE=$TMP
 fi
 
@@ -130,22 +128,34 @@ BAMFILES_COUNT=${#BAMFILES[@]}
 IFS=$oIFS
 
 >&2 echo -n "Start computing spreading index for genes using input BAM files (`date`).. "
-LAST_COL=$(perl -e '$col=6+'$BAMFILES_COUNT'; print "$col";')
+NCOL=$(zless  $GENEFILE | head -n 1 | perl -ane 'print scalar(@F);')
+LAST_COL=$(perl -e '$col='$NCOL'+'$BAMFILES_COUNT'; print "$col";')
 
-#echo "paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL)"; exit
+paste <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f $((NCOL+1))-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f $((NCOL+1))-$LAST_COL) |  binom.R -i stdin > $TMP".binom"
 
-#paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) | perl -ane 'chomp($_); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]"; for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $col_gb=(6+$i)+'$BAMFILES_COUNT'; $col_p=(6+$i); $ratio=sprintf("%0.5f", $F[$col_gb]/$F[$col_p]); print "\t$ratio\t$F[$col_gb]\t$F[$col_p]"; } print "\n";' 
-
-if [ -z "$POL2PAUSING" ]; then
-    paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) | perl -ane 'chomp($_); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]"; for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $col_gb=(6+$i)+'$BAMFILES_COUNT'; $col_p=(6+$i); $ratio=sprintf("%0.5f", $F[$col_p]/$F[$col_gb]); print "\t$ratio"; } print "\n";' | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $sum=0; $count=0; for($i=$field_count; $i<scalar(@F); $i++) { $sum+=$F[$i]; $count++; } printf("%0.5f\n", $sum/$count); } else { $_=~s/\s+$//g; print "$_\n"; }'
-else
-    paste <(zless $GENEFILE) <(zless $GENEFILE | perl -ane 'if($F[5]=~/^\-$/) { $start=$F[2]-150; $end=$F[2]+50; } else { $end=$F[1]+150; $start=$F[1]-50; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) <(zless $GENEFILE | perl -ane 'if($F[5]=~/^\-$/) { $end=$F[2]-250; $start=$end-2250; } else { $start=$F[1]+250; $end=$start+2250; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f 7-$LAST_COL) | perl -ane 'chomp($_); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]"; for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $col_gb=(6+$i)+'$BAMFILES_COUNT'; $col_p=(6+$i); $ratio=sprintf("%0.5f", $F[$col_p]/$F[$col_gb]); print "\t$ratio"; } print "\n";' | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $sum=0; $count=0; for($i=$field_count; $i<scalar(@F); $i++) { $sum+=$F[$i]; $count++; } printf("%0.5f\n", $sum/$count); } else { $_=~s/\s+$//g; print "$_\n"; }'  
-fi
+paste <(zless $GENEFILE) $TMP".binom" | perl -ane '
+    chomp($_);
+    print "$F[0]";
+    for($i=1; $i<'$NCOL'; $i++) {
+        print "\t$F[$i]";
+    }
+    for($i=0; $i<'$BAMFILES_COUNT'; $i++) {
+        $col_gb=('$NCOL'+$i)+'$BAMFILES_COUNT';
+        $col_p=('$NCOL'+$i);
+        $ratio=sprintf("%0.5f", $F[$col_p]/$F[$col_gb]);
+        $col_pVal=('$NCOL'+$i+('$BAMFILES_COUNT'*2));
+        $class="NONE";
+        if($F[$col_pVal] < '$PVAL') { $class="PROMOTER"; }
+        elsif($F[$col_pVal] > 1-'$PVAL') { $class="GENEBODY"; }
+        print "\t$ratio\t$F[$col_pVal]";
+    }
+    print "\n";' 
 >&2 echo "done"
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
     rm $TMP
+    rm $TMP".binom"
 fi
 
 >&2 echo "All done.. bye"
