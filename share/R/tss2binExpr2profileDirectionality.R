@@ -6,7 +6,7 @@ option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file containing output from tss2binExpr script (can be stdin)"),
     make_option(c("-c", "--profileCol"), default=8, help="column using which to define the profile directionality classes (default: %default)"),
     make_option(c("-o", "--outFile"), help="output pdf file"),
-    make_option(c("-l", "--outFileClass"), default="promoter_class", help="plot profiles categorized based on \"promoter_class\" or \"profile_directionality_class\" (default: %default)")
+    make_option(c("-l", "--classVariable"), default="promoter_class", help="plot profiles categorized based on \"promoter_class\" or \"profile_directionality_class\" (default: %default)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -116,7 +116,7 @@ data <- cbind(data[grep("HFR", data$name),], profile_directionality_class)
 ## plot profiles
 if(!is.null(opt$outFile)) {
     factors_order <- names(test)[c(8:NCOL)]
-    p <- lapply(factors_order, function(x) { plot_profile(test[[x]], x, opt$outFileClass) })
+    p <- lapply(factors_order, function(x) { plot_profile(test[[x]], x, opt$classVariable) })
     g <- do.call(grid.arrange, p)
     ggsave(g, dpi=300, height=30, width=25, filename=sprintf("%s.pdf", opt$outFile), useDingbats=FALSE)
 }
