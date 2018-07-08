@@ -18,7 +18,7 @@ usage() {
     echo "             [if multiple seperate by a comma]"
     echo "             **OR**"
     echo "             [input configuration file containing bam file information]"
-    echo "             [<id> <bam file> (id should be tpm)]"
+    echo "             [<id> <bam file> (id should start with tpm)]"
     echo "[OPTIONS]"
     echo " -s <float>  [normalize expression by input size factor]"
     echo "             [if multiple, seperate them by a comma]"
