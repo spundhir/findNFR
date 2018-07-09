@@ -1,0 +1,119 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+tss2pausing: compute pol2 pausing at gene TSS
+Copyright (C) 2018  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+VERSION="0.01"
+GENOME="mm9"
+WINDOW=500
+PVAL=0.05
+
+#### usage ####
+usage() {
+	echo Program: "tss2pausing (compute pol2 pausing at gene TSS)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: $VERSION
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: tss2pausing -i <file> -j <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input genomic coordinates of gene TSS in GTF format (can be stdin)]"
+    echo "             [source: ftp://ftp.sanger.ac.uk/pub/gencode/]"
+    echo " -j <file>   [input mapped reads in BAM format]"
+    echo "             [if multiple, separate them by a comma]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo " -w <int>    [flank promoter with input number of bases (default: 500)]"
+    echo " -p <float>  [p-value at which to consider an event as significant (default: 0.05)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:w:p:h ARG; do
+	case "$ARG" in
+		i) GTFFILE=$OPTARG;;
+        j) BAMFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        w) WINDOW=$OPTARG;;
+        p) PVAL=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+>&2 echo
+if [ "$HELP" ]; then
+    usage
+fi
+
+>&2 echo
+>&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
+## usage, if necessary file and directories are given/exist
+if [ -z "$GENEFILE" -o -z "$BAMFILE" ]; then
+    echo
+    echo "Error: one or more required paramter values not provided"
+    echo
+	usage
+fi
+>&2 echo "done"
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    >&2 usage
+fi
+>&2 echo "done"
+
+## create temporary BED file if input is from stdin
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+if [ "$GTFFILE" == "stdin" ]; then
+    while read LINE; do
+        echo "${LINE}"
+    done > $TMP.gtf
+    GTFFILE=$TMP.gtf
+fi
+
+## determine most active TSS for each gene
+gtf2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME > $TMP.tss
+
+
+## remove temporary file, if exists
+if [ "$GTFFILE" == "stdin" ]; then
+    rm $TMP.gtf
+fi
+
+>&2 echo "All done.. bye"

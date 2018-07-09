@@ -50,7 +50,7 @@ while getopts i:j:g:w:p:h ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
-        g) BLOCKHEIGHT=$OPTARG;;
+        g) GENOME=$OPTARG;;
         w) WINDOW=$OPTARG;;
         p) PVAL=$OPTARG;;
 		h) HELP=1;;
