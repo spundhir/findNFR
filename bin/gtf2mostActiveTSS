@@ -98,12 +98,12 @@ fi
 >&2 echo "done"
 
 ## create temporary GTF file if input is from stdin
-TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 if [ "$GTFFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     while read LINE; do
         echo "${LINE}"
-    done > $TMP.gtf
-    GTFFILE=$TMP.gtf
+    done > $TMP
+    GTFFILE=$TMP
 fi  
 
 ## extract TSS coordinates from the input GTF file and determine most active TSS for each gene
@@ -114,8 +114,8 @@ else
  fi
  
 ## remove temporary file, if exists
-if [ "$GTFFILE" == "stdin" ]; then
-    rm $TMP.gtf
+if [ ! -z "$TMP" ]; then
+    rm $TMP
 fi  
 
 >&2 echo "All done.. bye"
