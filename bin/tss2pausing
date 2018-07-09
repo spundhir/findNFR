@@ -110,7 +110,6 @@ fi
 ## determine most active TSS for each gene
 gtf2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME > $TMP.tss
 
-
 ## remove temporary file, if exists
 if [ "$GTFFILE" == "stdin" ]; then
     rm $TMP.gtf

@@ -108,10 +108,10 @@ fi
 
 ## extract TSS coordinates from the input GTF file and determine most active TSS for each gene
 if [ ! -z "$ONLYPROTEINCODING" ]; then
-    zless $GTFFILE | grep -w transcript | grep -w protein_coding | gtf2bed | perl -an -F'/\t+/' -e '$F[9]=~s/^.*transcript_name//g; $F[9]=~s/\;.*//g; $F[9]=~s/\"//g; chomp($F[9]    ); print "$F[0]\t$F[1]\t$F[2]\t$F[9]\t$F[4]\t$F[5]\t$F[3]\n";' | bed2window -i stdin -w $WINDOW -t | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME | sort -k 7,7 -k 8rg,8 | perl -ane 'if(!$seen{$F[6]}) { print $_; $seen{$F[6]}=1; }' 
+    zless $GTFFILE | grep -w transcript | grep -w protein_coding | gtf2bed | perl -an -F'/\t+/' -e '$F[9]=~s/^.*transcript_name//g; $F[9]=~s/\;.*//g; $F[9]=~s/\"//g; chomp($F[9]    ); print "$F[0]\t$F[1]\t$F[2]\t$F[9]\t$F[4]\t$F[5]\t$F[3]\t$F[0]:$F[1]-$F[2]\n";' | bed2window -i stdin -w $WINDOW -t | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME | sort -k 7,7 -k 9rg,9 | perl -ane 'if(!$seen{$F[6]}) { print $_; $seen{$F[6]}=1; }' 
 else
-    zless $GTFFILE | grep -w transcript | gtf2bed | perl -an -F'/\t+/' -e '$F[9]=~s/^.*transcript_name//g; $F[9]=~s/\;.*//g; $F[9]=~s/\"//g; chomp($F[9]); print "$F[0]\t$F[1]\t$    F[2]\t$F[9]\t$F[4]\t$F[5]\t$F[3]\n";' | bed2window -i stdin -w $WINDOW -t | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME | sort -k 7,7 -k 8rg,8 | perl -ane 'if(!$seen{$F[6]}) { print $_; $seen{$F[6]}=1; }'
- fi
+    zless $GTFFILE | grep -w transcript | gtf2bed | perl -an -F'/\t+/' -e '$F[9]=~s/^.*transcript_name//g; $F[9]=~s/\;.*//g; $F[9]=~s/\"//g; chomp($F[9]); print "$F[0]\t$F[1]\t$    F[2]\t$F[9]\t$F[4]\t$F[5]\t$F[3]\t$F[0]:$F[1]-$F[2]\n";' | bed2window -i stdin -w $WINDOW -t | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME | sort -k 7,7 -k 9rg,9 | perl -ane 'if(!$seen{$F[6]}) { print $_; $seen{$F[6]}=1; }'
+fi
  
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
