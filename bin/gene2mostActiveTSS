@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 <<"copyright_info"
-gtf2mostActiveTSS: determine most active tss for each gene
+gene2mostActiveTSS: determine most active tss for each gene
 Copyright (C) 2018  Sachin Pundhir (pundhir@binf.ku.dk)
 
 This program is free software: you can redistribute it and/or modify
@@ -25,11 +25,11 @@ WINDOW=1
 
 #### usage ####
 usage() {
-	echo Program: "gtf2mostActiveTSS (determine most active tss for each gene)"
+	echo Program: "gene2mostActiveTSS (determine most active tss for each gene)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: $VERSION
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: gtf2mostActiveTSS -i <file> -j <file> [OPTIONS]"
+	echo "Usage: gene2mostActiveTSS -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input genomic coordinates of gene TSS in GTF format (can be stdin)]"
     echo "             [source: ftp://ftp.sanger.ac.uk/pub/gencode/]"
@@ -37,7 +37,7 @@ usage() {
     echo "             [if multiple, separate them by a comma]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
-    echo " -w <int>    [flank promoter with input number of bases (default: 500)]"
+    echo " -w <int>    [flank promoter with input number of bases (default: 1)]"
     echo " -r          [only for protein coding genes (default: all genes)]"
 	echo " -h          [help]"
 	echo
@@ -65,10 +65,10 @@ fi
 >&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
 ## usage, if necessary file and directories are given/exist
 if [ -z "$GTFFILE" -o -z "$BAMFILE" ]; then
-    echo
-    echo "Error: one or more required paramter values not provided"
-    echo
-	usage
+    >&2 echo
+    >&2 echo "Error: one or more required paramter values not provided"
+    >&2 echo
+	>&2 usage
 fi
 >&2 echo "done"
 

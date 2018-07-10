@@ -21,7 +21,7 @@ copyright_info
 
 VERSION="0.01"
 GENOME="mm9"
-WINDOW=500
+WINDOW=1
 PVAL=0.05
 
 #### usage ####
@@ -38,21 +38,23 @@ usage() {
     echo "             [if multiple, separate them by a comma]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
-    echo " -w <int>    [flank promoter with input number of bases (default: 500)]"
+    echo " -w <int>    [flank promoter with input number of bases to compute most active TSS (default: 1)]"
     echo " -p <float>  [p-value at which to consider an event as significant (default: 0.05)]"
+    echo " -r          [only for protein coding genes (default: all genes)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:w:p:h ARG; do
+while getopts i:j:g:w:p:rh ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
         g) GENOME=$OPTARG;;
         w) WINDOW=$OPTARG;;
         p) PVAL=$OPTARG;;
+        r) ONLYPROTEINCODING=1;;
 		h) HELP=1;;
 	esac
 done
@@ -65,11 +67,11 @@ fi
 >&2 echo
 >&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
 ## usage, if necessary file and directories are given/exist
-if [ -z "$GENEFILE" -o -z "$BAMFILE" ]; then
-    echo
-    echo "Error: one or more required paramter values not provided"
-    echo
-	usage
+if [ -z "$GTFFILE" -o -z "$BAMFILE" ]; then
+    >&2 echo
+    >&2 echo "Error: one or more required paramter values not provided"
+    >&2 echo
+	>&2 usage
 fi
 >&2 echo "done"
 
@@ -108,7 +110,15 @@ if [ "$GTFFILE" == "stdin" ]; then
 fi
 
 ## determine most active TSS for each gene
-gtf2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME > $TMP.tss
+if [ ! -z "$ONLYPROTEINCODING" ]; then
+    gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW -r | perl -ane '@coor=split(/[\:\-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\n";' | sortBed -i stdin > $TMP.mostActiveTSS
+else
+    gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW | perl -ane '@coor=split(/[\:\-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\n";' | sortBed -i stdin > $TMP.mostActiveTSS
+fi
+
+
+## compute pol2 pausing
+closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-9,19
 
 ## remove temporary file, if exists
 if [ "$GTFFILE" == "stdin" ]; then
