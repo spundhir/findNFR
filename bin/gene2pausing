@@ -32,7 +32,7 @@ usage() {
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: gene2pausing -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
-	echo " -i <file>   [input genomic coordinates of gene TSS in GTF format (can be stdin)]"
+	echo " -i <file>   [input genomic coordinates of gene TSS in GTF or BED format (can be stdin)]"
     echo "             [source: ftp://ftp.sanger.ac.uk/pub/gencode/]"
     echo " -j <file>   [input mapped reads in BAM format]"
     echo "             [if multiple, separate them by a comma]"
@@ -40,7 +40,7 @@ usage() {
     echo " -g <string> [genome (default: mm9)]"
     echo " -w <int>    [extend TSS downstream with input number of bases to define TSSR (default: 300)]"
     echo " -p <float>  [p-value at which to consider an event as significant (default: 0.05)]"
-    echo " -r          [only for protein coding genes (default: all genes)]"
+    echo " -r          [only for protein coding genes (default: all genes; only valid if input is in GTF format)]"
     echo " -c <file>   [input mapped reads in BAM format for control sample (IgG)]"
 	echo " -h          [help]"
 	echo
@@ -111,19 +111,27 @@ if [ "$GTFFILE" == "stdin" ]; then
     GTFFILE=$TMP.gtf
 fi
 
-## determine most active TSS for each gene
-ARG=""
-if [ ! -z "$ONLYPROTEINCODING" ]; then ARG=$(echo $ARG "-r "); fi
-if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
+## check, if input genomic coordinates are in BED format, and convert to GTF
+IS_BED=$(zless $GTFFILE | cut -f 2 | head -n 2 | tail -n 1 | perl -ane 'if($_=~/^[0-9]+$/) { print $_; }' | wc -l);
 
-gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW $ARG | perl -ane '@coor=split(/[\:\-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\n";' | sortBed -i stdin > $TMP.mostActiveTSS
+if [ "$IS_BED" -gt 0 ]; then
+    scp $GTFFILE $TMP.mostActiveTSS
+else
+    ## determine most active TSS for each gene
+    ARG=""
+    if [ ! -z "$ONLYPROTEINCODING" ]; then ARG=$(echo $ARG "-r "); fi
+    if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
 
+    gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW $ARG | sortBed -i stdin > $TMP.mostActiveTSS
+fi
 
 ## compute pol2 pausing
 ARG=""
 if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
 
-closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-9,19 | gene2spreadingIndex -i stdin -j $BAMFILE -g $GENOME -w $WINDOW $ARG
+NCOL=$(zless $TMP.mostActiveTSS | head -n 1 | perl -ane 'print scalar(@F);') 
+
+closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1)) | gene2spreadingIndex -i stdin -j $BAMFILE -g $GENOME -w $WINDOW $ARG
 
 ## remove temporary file, if exists
 if [ "$GTFFILE" == "stdin" ]; then
