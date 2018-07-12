@@ -21,7 +21,8 @@ copyright_info
 
 VERSION="0.01"
 GENOME="mm9"
-WINDOW=300
+WINDOW=500
+PVAL=0.05
 
 #### usage ####
 usage() {
@@ -37,21 +38,21 @@ usage() {
     echo "             [if multiple, separate them by a comma]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
-    echo " -w <int>    [extend TSS downstream with input number of bases to define TSSR (default: 300)]"
-    echo " -c <file>   [input mapped reads in BAM format for control sample]"
+    echo " -w <int>    [flank promoter with input number of bases (default: 500)]"
+    echo " -p <float>  [p-value at which to consider an event as significant (default: 0.05)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:w:c:h ARG; do
+while getopts i:j:g:w:p:h ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
         g) GENOME=$OPTARG;;
         w) WINDOW=$OPTARG;;
-        c) BAMFILECONTROL=$OPTARG;;
+        p) PVAL=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -65,10 +66,10 @@ fi
 >&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
 ## usage, if necessary file and directories are given/exist
 if [ -z "$GENEFILE" -o -z "$BAMFILE" ]; then
-    >&2 echo
-    >&2 echo "Error: one or more required paramter values not provided"
-    >&2 echo
-	>&2 usage
+    echo
+    echo "Error: one or more required paramter values not provided"
+    echo
+	usage
 fi
 >&2 echo "done"
 
@@ -88,12 +89,12 @@ function wait_for_jobs_to_finish {
 GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
 GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
 if [ ! -f "$GENOME_FILE" ]; then
-    >&2 echo
-    >&2 echo "computation for $GENOME is not available yet"
-    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
-    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
-    >&2 echo
-    >&2 usage
+    echo
+    echo "computation for $GENOME is not available yet"
+    echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    echo
+    usage
 fi
 >&2 echo "done"
 
@@ -104,15 +105,19 @@ if [ "$GENEFILE" == "stdin" ]; then
         echo "${LINE}"
     done > $TMP
     GENEFILE=$TMP
+else
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    zless $GENEFILE | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } print $_;' > $TMP
+    GENEFILE=$TMP
 fi
 
 ## check if input gene file is in proper format
 NCOL=$(zless $GENEFILE | perl -ane 'print scalar(@F)."\n";' | sort -k 1r,1 | head -n 1)
 if [ "$NCOL" -lt "6" ]; then
-    >&2 echo
-    >&2 echo "input gene file is not in correct format"
-    >&2 echo
-    >&2 usage
+    echo
+    echo "input gene file is not in correct format"
+    echo
+    usage
 fi
 
 ## parse input bam files in an array
@@ -126,14 +131,31 @@ IFS=$oIFS
 NCOL=$(zless  $GENEFILE | head -n 1 | perl -ane 'print scalar(@F);')
 LAST_COL=$(perl -e '$col='$NCOL'+'$BAMFILES_COUNT'; print "$col";')
 
-ARG=""
-if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
+paste <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -x | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f $((NCOL+1))-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | cut -f $((NCOL+1))-$LAST_COL) |  binom.R -i stdin > $TMP".binom"
 
-paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -p | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bedtools slop -i stdin -g $GENOME_FILE -l 0 -r 3000 -s | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $gene_col=$tssr_col+'$BAMFILES_COUNT'; print "\t$F[$tssr_col]/$F[$gene_col]"; } print "\n";' 
+paste <(zless $GENEFILE) $TMP".binom" | perl -ane '
+    chomp($_);
+    print "$F[0]";
+    for($i=1; $i<'$NCOL'; $i++) {
+        print "\t$F[$i]";
+    }
+    for($i=0; $i<'$BAMFILES_COUNT'; $i++) {
+        $col_gb=('$NCOL'+$i)+'$BAMFILES_COUNT';
+        $col_p=('$NCOL'+$i);
+        $ratio=sprintf("%0.5f", $F[$col_p]/$F[$col_gb]);
+        $col_pVal=('$NCOL'+$i+('$BAMFILES_COUNT'*2));
+        $class="NONE";
+        if($F[$col_pVal] < '$PVAL') { $class="PROMOTER"; }
+        elsif($F[$col_pVal] > 1-'$PVAL') { $class="GENEBODY"; }
+        print "\t$ratio\t$F[$col_pVal]";
+    }
+    print "\n";' 
+>&2 echo "done"
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
     rm $TMP
+    rm $TMP".binom"
 fi
 
 >&2 echo "All done.. bye"

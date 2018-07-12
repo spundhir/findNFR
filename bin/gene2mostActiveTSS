@@ -21,7 +21,7 @@ copyright_info
 
 VERSION="0.01"
 GENOME="mm9"
-WINDOW=1
+WINDOW=300
 
 #### usage ####
 usage() {
@@ -37,21 +37,23 @@ usage() {
     echo "             [if multiple, separate them by a comma]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
-    echo " -w <int>    [flank promoter with input number of bases (default: 1)]"
+    echo " -w <int>    [extend TSS downstream with input number of bases to define TSSR (default: 300)]"
     echo " -r          [only for protein coding genes (default: all genes)]"
+    echo " -c <file>   [input mapped reads in BAM format for control sample (IgG)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:w:rh ARG; do
+while getopts i:j:g:w:rc:h ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
         g) GENOME=$OPTARG;;
         w) WINDOW=$OPTARG;;
         r) ONLYPROTEINCODING=1;;
+        c) BAMFILECONTROL=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -107,10 +109,13 @@ if [ "$GTFFILE" == "stdin" ]; then
 fi  
 
 ## extract TSS coordinates from the input GTF file and determine most active TSS for each gene
+ARG=""
+if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
+
 if [ ! -z "$ONLYPROTEINCODING" ]; then
-    zless $GTFFILE | grep -w transcript | grep -w protein_coding | gtf2bed | perl -an -F'/\t+/' -e '$F[9]=~s/^.*transcript_name//g; $F[9]=~s/\;.*//g; $F[9]=~s/\"//g; chomp($F[9]    ); print "$F[0]\t$F[1]\t$F[2]\t$F[9]\t$F[4]\t$F[5]\t$F[3]\t$F[0]:$F[1]-$F[2]\n";' | bed2window -i stdin -w $WINDOW -t | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME | sort -k 7,7 -k 9rg,9 | perl -ane 'if(!$seen{$F[6]}) { print $_; $seen{$F[6]}=1; }' 
+    zless $GTFFILE | grep -w transcript | grep -w protein_coding | gtf2bed | perl -an -F'/\t+/' -e '$F[9]=~s/^.*transcript_name//g; $F[9]=~s/\;.*//g; $F[9]=~s/\"//g; chomp($F[9]); print "$F[0]\t$F[1]\t$F[2]\t$F[9]\t$F[4]\t$F[5]\t$F[3]\t$F[0]:$F[1]-$F[2]\n";' | bed2window -i stdin -w $WINDOW -p | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME $ARG | sort -k 7,7 -k 9rg,9 | perl -ane 'if(!$seen{$F[6]}) { print $_; $seen{$F[6]}=1; }'
 else
-    zless $GTFFILE | grep -w transcript | gtf2bed | perl -an -F'/\t+/' -e '$F[9]=~s/^.*transcript_name//g; $F[9]=~s/\;.*//g; $F[9]=~s/\"//g; chomp($F[9]); print "$F[0]\t$F[1]\t$    F[2]\t$F[9]\t$F[4]\t$F[5]\t$F[3]\t$F[0]:$F[1]-$F[2]\n";' | bed2window -i stdin -w $WINDOW -t | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME | sort -k 7,7 -k 9rg,9 | perl -ane 'if(!$seen{$F[6]}) { print $_; $seen{$F[6]}=1; }'
+    zless $GTFFILE | grep -w transcript | gtf2bed | perl -an -F'/\t+/' -e '$F[9]=~s/^.*transcript_name//g; $F[9]=~s/\;.*//g; $F[9]=~s/\"//g; chomp($F[9]); print "$F[0]\t$F[1]\t$F[2]\t$F[9]\t$F[4]\t$F[5]\t$F[3]\t$F[0]:$F[1]-$F[2]\n";' | bed2window -i stdin -w $WINDOW -p | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME $ARG | sort -k 7,7 -k 9rg,9 | perl -ane 'if(!$seen{$F[6]}) { print $_; $seen{$F[6]}=1; }'
 fi
  
 ## remove temporary file, if exists

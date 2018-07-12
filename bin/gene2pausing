@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 <<"copyright_info"
-tss2pausing: compute pol2 pausing at gene TSS
+gene2pausing: compute pol2 pausing at most active TSS of genes
 Copyright (C) 2018  Sachin Pundhir (pundhir@binf.ku.dk)
 
 This program is free software: you can redistribute it and/or modify
@@ -21,16 +21,16 @@ copyright_info
 
 VERSION="0.01"
 GENOME="mm9"
-WINDOW=1
+WINDOW=300
 PVAL=0.05
 
 #### usage ####
 usage() {
-	echo Program: "tss2pausing (compute pol2 pausing at gene TSS)"
+	echo Program: "gene2pausing (compute pol2 pausing at most active TSS of genes)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: $VERSION
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: tss2pausing -i <file> -j <file> [OPTIONS]"
+	echo "Usage: gene2pausing -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input genomic coordinates of gene TSS in GTF format (can be stdin)]"
     echo "             [source: ftp://ftp.sanger.ac.uk/pub/gencode/]"
@@ -38,16 +38,17 @@ usage() {
     echo "             [if multiple, separate them by a comma]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
-    echo " -w <int>    [flank promoter with input number of bases to compute most active TSS (default: 1)]"
+    echo " -w <int>    [extend TSS downstream with input number of bases to define TSSR (default: 300)]"
     echo " -p <float>  [p-value at which to consider an event as significant (default: 0.05)]"
     echo " -r          [only for protein coding genes (default: all genes)]"
+    echo " -c <file>   [input mapped reads in BAM format for control sample (IgG)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:w:p:rh ARG; do
+while getopts i:j:g:w:p:rc:h ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
@@ -55,6 +56,7 @@ while getopts i:j:g:w:p:rh ARG; do
         w) WINDOW=$OPTARG;;
         p) PVAL=$OPTARG;;
         r) ONLYPROTEINCODING=1;;
+        c) BAMFILECONTROL=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -110,19 +112,23 @@ if [ "$GTFFILE" == "stdin" ]; then
 fi
 
 ## determine most active TSS for each gene
-if [ ! -z "$ONLYPROTEINCODING" ]; then
-    gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW -r | perl -ane '@coor=split(/[\:\-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\n";' | sortBed -i stdin > $TMP.mostActiveTSS
-else
-    gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW | perl -ane '@coor=split(/[\:\-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\n";' | sortBed -i stdin > $TMP.mostActiveTSS
-fi
+ARG=""
+if [ ! -z "$ONLYPROTEINCODING" ]; then ARG=$(echo $ARG "-r "); fi
+if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
+
+gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW $ARG | perl -ane '@coor=split(/[\:\-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\n";' | sortBed -i stdin > $TMP.mostActiveTSS
 
 
 ## compute pol2 pausing
-closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-9,19
+ARG=""
+if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
+
+closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-9,19 | gene2spreadingIndex -i stdin -j $BAMFILE -g $GENOME -w $WINDOW $ARG
 
 ## remove temporary file, if exists
 if [ "$GTFFILE" == "stdin" ]; then
     rm $TMP.gtf
 fi
+rm $TMP.mostActiveTSS
 
 >&2 echo "All done.. bye"
