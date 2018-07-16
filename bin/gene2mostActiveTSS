@@ -116,7 +116,7 @@ if [ ! -z "$ONLYPROTEINCODING" ]; then
     zless $GTFFILE | grep -w transcript | grep -w protein_coding 
 else
     zless $GTFFILE | grep -w transcript
-fi | gtf2bed | perl -an -F'/\t+/' -e '$F[9]=~s/^.*transcript_name//g; $F[9]=~s/\;.*//g; $F[9]=~s/\"//g; chomp($F[9]); print "$F[0]\t$F[1]\t$F[2]\t$F[9]\t$F[4]\t$F[5]\t$F[3]\t$F[0]:$F[1]-$F[2]\n";' | bed2window -i stdin -w $WINDOW -p | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME $ARG | perl -ane '@coor=split(/[\:\-]+/,$F[7]); $width=$coor[2]-$coor[1]; print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$width\n";' | sort -k 7,7 -k 9rg,9 -k 10rn,10 | perl -ane 'if(!$seen{$F[6]}) { print $_; $seen{$F[6]}=1; }' | cut -f 1-9
+fi | gtf2bed | perl -an -F'/\t+/' -e '$F[9]=~s/^.*transcript_name//g; $F[9]=~s/\;.*//g; $F[9]=~s/\"//g; chomp($F[9]); print "$F[0]\t$F[1]\t$F[2]\t$F[9]\t$F[4]\t$F[5]\t$F[3]\t$F[0]:$F[1]-$F[2]\n";' | bed2window -i stdin -w $WINDOW -p | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME $ARG | perl -ane '@coor=split(/[\:\-]+/,$F[7]); $mean_pol2=0; $sample_count=0; foreach(@F[8..scalar(@F)-1]) { $mean_pol2+=$_; $sample_count++; } $mean_pol2=sprintf("%0.5f", $mean_pol2/$sample_count); $width=$coor[2]-$coor[1]; print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$mean_pol2\t$width\n";' | sort -k 7,7 -k 9rg,9 -k 10rn,10 | perl -ane 'if(!$seen{$F[6]}) { print $_; $seen{$F[6]}=1; }' | cut -f 1-9
  
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
