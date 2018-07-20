@@ -39,19 +39,22 @@ usage() {
     echo " -g <string> [genome (default: mm9)]"
     echo " -w <int>    [extend TSS downstream with input number of bases to define TSSR (default: 300)]"
     echo " -c <file>   [input mapped reads in BAM format for control sample]"
+    echo " -e          [use signal at TSSR vs TESR to compute pausing]"
+    echo "             [default: TSSR vs Genebody]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:w:c:h ARG; do
+while getopts i:j:g:w:c:eh ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
         g) GENOME=$OPTARG;;
         w) WINDOW=$OPTARG;;
         c) BAMFILECONTROL=$OPTARG;;
+        e) TESR_MODE=1;;
 		h) HELP=1;;
 	esac
 done
@@ -129,7 +132,11 @@ LAST_COL=$(perl -e '$col='$NCOL'+'$BAMFILES_COUNT'; print "$col";')
 ARG=""
 if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
 
-paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -p | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bedtools slop -i stdin -g $GENOME_FILE -l 0 -r 3000 -s | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $gene_col=$tssr_col+'$BAMFILES_COUNT'; print "\t$F[$tssr_col]/$F[$gene_col]"; } print "\n";' 
+if [ ! -z "$TESR_MODE" ]; then
+    paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -S | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -E | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $gene_col=$tssr_col+'$BAMFILES_COUNT'; print "\t$F[$tssr_col]/$F[$gene_col]"; } print "\n";' 
+else
+    paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -S | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bedtools slop -i stdin -g $GENOME_FILE -l 0 -r 3000 -s | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $gene_col=$tssr_col+'$BAMFILES_COUNT'; print "\t$F[$tssr_col]/$F[$gene_col]"; } print "\n";' 
+fi
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
