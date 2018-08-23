@@ -48,10 +48,11 @@ usage() {
     echo " -c <file>   [input mapped reads in BAM format for control sample (IgG)]"
     echo " -t          [instead compute using travelling ratio formula (default: using pausing formula)]"
     echo "             [pausing = A/B] or [travelling ratio = A/(A+B)]"
-    echo "             [where A: RPKM in TSSR; B: RPKM in gene body + 3KB - TSSR]"
+    echo "             [where A: RPKM at TSSR; B: RPKM at gene body + 3KB - TSSR]"
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: pausing)]"
     echo " -e          [use signal at TSSR vs TESR to compute pausing]"
     echo "             [default: TSSR vs Genebody]"
+    echo " -a          [output raw counts at TSSSR and Genebody separately (default: pol2 pause rate computed using RPKM)]"
 	echo " -h          [help]"
     echo "[NOTE]"
     echo "             [parameters are set as per details from Day et al. 2016 Genome Biology]"
@@ -60,7 +61,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:g:w:p:rc:tf:eh ARG; do
+while getopts i:j:g:w:p:rc:tf:eah ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
@@ -72,6 +73,7 @@ while getopts i:j:g:w:p:rc:tf:eh ARG; do
         t) TR=$OPTARG;;
         f) CONFIG_FILTER=$OPTARG;;
         e) TESR_MODE=1;;
+        a) RAW=1;;
 		h) HELP=1;;
 	esac
 done
@@ -159,13 +161,18 @@ fi
 ARG=""
 if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
 if [ ! -z "$TESR_MODE" ]; then ARG=$(echo $ARG "-e "); fi
+if [ ! -z "$RAW" ]; then ARG=$(echo $ARG "-a "); fi
 
 NCOL=$(zless $TMP.mostActiveTSS | head -n 1 | perl -ane 'print scalar(@F);') 
 
+if [ -z "$RAW" ]; then
+    RAW=0;
+fi
+
 if [ -z "$TR "]; then
-    closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1)) | gene2spreadingIndex -i stdin -j $BAMFILE -g $GENOME -w $WINDOW $ARG | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/$val[1]); } else { print "\t$_"; } } print "\n";'
+    closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1)) | gene2spreadingIndex -i stdin -j $BAMFILE -g $GENOME -w $WINDOW $ARG | perl -ane 'if('$RAW') { print $_; } else { print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/$val[1]); } else { print "\t$_"; } } print "\n"; }'
 else
-    closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1)) | gene2spreadingIndex -i stdin -j $BAMFILE -g $GENOME -w $WINDOW $ARG | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/($val[0]+$val[1])); } else { print "\t$_"; } } print "\n";'
+    closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1)) | gene2spreadingIndex -i stdin -j $BAMFILE -g $GENOME -w $WINDOW $ARG | perl -ane 'if('$RAW') { print $_; } else { print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/($val[0]+$val[1])); } else { print "\t$_"; } } print "\n"; }'
 fi
 
 ## remove temporary file, if exists
