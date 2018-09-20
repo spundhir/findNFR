@@ -55,18 +55,18 @@ done
 
 ## usage, if necessary file and directories are given/exist
 if [ ! -f "$BAMFILE" -o "$HELP" ]; then
-	usage
+	>&2 usage
 fi
 
 ## populating files based on input genome
 GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
 GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
 if [ ! -f "$GENOME_FILE" ]; then
-    echo
-    echo "computation for $GENOME is not feasible yet"
-    echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
-    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
-    echo
+    >&2 echo
+    >&2 echo "computation for $GENOME is not feasible yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
     usage
 fi
 
@@ -92,10 +92,10 @@ if [ ! -z "$EXTEND" ]; then
     EXTEND_VALUE=$(macs2 predictd -i $BAMFILE -g $GENOME_MACS2 2>&1 | grep "predicted fragment length" | perl -ane 'print $F[scalar(@F)-2];')
 
     if [ -z "$EXTEND_VALUE" ]; then
-        echo
-        echo "Extend value is not computed correctly.. exiting"
-        echo
-        exit
+        >&2 echo
+        >&2 echo "Extend value is not computed correctly for $BAMFILE. Using it as 0"
+        >&2 echo
+        EXTEND_VALUE=0
     fi
 
     if [ ! -z "predictd" ]; then
