@@ -1,0 +1,145 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+bed2directionalityBias: compute directionality of input chromatin modification or nascent RNA 
+Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+VERSION="0.01"
+GENOME="mm9"
+WINDOW=500
+
+#### usage ####
+usage() {
+	echo Program: "bed2directionalityBias (compute directionality of input chromatin modification or nascent RNA)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: $VERSION
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2directionalityBias -i <file> -j <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input genomic coordinates in BED format]"
+    echo "             [format: chr start end name score strand]"
+    echo "             [NOTE: should be 1bp, example TSS]"
+    echo " -j <file>   [input mapped reads in BAM format]"
+    echo "             [if multiple, separate them by a comma]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo " -w <int>    [window length around input coordinates (default: 500)]"
+    echo " -c <file>   [input mapped reads in BAM format for control sample]"
+    echo " -r          [require same strandedness]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:w:c:rh ARG; do
+	case "$ARG" in
+		i) BEDFILE=$OPTARG;;
+        j) BAMFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        w) WINDOW=$OPTARG;;
+        c) BAMFILECONTROL=$OPTARG;;
+        r) SAME_STRAND=1;;
+		h) HELP=1;;
+	esac
+done
+
+>&2 echo
+if [ "$HELP" ]; then
+    usage
+fi
+
+>&2 echo
+>&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
+## usage, if necessary file and directories are given/exist
+if [ -z "$BEDFILE" -o -z "$BAMFILE" ]; then
+    >&2 echo
+    >&2 echo "Error: one or more required paramter values not provided"
+    >&2 echo
+	>&2 usage
+fi
+>&2 echo "done"
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    >&2 usage
+fi
+>&2 echo "done"
+
+## create temporary BED file if input is from stdin
+if [ "$BEDFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo "${LINE}"
+    done > $TMP
+    BEDFILE=$TMP
+fi
+
+## check if input gene file is in proper format
+BP=$(zless $BEDFILE | perl -ane '$len=$F[2]-$F[1]; print "$len\n";' | sort -k 1rn,1 | head -n 1)
+if [ "$BP" -gt "1" ]; then
+    >&2 echo
+    >&2 echo "width of input BED coordinates should be 1bp, example TSS"
+    >&2 echo
+    >&2 usage
+fi
+
+## parse input bam files in an array
+oIFS=$IFS
+IFS=","
+BAMFILES=($BAMFILE)
+BAMFILES_COUNT=${#BAMFILES[@]}
+IFS=$oIFS
+
+>&2 echo -n "Start computing directionality bias using input BAM files (`date`).. "
+NCOL=$(zless  $BEDFILE | head -n 1 | perl -ane 'print scalar(@F);')
+LAST_COL=$(perl -e '$col='$NCOL'+'$BAMFILES_COUNT'; print "$col";')
+
+ARG=""
+if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
+if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); fi
+
+bed2binExpr -i $BEDFILE -j $BAMFILE -g $GENOME -w $WINDOW -n $WINDOW $ARG | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $up_col=$i+'$NCOL'; $down_col=$up_col+'$BAMFILES_COUNT'; if($F[5]=~/-/) { printf("\t%0.4f", ($F[$down_col]-$F[$up_col])/($F[$down_col]+$F[$up_col])); } else { printf("\t%0.4f", ($F[$up_col]-$F[$down_col])/($F[$up_col]+$F[$down_col])); } } print "\n";'
+
+#paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -S | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bedtools slop -i stdin -g $GENOME_FILE -l 0 -r 3000 -s | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $gene_col=$tssr_col+'$BAMFILES_COUNT'; print "\t$F[$tssr_col]/$F[$gene_col]"; } print "\n";' 
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
+
+>&2 echo "All done.. bye"
