@@ -35,7 +35,10 @@ usage() {
     echo "             [format: chr start end name score strand]"
     echo "             [NOTE: should be 1bp, example TSS]"
     echo " -j <file>   [input mapped reads in BAM format]"
-    echo "             [if multiple, separate them by a comma]"
+    echo "             [if multiple separate by a comma]"
+    echo "             **OR**"
+    echo "             [configuration file]"
+    echo "             [FORMAT: directionality <absolute path to bam file>]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
     echo " -w <int>    [window length around input coordinates (default: 500)]"
@@ -50,7 +53,7 @@ usage() {
 while getopts i:j:g:w:c:rh ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
-        j) BAMFILE=$OPTARG;;
+        j) INPUTBAMFILES=$OPTARG;;
         g) GENOME=$OPTARG;;
         w) WINDOW=$OPTARG;;
         c) BAMFILECONTROL=$OPTARG;;
@@ -67,7 +70,7 @@ fi
 >&2 echo
 >&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
 ## usage, if necessary file and directories are given/exist
-if [ -z "$BEDFILE" -o -z "$BAMFILE" ]; then
+if [ -z "$BEDFILE" -o -z "$INPUTBAMFILES" ]; then
     >&2 echo
     >&2 echo "Error: one or more required paramter values not provided"
     >&2 echo
@@ -118,10 +121,31 @@ if [ "$BP" -gt "1" ]; then
     >&2 usage
 fi
 
+## check if input is BAM files or configuration file containing BAM file information
+INPUT=$(echo $INPUTBAMFILES | perl -ane '$_=~s/\,.*//g; print $_;')
+if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
+    INPUT=$(cat $INPUTBAMFILES | perl -ane '
+        if($_=~/^directionality/) {
+            $file.="$F[1],";
+        } END {
+            $file=~s/\,$//g;
+            print "$file\n";
+        }'
+    )
+    INPUTBAMFILES=$INPUT
+fi
+
+if [ -z "$INPUTBAMFILES" ]; then
+    echo
+    echo "ERROR: Cannot populate input BAM files. Check your configuration file"
+    echo
+    usage
+fi
+
 ## parse input bam files in an array
 oIFS=$IFS
 IFS=","
-BAMFILES=($BAMFILE)
+BAMFILES=($INPUTBAMFILES)
 BAMFILES_COUNT=${#BAMFILES[@]}
 IFS=$oIFS
 
@@ -133,9 +157,7 @@ ARG=""
 if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
 if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); fi
 
-zless $BEDFILE | bed2window -i stdin -N | bed2binExpr -i stdin -j $BAMFILE -g $GENOME -w $WINDOW -n $WINDOW $ARG | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $up_col=$i+'$NCOL'; $down_col=$up_col+'$BAMFILES_COUNT'; if($F[5]=~/-/) { printf("\t%0.4f", ($F[$up_col]-$F[$down_col])/($F[$up_col]+$F[$down_col])); } else { printf("\t%0.4f", ($F[$down_col]-$F[$up_col])/($F[$down_col]+$F[$up_col])); } } print "\n";'
-
-#paste <(zless $GENEFILE) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -S | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $GENEFILE | bed2window -i stdin -w $WINDOW -v | bedtools slop -i stdin -g $GENOME_FILE -l 0 -r 3000 -s | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $gene_col=$tssr_col+'$BAMFILES_COUNT'; print "\t$F[$tssr_col]/$F[$gene_col]"; } print "\n";' 
+zless $BEDFILE | bed2window -i stdin -N | bed2binExpr -i stdin -j $INPUTBAMFILES -g $GENOME -w $WINDOW -n $WINDOW $ARG | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $up_col=$i+'$NCOL'; $down_col=$up_col+'$BAMFILES_COUNT'; if($F[5]=~/-/) { printf("\t%0.4f", ($F[$up_col]-$F[$down_col])/($F[$up_col]+$F[$down_col])); } else { printf("\t%0.4f", ($F[$down_col]-$F[$up_col])/($F[$down_col]+$F[$up_col])); } } print "\n";'
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then

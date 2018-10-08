@@ -16,14 +16,17 @@ usage() {
 	echo " -i <file>   [input file containing genomic coordinates of TSS in BED format (can be stdin)]"
     echo "             [FORMAT: chr start end name score strand distance class]"
     echo "             [distance by which core promoter is extended downstream to TSS, computed using gene2promoter)]"
-    echo " -j <file>   [configuration file]"
+    echo " -j <file>   [input mapped reads in BAM format]"
+    echo "             [if multiple separate by a comma]"
+    echo "             **OR**"
+    echo "             [configuration file]"
     echo "             [FORMAT: profile <absolute path to bam file>]"
     echo "[OPTIONS]"
     echo " -c          [analyze for enhancer (default: promoter)]"
     echo " -r <file>   [input BAM file (eg. chd4 ChIP-seq data) to refine DISTANCE (eg. 3' boundary of promoter)]"
     echo "[OPTIONS: bed2expr]"
     echo " -s <float>  [normalize expression by input size factor]"
-    echo "             [if multiple, seperate them by a comma]"
+    echo "             [if multiple, separate them by a comma]"
     echo " -m          [normalize expression by counts per million mapped reads (RPM)]"
     echo " -k          [normalize expression by counts per kilo base per million mapped reads (RPKM)]"
     echo " -d          [remove duplicate reads]"
@@ -46,7 +49,7 @@ usage() {
 while getopts i:j:c:r:s:mkde:v:tng:h ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
-        j) CONFIGFILE=$OPTARG;;
+        j) INPUTBAMFILES=$OPTARG;;
         c) REGION=$OPTARG;;
         r) REFINE=$OPTARG;;
         s) INPUTSIZEFACTORS=$OPTARG;; 
@@ -63,7 +66,7 @@ while getopts i:j:c:r:s:mkde:v:tng:h ARG; do
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ -z "$INPUTBEDFILE" -o ! -s "$CONFIGFILE" -o "$HELP" ]; then
+if [ -z "$INPUTBEDFILE" -o -z "$INPUTBAMFILES" -o "$HELP" ]; then
 	usage
 fi
 
@@ -103,15 +106,19 @@ if [ ! -z "$INPUTEXTENDS" ]; then PARAM_BIN="$PARAM_BIN -e $INPUTEXTENDS"; fi
 if [ ! -z "$SAME_STRAND" ]; then PARAM_BIN="$PARAM_BIN -r"; fi
 if [ ! -z "$ADDONE" ]; then PARAM_BIN="$PARAM_BIN -n"; fi
 
-## parse input bam files
-INPUTBAMFILES=$(cat $CONFIGFILE | perl -ane '
-    if($_=~/^profile/) {
-        $file.="$F[1],";
-    } END {
-        $file=~s/\,$//g;
-        print "$file\n";
-    }'
-)
+## check if input is BAM files or configuration file containing BAM file information
+INPUT=$(echo $INPUTBAMFILES | perl -ane '$_=~s/\,.*//g; print $_;')
+if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
+    INPUT=$(cat $INPUTBAMFILES | perl -ane '
+        if($_=~/^profile/) {
+            $file.="$F[1],";
+        } END {
+            $file=~s/\,$//g;
+            print "$file\n";
+        }'
+    )
+    INPUTBAMFILES=$INPUT
+fi
 
 if [ -z "$INPUTBAMFILES" ]; then
     echo
