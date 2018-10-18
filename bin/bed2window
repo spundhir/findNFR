@@ -26,7 +26,7 @@ usage() {
     echo "             [only valid with -l or -r parameters]"
     echo " -S          [create TSSR for pol2 pausing calculation (TSS-50 to TSS+w)]"
     echo " -E          [create TESR for pol2 pausing calculation (TES-w to TES+50)]"
-    echo " -N          [create NDR window around TSS (TES-100 to TES+10)]"
+    echo " -N          [create NDR window around TSS (TSS-100 to TSS+10)]"
 	echo " -h          [help]"
 	echo
 	exit 0

@@ -52,7 +52,7 @@ usage() {
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: pausing)]"
     echo " -e          [use signal at TSSR vs TESR to compute pausing]"
     echo "             [default: TSSR vs Genebody]"
-    echo " -a          [output raw counts at TSSSR and Genebody separately (default: pol2 pause rate computed using RPKM)]"
+    echo " -a          [output raw counts at TSSR and Genebody separately (default: pol2 pause rate computed using RPKM)]"
 	echo " -h          [help]"
     echo "[NOTE]"
     echo "             [parameters are set as per details from Day et al. 2016 Genome Biology]"

@@ -22,13 +22,19 @@ usage() {
     echo " -w <int>    [window size (default: 500)]"
     echo " -n <int>    [bin size within the window (default: 20)]"
     echo " -r          [require same strandedness (upstream: -; downstream: +)]"
+    echo " -s <float>  [normalize expression by input size factor]"
+    echo "             [if multiple, seperate them by a comma]"
+    echo " -m          [normalize expression by counts per million mapped reads (RPM)]"
+    echo " -k          [normalize expression by counts per kilo base per million mapped reads (RPKM)]"
+    echo " -d          [remove duplicate reads]"
+    echo " -a          [add 1 to all the raw expression counts - useful while taking log]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:w:n:rh ARG; do
+while getopts i:j:g:w:n:rs:mkdah ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
 		j) BAMFILES=$OPTARG;;
@@ -36,6 +42,11 @@ while getopts i:j:g:w:n:rh ARG; do
         w) WINDOW=$OPTARG;;
         n) BIN=$OPTARG;;
         r) SAME_STRAND=1;;
+        s) INPUTSIZEFACTORS=$OPTARG;;
+        m) CPM=1;;
+        k) FPKM=1;;
+        d) REMOVE_DUPLICATE=1;;
+        a) ADDONE=1;;
 		h) HELP=1;;
 	esac
 done
@@ -86,15 +97,44 @@ IFS=$oIFS
 
 BIN_COUNT=$(($((WINDOW*2))/$BIN))
 
-if [ "$WINDOW" -eq "$BIN" ]; then
-    if [ -z "$SAME_STRAND" ]; then
-        paste $BEDFILE <(paste <(cat $BEDFILE | bed2window -i stdin -w $WINDOW -l -s -m | bed2expr -i stdin -j $BAMFILES -m -d -g $GENOME -n | perl -ane '$start=scalar(@F)-'$BAMFILES_COUNT'; $end=scalar(@F)-1; $line=""; foreach(@F[$start..$end]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";') <(cat $BEDFILE | bed2window -i stdin -w $WINDOW -r -s -m | bed2expr -i stdin -j $BAMFILES -m -d -g $GENOME -n | perl -ane '$start=scalar(@F)-'$BAMFILES_COUNT'; $end=scalar(@F)-1; $line=""; foreach(@F[$start..$end]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'))
-    else
-        paste $BEDFILE <(paste <(cat $BEDFILE | bed2window -i stdin -w $WINDOW -l -s -m | bed2expr -i stdin -j $BAMFILES -m -d -g $GENOME -r -n | perl -ane '$start=scalar(@F)-'$BAMFILES_COUNT'; $end=scalar(@F)-1; $line=""; foreach(@F[$start..$end]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";') <(cat $BEDFILE | bed2window -i stdin -w $WINDOW -r -s -m | bed2expr -i stdin -j $BAMFILES -m -d -g $GENOME -r -n | perl -ane '$start=scalar(@F)-'$BAMFILES_COUNT'; $end=scalar(@F)-1; $line=""; foreach(@F[$start..$end]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'))
+## initialize size factors, if both size factors and total reads not provided
+if [ -z "$INPUTSIZEFACTORS" -a -z "$CPM" -a -z "$FPKM" ]; then
+    INPUTSIZEFACTORS=""
+    for(( i=0; i<$BAMFILES_COUNT; i++ )); do
+        INPUTSIZEFACTORS="$INPUTSIZEFACTORS,1"
+    done
+    INPUTSIZEFACTORS=`echo $INPUTSIZEFACTORS | perl -ane '$_=~s/^\,//g; print $_;'`;
+fi
+
+## check, if number of size factors are equal to the number of input bam files
+if [ ! -z "$INPUTSIZEFACTORS" ]; then
+    IFS=","
+    SIZEFACTORS=($INPUTSIZEFACTORS)
+    SIZEFACTORS_COUNT=${#SIZEFACTORS[@]}
+    IFS=$oIFS
+
+    if [ "$BAMFILES_COUNT" -ne "$SIZEFACTORS_COUNT" ]; then
+        >&2 echo
+        >&2 echo -n "Please provide size factor for each input bam file";
+        >&2 echo
+        >&2 usage
     fi
+fi
+
+## parse arguments to bed2expr script
+ARG=""
+if [ ! -z "$INPUTSIZEFACTORS" ]; then ARG=$(echo $ARG "-s $INPUTSIZEFACTORS "); fi
+if [ ! -z "$CPM" ]; then ARG=$(echo $ARG "-m "); fi
+if [ ! -z "$FPKM" ]; then ARG=$(echo $ARG "-k "); fi
+if [ ! -z "$REMOVE_DUPLICATE" ]; then ARG=$(echo $ARG "-d "); fi
+if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); fi
+if [ "$ADDONE" -eq 1 ]; then ARG=$(echo $ARG "-n "); fi
+
+if [ "$WINDOW" -eq "$BIN" ]; then
+        paste $BEDFILE <(paste <(cat $BEDFILE | bed2window -i stdin -w $WINDOW -l -s -m | bed2expr -i stdin -j $BAMFILES -g $GENOME $ARG | perl -ane '$start=scalar(@F)-'$BAMFILES_COUNT'; $end=scalar(@F)-1; $line=""; foreach(@F[$start..$end]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";') <(cat $BEDFILE | bed2window -i stdin -w $WINDOW -r -s -m | bed2expr -i stdin -j $BAMFILES -g $GENOME $ARG | perl -ane '$start=scalar(@F)-'$BAMFILES_COUNT'; $end=scalar(@F)-1; $line=""; foreach(@F[$start..$end]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'))
 else
     paste $BEDFILE <(while read LINE; do
-        echo $LINE | bed2window -i stdin -w $WINDOW -s | bedtools makewindows -b stdin -n $BIN_COUNT | bed2expr -i stdin -j $BAMFILES -m -d -g $GENOME -n | perl -ane 'BEGIN { @expr=(); } $start=scalar(@F)-'$BAMFILES_COUNT'; $end=scalar(@F)-1; push(@expr, @F[$start..$end]); END { $line=""; foreach(@expr) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n"; }'
+        echo $LINE | bed2window -i stdin -w $WINDOW -s | bedtools makewindows -b stdin -n $BIN_COUNT | bed2expr -i stdin -j $BAMFILES -g $GENOME $ARG | perl -ane 'BEGIN { @expr=(); } $start=scalar(@F)-'$BAMFILES_COUNT'; $end=scalar(@F)-1; push(@expr, @F[$start..$end]); END { $line=""; foreach(@expr) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n"; }'
     done < $BEDFILE)
 fi
 
