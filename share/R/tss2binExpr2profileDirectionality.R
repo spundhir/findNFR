@@ -141,9 +141,9 @@ if(!is.null(opt$customGenes)) {
     customGenes <- read.table(opt$customGenes)
     colnames(customGenes) <- c("gene", "custom_class")
 
-    # slow but genes in the same order as in input (opt$customGenes)
+    # slow but genes are in the same order as in input (opt$customGenes)
     #lapply(test, function(x) x[unlist(lapply(as.character(customGenes$gene), function(y) grep(sprintf("^%s$", y),x$gene))),])
-    # fast but genes not in the same order as in input (opt$customGenes)
+    # fast but genes are not in the same order as in input (opt$customGenes)
     test <- lapply(test, function(x) x[grep(paste(sprintf("^%s$", as.character(customGenes$gene)), collapse="|"), x$gene),])
     test <- lapply(test, function(x) { x <- merge(x, customGenes, by.x="gene", by.y="gene")[,c(2:ncol(x),1,ncol(x)+1)]; colnames(x)[ncol(x)] <- "custom_class"; return(x); })
     data <- data[grep(paste(sprintf("^%s$", as.character(customGenes$gene)), collapse="|"), data$name),]

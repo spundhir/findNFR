@@ -128,7 +128,7 @@ if [ ! -z "$CPM" ]; then ARG=$(echo $ARG "-m "); fi
 if [ ! -z "$FPKM" ]; then ARG=$(echo $ARG "-k "); fi
 if [ ! -z "$REMOVE_DUPLICATE" ]; then ARG=$(echo $ARG "-d "); fi
 if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); fi
-if [ "$ADDONE" -eq 1 ]; then ARG=$(echo $ARG "-n "); fi
+if [ ! -z "$ADDONE" ]; then ARG=$(echo $ARG "-n "); fi
 
 if [ "$WINDOW" -eq "$BIN" ]; then
         paste $BEDFILE <(paste <(cat $BEDFILE | bed2window -i stdin -w $WINDOW -l -s -m | bed2expr -i stdin -j $BAMFILES -g $GENOME $ARG | perl -ane '$start=scalar(@F)-'$BAMFILES_COUNT'; $end=scalar(@F)-1; $line=""; foreach(@F[$start..$end]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";') <(cat $BEDFILE | bed2window -i stdin -w $WINDOW -r -s -m | bed2expr -i stdin -j $BAMFILES -g $GENOME $ARG | perl -ane '$start=scalar(@F)-'$BAMFILES_COUNT'; $end=scalar(@F)-1; $line=""; foreach(@F[$start..$end]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'))

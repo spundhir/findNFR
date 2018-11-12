@@ -45,15 +45,16 @@ usage() {
     echo " -c <file>   [input mapped reads in BAM format for control sample]"
     echo " -r          [require same strandedness (GRO-seq)]"
     echo " -d          [remove duplicate reads (ChIP-seq)]"
-    echo " -x          [output raw counts at regions down- and up-stream to TSS separately (default: directionality computed using CPM)]"
+    echo " -x          [output raw counts at regions down- and up-stream to TSS (default: CPM values)]"
     echo "             [directionality = (down - up)/(down + up)]"
+    echo " -a          [add 1 to all the raw expression counts - useful while taking log]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:w:c:rdxh ARG; do
+while getopts i:j:g:w:c:rdxah ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         j) INPUTBAMFILES=$OPTARG;;
@@ -63,6 +64,7 @@ while getopts i:j:g:w:c:rdxh ARG; do
         r) SAME_STRAND=1;;
         d) REMOVE_DUPLICATE=1;;
         x) RAW=1;;
+        a) ADDONE=1;;
 		h) HELP=1;;
 	esac
 done
@@ -162,13 +164,15 @@ ARG=""
 if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
 if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); fi
 if [ ! -z "$REMOVE_DUPLICATE" ]; then ARG=$(echo $ARG "-d "); fi
+if [ ! -z "$ADDONE" ]; then ARG=$(echo $ARG "-a "); fi
 
-#echo "zless $BEDFILE | bed2window -i stdin -N | bed2binExpr -i stdin -j $INPUTBAMFILES -g $GENOME -w $WINDOW -n $WINDOW $ARG -m -a"; exit
+#echo "zless $BEDFILE | bed2window -i stdin -N | bed2binExpr -i stdin -j $INPUTBAMFILES -g $GENOME -w $WINDOW -n $WINDOW $ARG -m"; exit
 
 if [ -z "$RAW" ]; then
-    zless $BEDFILE | bed2window -i stdin -N | bed2binExpr -i stdin -j $INPUTBAMFILES -g $GENOME -w $WINDOW -n $WINDOW $ARG -m -a | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $reverse_col=$i+'$NCOL'; $forward_col=$reverse_col+'$BAMFILES_COUNT'; if($F[5]=~/-/) { printf("\t%0.4f", ($F[$reverse_col]-$F[$forward_col])/($F[$reverse_col]+$F[$forward_col])); } else { printf("\t%0.4f", ($F[$forward_col]-$F[$reverse_col])/($F[$forward_col]+$F[$reverse_col])); } } print "\n";'
+    zless $BEDFILE | bed2window -i stdin -N | bed2binExpr -i stdin -j $INPUTBAMFILES -g $GENOME -w $WINDOW -n $WINDOW $ARG -m | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $reverse_col=$i+'$NCOL'; $forward_col=$reverse_col+'$BAMFILES_COUNT'; if($F[5]=~/-/) { printf("\t%0.4f\t%0.4f", $F[$reverse_col], $F[$forward_col]); } else { printf("\t%0.4f\t%0.4f", $F[$forward_col], $F[$reverse_col]); } } print "\n";'
+    #zless $BEDFILE | bed2window -i stdin -N | bed2binExpr -i stdin -j $INPUTBAMFILES -g $GENOME -w $WINDOW -n $WINDOW $ARG -m | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $reverse_col=$i+'$NCOL'; $forward_col=$reverse_col+'$BAMFILES_COUNT'; if($F[5]=~/-/) { printf("\t%0.4f", ($F[$reverse_col]-$F[$forward_col])/($F[$reverse_col]+$F[$forward_col])); } else { printf("\t%0.4f", ($F[$forward_col]-$F[$reverse_col])/($F[$forward_col]+$F[$reverse_col])); } } print "\n";'
 else
-    zless $BEDFILE | bed2window -i stdin -N | bed2binExpr -i stdin -j $INPUTBAMFILES -g $GENOME -w $WINDOW -n $WINDOW $ARG -m -a | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $reverse_col=$i+'$NCOL'; $forward_col=$reverse_col+'$BAMFILES_COUNT'; if($F[5]=~/-/) { printf("\t%0.4f\t%0.4f", $F[$reverse_col], $F[$forward_col]); } else { printf("\t%0.4f\t%0.4f", $F[$forward_col], $F[$reverse_col]); } } print "\n";'
+    zless $BEDFILE | bed2window -i stdin -N | bed2binExpr -i stdin -j $INPUTBAMFILES -g $GENOME -w $WINDOW -n $WINDOW $ARG | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $reverse_col=$i+'$NCOL'; $forward_col=$reverse_col+'$BAMFILES_COUNT'; if($F[5]=~/-/) { printf("\t%0.4f\t%0.4f", $F[$reverse_col], $F[$forward_col]); } else { printf("\t%0.4f\t%0.4f", $F[$forward_col], $F[$reverse_col]); } } print "\n";'
 fi
 
 ## remove temporary file, if exists
