@@ -3,11 +3,11 @@ suppressPackageStartupMessages(library("optparse"))
 
 ## parse command line arguments
 option_list <- list(
-	make_option(c("-i", "--inFile"), help="input file containing output from tss2binExpr script (can be stdin)"),
-    make_option(c("-l", "--classVariable"), default="class", help="plot profiles categorized based on promoter a) class or b) directionality (default: %default)"),
+	make_option(c("-i", "--inFile"), help="input file containing output from gene2promoter2profile script (can be stdin)"),
+    make_option(c("-l", "--classVariable"), default="class", help="plot profiles for promoters categorized based on: a) class or b) directionality (default: %default)"),
+    make_option(c("-m", "--customClass"), help="file containing custom class information to categorize promoters (format: gene_name class)"),
     make_option(c("-c", "--directionalityCol"), default=8, help="column using which to define the promoter directionality classes (default: %default)"),
-    make_option(c("-m", "--customGenes"), help="file containing custom class information (format: gene_name class) (default: all genes divided per directionality class"),
-    make_option(c("-p", "--plotCol"), help="specific column for which profile needs to be plotted (default: all columns)"),
+    make_option(c("-p", "--plotCol"), help="column for which profile needs to be plotted (default: all columns)"),
     make_option(c("-o", "--outFile"), help="output pdf file")
 )
 
@@ -16,7 +16,7 @@ opt <- parse_args(parser)
 
 ## check, if all required arguments are given
 if(is.null(opt$inFile)) {
-	cat("\nProgram: tss2binExpr2profileDirectionality.R (R script to plot profile directionality (eg. chd4))\n")
+	cat("\nProgram: gene2promoter2profile.R (R script to plot histone modification profile (eg. chd4))\n")
 	cat("Author: BRIC, University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
 	cat("Contact: pundhir@binf.ku.dk\n");
@@ -137,16 +137,16 @@ data <- cbind(data[grep("HFR", data$name),], profile_directionality_class)
 data$name <- gsub("HFR#", "", data$name)
 
 ## filter based on input genes and define custom classes if provided
-if(!is.null(opt$customGenes)) {
-    customGenes <- read.table(opt$customGenes)
-    colnames(customGenes) <- c("gene", "custom_class")
+if(!is.null(opt$customClass)) {
+    customClass <- read.table(opt$customClass)
+    colnames(customClass) <- c("gene", "custom_class")
 
-    # slow but genes are in the same order as in input (opt$customGenes)
-    #lapply(test, function(x) x[unlist(lapply(as.character(customGenes$gene), function(y) grep(sprintf("^%s$", y),x$gene))),])
-    # fast but genes are not in the same order as in input (opt$customGenes)
-    test <- lapply(test, function(x) x[grep(paste(sprintf("^%s$", as.character(customGenes$gene)), collapse="|"), x$gene),])
-    test <- lapply(test, function(x) { x <- merge(x, customGenes, by.x="gene", by.y="gene")[,c(2:ncol(x),1,ncol(x)+1)]; colnames(x)[ncol(x)] <- "custom_class"; return(x); })
-    data <- data[grep(paste(sprintf("^%s$", as.character(customGenes$gene)), collapse="|"), data$name),]
+    # slow but genes are in the same order as in input (opt$customClass)
+    #lapply(test, function(x) x[unlist(lapply(as.character(customClass$gene), function(y) grep(sprintf("^%s$", y),x$gene))),])
+    # fast but genes are not in the same order as in input (opt$customClass)
+    test <- lapply(test, function(x) x[grep(paste(sprintf("^%s$", as.character(customClass$gene)), collapse="|"), x$gene),])
+    test <- lapply(test, function(x) { x <- merge(x, customClass, by.x="gene", by.y="gene")[,c(2:ncol(x),1,ncol(x)+1)]; colnames(x)[ncol(x)] <- "custom_class"; return(x); })
+    data <- data[grep(paste(sprintf("^%s$", as.character(customClass$gene)), collapse="|"), data$name),]
 }
 
 ## plot profiles or output file to stdout
@@ -157,7 +157,7 @@ if(!is.null(opt$outFile)) {
         factors_order <- names(test)[c(8:NCOL)]
     }
 
-    if(!is.null(opt$customGenes)) {
+    if(!is.null(opt$customClass)) {
         p <- lapply(factors_order, function(x) { plot_profile(test[[x]], x, "custom") })
     } else {
         p <- lapply(factors_order, function(x) { plot_profile(test[[x]], x, opt$classVariable) })

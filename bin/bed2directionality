@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 <<"copyright_info"
-bed2directionalityBias: compute directionality of input chromatin modification or nascent RNA 
+bed2directionality: compute directionality of input chromatin modification or nascent RNA 
 Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
 
 This program is free software: you can redistribute it and/or modify
@@ -25,11 +25,11 @@ WINDOW=500
 
 #### usage ####
 usage() {
-	echo Program: "bed2directionalityBias (compute directionality of input chromatin modification or nascent RNA)"
+	echo Program: "bed2directionality (compute directionality of input chromatin modification or nascent RNA)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: $VERSION
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: bed2directionalityBias -i <file> -j <file> [OPTIONS]"
+	echo "Usage: bed2directionality -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input genomic coordinates in BED format]"
     echo "             [format: chr start end name score strand]"
@@ -46,9 +46,10 @@ usage() {
     echo " -r          [require same strandedness (GRO-seq)]"
     echo " -d          [remove duplicate reads (ChIP-seq)]"
     echo " -x          [output raw counts at regions down- and up-stream to TSS (default: CPM values)]"
-    echo "             [directionality = (down - up)/(down + up)]"
     echo " -a          [add 1 to all the raw expression counts - useful while taking log]"
 	echo " -h          [help]"
+    echo "[OUTPUT]"
+    echo "             [for each input bam file: \"... count_down_to_tss count_tss_up_to_tss\"]"
 	echo
 	exit 0
 }

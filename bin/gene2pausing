@@ -44,7 +44,7 @@ usage() {
     echo " -g <string> [genome (default: mm9)]"
     echo " -w <int>    [extend TSS downstream with input number of bases to define TSSR (default: 300)]"
     echo " -p <float>  [p-value at which to consider an event as significant (default: 0.05)]"
-    echo " -r          [only for protein coding genes (default: all genes; only valid if input is in GTF format)]"
+    echo " -r          [analyze protein coding genes only (default: all genes; only valid if input is in GTF format)]"
     echo " -c <file>   [input mapped reads in BAM format for control sample (IgG)]"
     echo " -t          [instead compute using travelling ratio formula (default: using pausing formula)]"
     echo "             [pausing = A/B] or [travelling ratio = A/(A+B)]"
@@ -52,10 +52,14 @@ usage() {
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: pausing)]"
     echo " -e          [use signal at TSSR vs TESR to compute pausing]"
     echo "             [default: TSSR vs Genebody]"
-    echo " -a          [output raw counts at TSSR and Genebody separately (default: pol2 pause rate computed using RPKM)]"
+    echo " -a          [output raw counts as \"TSSR/Genebody\" (default: pol2 pause rate computed using RPKM)]"
 	echo " -h          [help]"
     echo "[NOTE]"
     echo "             [parameters are set as per details from Day et al. 2016 Genome Biology]"
+    echo "[OUTPUT]"
+    echo "             [for each input bam file: \"... TSSR_coordinate pol2_at_TSSR dist_closest_tss pausing\"]"
+    echo "             **OR**"
+    echo "             [for each input bam file: \"... TSSR_coordinate pol2_at_TSSR dist_closest_tss count_TSSR/count_genebody\"]"
 	echo
 	exit 0
 }

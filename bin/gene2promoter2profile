@@ -7,11 +7,11 @@ REGION="promoter"
 
 #### usage ####
 usage() {
-	echo Program: "tss2binExpr (compute read count corresponding to input TSS and flanking regions divided into bins)"
+	echo Program: "gene2promoter2profile (compute read count profile corresponding to input TSS by binning flanking regions)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: tss2binExpr -i <file> -j <file> [OPTIONS]"
+	echo "Usage: gene2promoter2profile -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input file containing genomic coordinates of TSS in BED format (can be stdin)]"
     echo "             [FORMAT: chr start end name score strand distance class]"
