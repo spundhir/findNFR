@@ -32,13 +32,14 @@ usage() {
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: gene2pausing -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
-	echo " -i <file>   [input genomic coordinates of gene TSS in GTF or BED format (can be stdin)]"
+	echo " -i <file>   [input genomic coordinates of genes in GTF or BED format (can be stdin)]"
     echo "             [source: ftp://ftp.sanger.ac.uk/pub/gencode/]"
     echo " -j <file>   [input mapped reads in BAM format]"
     echo "             [if multiple, separate them by a comma]"
     echo "             **OR**"
     echo "             [input configuration file containing bam file information]"
-    echo "             [<id> <bam file> (id should start with pausing or pausing_strandAware; if compute strand aware)]"
+    echo "             [<id> <bam file> (eg. pausing pol2_esc_Rep1.bam)]"
+    echo "             [<id> <bam file> (eg. pausing_strandAware groseq_esc_Rep1.bam)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
     echo " -w <int>    [extend TSS downstream with input number of bases to define TSSR (default: 300)]"
@@ -202,7 +203,11 @@ else
     closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1)) | gene2signalValues -i stdin -j $BAMFILE -g $GENOME -w $WINDOW $ARG | perl -ane 'if('$RAW') { print $_; } else { print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/($val[0]+$val[1])); } else { print "\t$_"; } } print "\n"; }'
 fi > $TMP.pausing
 
-paste $TMP.pausing $TMP.strandAwarePausing
+if [ ! -z "$BAMFILE_STRANDAWARE" ]; then
+    paste $TMP.pausing $TMP.pausingStrandAware
+else
+    paste $TMP.pausing
+fi
 
 ## remove temporary file, if exists
 if [ "$GTFFILE" == "stdin" ]; then
