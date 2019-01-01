@@ -40,13 +40,14 @@ usage() {
     echo " -w <int>    [extend TSS downstream with input number of bases to define TSSR (default: 300)]"
     echo " -r          [only for protein coding genes (default: all genes)]"
     echo " -c <file>   [input mapped reads in BAM format for control sample (IgG)]"
+    echo " -s          [require same strandedness]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:w:rc:h ARG; do
+while getopts i:j:g:w:rc:sh ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
@@ -54,6 +55,7 @@ while getopts i:j:g:w:rc:h ARG; do
         w) WINDOW=$OPTARG;;
         r) ONLYPROTEINCODING=1;;
         c) BAMFILECONTROL=$OPTARG;;
+        s) SAME_STRAND=1;;
 		h) HELP=1;;
 	esac
 done
@@ -111,6 +113,7 @@ fi
 ## extract TSS coordinates from the input GTF file and determine most active TSS for each gene
 ARG=""
 if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
+if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); fi
 
 if [ ! -z "$ONLYPROTEINCODING" ]; then
     zless $GTFFILE | grep -w transcript | grep -w protein_coding 

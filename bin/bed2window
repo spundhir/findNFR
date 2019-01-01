@@ -28,13 +28,14 @@ usage() {
     echo " -S          [create TSSR for pol2 pausing calculation (TSS-50 to TSS+w)]"
     echo " -E          [create TESR for pol2 pausing calculation (TES-w to TES+50)]"
     echo " -N          [create NDR window around TSS (TSS-100 to TSS+10)]"
+    echo " -c          [switch strand information - to + and + to -]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:w:xtnuvlrsmSENh ARG; do
+while getopts i:w:xtnuvlrsmSENch ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         w) WIN=$OPTARG;;
@@ -50,6 +51,7 @@ while getopts i:w:xtnuvlrsmSENh ARG; do
         S) TSSR_PAUSING=1;;
         E) TESR_PAUSING=1;;
         N) TSS_NDR=1;;
+        c) SWITCH_STRAND=1;;
 		h) HELP=1;;
 	esac
 done
@@ -59,7 +61,13 @@ if [ -z "$INPUTBEDFILE" -o "$HELP" ]; then
 	usage
 fi
 
-if [ ! -z "$TSS_NDR" ]; then
+if [ ! -z "$SWITCH_STRAND" ]; then
+    if [ -f "$INPUTBEDFILE" ]; then
+        zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $F[5]="+"; } elsif($F[5]=~/^\+$/) { $F[5]="-"; } print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";'
+    elif [ "$INPUTBEDFILE" == "stdin" ]; then
+        while read LINE; do echo "${LINE}"; done | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $F[5]="+"; } elsif($F[5]=~/^\+$/) { $F[5]="-"; } print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' 
+    fi
+elif [ ! -z "$TSS_NDR" ]; then
     if [ -f "$INPUTBEDFILE" ]; then
         zless $INPUTBEDFILE | grep -v "^\#" | perl -ane 'if($F[1]=~/[a-zA-Z]+/ | $F[1]<=0) { next; } if($F[5]=~/^\-$/) { $start=$F[2]-'10'; $end=$F[2]+100; } else { $end=$F[1]+'10'; $start=$F[1]-100; } $chr=$F[0]; if($start<0) { $start=1 } $line="$chr\t$start\t$end\t"; foreach(@F[3..scalar(@F)-1]) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
     elif [ "$INPUTBEDFILE" == "stdin" ]; then
