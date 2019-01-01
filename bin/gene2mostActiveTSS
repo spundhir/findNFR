@@ -41,6 +41,8 @@ usage() {
     echo " -r          [only for protein coding genes (default: all genes)]"
     echo " -c <file>   [input mapped reads in BAM format for control sample (IgG)]"
     echo " -s          [require same strandedness]"
+    echo "[OUTPUT]"
+    echo "             [chr start end name score strand gene coordinate (TSSR) signal (TSSR) distance (closest_tss)]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -102,8 +104,8 @@ fi
 >&2 echo "done"
 
 ## create temporary GTF file if input is from stdin
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 if [ "$GTFFILE" == "stdin" ]; then
-    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     while read LINE; do
         echo "${LINE}"
     done > $TMP
@@ -119,11 +121,17 @@ if [ ! -z "$ONLYPROTEINCODING" ]; then
     zless $GTFFILE | grep -w transcript | grep -w protein_coding 
 else
     zless $GTFFILE | grep -w transcript
-fi | gtf2bed | perl -an -F'/\t+/' -e '$F[9]=~s/^.*transcript_name//g; $F[9]=~s/\;.*//g; $F[9]=~s/\"//g; chomp($F[9]); print "$F[0]\t$F[1]\t$F[2]\t$F[9]\t$F[4]\t$F[5]\t$F[3]\t$F[0]:$F[1]-$F[2]\n";' | bed2window -i stdin -w $WINDOW -S | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME $ARG | perl -ane '@coor=split(/[\:\-]+/,$F[7]); $mean_pol2=0; $sample_count=0; foreach(@F[8..scalar(@F)-1]) { $mean_pol2+=$_; $sample_count++; } $mean_pol2=sprintf("%0.5f", $mean_pol2/$sample_count); $width=$coor[2]-$coor[1]; print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$mean_pol2\t$width\n";' | sort -k 7,7 -k 9rg,9 -k 10rn,10 | perl -ane 'if(!$seen{$F[6]}) { print $_; $seen{$F[6]}=1; }' | cut -f 1-9
+fi | gtf2bed | perl -an -F'/\t+/' -e '$F[9]=~s/^.*transcript_name//g; $F[9]=~s/\;.*//g; $F[9]=~s/\"//g; chomp($F[9]); print "$F[0]\t$F[1]\t$F[2]\t$F[9]\t$F[4]\t$F[5]\t$F[3]\t$F[0]:$F[1]-$F[2]\n";' | bed2window -i stdin -w $WINDOW -S | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME $ARG | perl -ane '@coor=split(/[\:\-]+/,$F[7]); $mean_pol2=0; $sample_count=0; foreach(@F[8..scalar(@F)-1]) { $mean_pol2+=$_; $sample_count++; } $mean_pol2=sprintf("%0.5f", $mean_pol2/$sample_count); $width=$coor[2]-$coor[1]; print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$mean_pol2\t$width\n";' | sort -k 7,7 -k 9rg,9 -k 10rn,10 | perl -ane 'if(!$seen{$F[6]}) { print $_; $seen{$F[6]}=1; }' | cut -f 1-9 | sortBed -i stdin > $TMP.mostActiveTSS
+
+## add information about distance to closest gene TSS in the output file
+NCOL=$(zless $TMP.mostActiveTSS | perl -ane 'print scalar(@F)."\n";' | sort -k 1r,1 | head -n 1)
+closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1))
  
 ## remove temporary file, if exists
-if [ ! -z "$TMP" ]; then
+if [ "$GTFFILE" == "stdin" ]; then
     rm $TMP
 fi  
+
+rm $TMP.mostActiveTSS
 
 >&2 echo "All done.. bye"

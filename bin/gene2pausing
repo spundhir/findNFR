@@ -48,25 +48,22 @@ usage() {
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: pausing)]"
     echo " -s          [require same strandedness (GRO-seq)]"
     echo "[OPTIONS: COMPUTE]"
+    echo " -e          [use signal at TESR as B (default: genebody)]"
     echo " -t          [compute travelling rate (default: pausing rate)]"
     echo "             [pausing rate = A/B]"
     echo "             [travelling rate = A/(A+B)]"
     echo "             [where A: RPKM at TSSR; B: RPKM at gene body + 3KB - TSSR]"
-    echo " -e          [use signal at TESR as B (default: genebody)]"
-    echo " -a          [output raw read counts as \"TSSR/Genebody\" (default: pause rate)]"
 	echo " -h          [help]"
     echo "[NOTE]"
     echo "             [parameters are set as per details from Day et al. 2016 Genome Biology]"
     echo "[OUTPUT]"
-    echo "             [for each input bam file: \"... TSSR_coordinate pol2_at_TSSR dist_closest_tss pausing\"]"
-    echo "             **OR**"
-    echo "             [for each input bam file: \"... TSSR_coordinate pol2_at_TSSR dist_closest_tss count_TSSR/count_genebody\"]"
+    echo "             [chr start end name score strand gene coordinate (TSSR) signal (TSSR) distance (closest_tss) pausing (per bam file)]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:g:w:rc:f:steah ARG; do
+while getopts i:j:g:w:rc:f:seth ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
@@ -76,9 +73,8 @@ while getopts i:j:g:w:rc:f:steah ARG; do
         c) BAMFILECONTROL=$OPTARG;;
         f) CONFIG_FILTER=$OPTARG;;
         s) SAME_STRAND=1;;
-        t) TR=1;;
         e) TESR_MODE=1;;
-        a) RAW=1;;
+        t) TR=1;;
 		h) HELP=1;;
 	esac
 done
@@ -124,6 +120,21 @@ if [ ! -f "$GENOME_FILE" ]; then
 fi
 >&2 echo "done"
 
+## determine most active TSS for each gene
+ARG=""
+if [ ! -z "$ONLYPROTEINCODING" ]; then ARG=$(echo $ARG "-r "); fi
+if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
+if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-s "); fi
+if [ ! -z "$TESR_MODE" ]; then ARG=$(echo $ARG "-e "); fi
+
+## compute pol2 pausing
+if [ -z "$TR" ]; then
+    gene2signalValues -i $GTFFILE -j $BAMFILE -g $GENOME -f $CONFIG_FILTER -w $WINDOW $ARG | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/$val[1]); } else { print "\t$_"; } } print "\n";'
+else
+    gene2signalValues -i $GTFFILE -j $BAMFILE -g $GENOME -f $CONFIG_FILTER -w $WINDOW $ARG | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/($val[0]+$val[1])); } else { print "\t$_"; } } print "\n";'
+fi
+
+exit
 ## check if input is BAM files or configuration file containing BAM file information
 INPUT=$(echo $BAMFILE | perl -ane '$_=~s/\,.*//g; print $_;')
 if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
