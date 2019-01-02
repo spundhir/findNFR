@@ -21,7 +21,7 @@ copyright_info
 
 VERSION="0.01"
 GENOME="mm9"
-WINDOW=300
+WINDOW=500
 CONFIG_FILTER="divergent"
 
 #### usage ####
@@ -32,7 +32,7 @@ usage() {
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: gene2divergentTranscription -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
-	echo " -i <file>   [input genomic coordinates of gene TSS in GTF or BED format (can be stdin)]"
+	echo " -i <file>   [input genomic coordinates of genes in GTF or BED format (can be stdin)]"
     echo "             [source: ftp://ftp.sanger.ac.uk/pub/gencode/]"
     echo " -j <file>   [input mapped reads in BAM format]"
     echo "             [if multiple, separate them by a comma]"
@@ -40,17 +40,16 @@ usage() {
     echo "             [input configuration file containing bam file information]"
     echo "             [<id> <bam file> (eg. divergent pol2_esc_Rep1.bam)]"
     echo "             [<id> <bam file> (eg. divergent_strandAware groseq_esc_Rep1.bam)]"
-    echo "             [<id> <bam file> (id should start with divergent)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
-    echo " -w <int>    [extend TSS up- and downstream with input number of bases to measure TSS_UP and TSS_DOWN (default: 300)]"
+    echo " -w <int>    [extend NDR up- and downstream with input number of bases to measure NDR_UP and NDR_DOWN (default: 500)]"
     echo " -r          [analyze protein coding genes only (default: all genes; only valid if input is in GTF format)]"
     echo " -c <file>   [input mapped reads in BAM format for control sample (IgG)]"
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: divergent)]"
     echo " -s          [require same strandedness (GRO-seq)]"
     echo " -a          [measure using raw read counts (default: RPKM normalized)]"
     echo "[OUTPUT]"
-    echo "             [for each input bam file: \"... TSSR_coordinate signal_at_TSSR dist_closest_tss TSS_UP/TSS_DOWN/Genebody\"]"  
+    echo "             [\"... NDR_UP/NDR_DOWN/Genebody (per bam file)]"  
 	echo " -h          [help]"
 	echo
 	exit 0

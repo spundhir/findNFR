@@ -50,12 +50,12 @@ usage() {
     echo " -a          [output raw read counts (default: RPKM normalized)]"
     echo "[OPTIONS: MODE]"
     echo " -e          [tesr mode: measure signal at TSSR, TESR (default: TSSR, genebody)]"
-    echo " -d          [divergent mode: measure signal at TSS_UP, TSS_DOWN, genebody (default: TSSR, genebody)]"
+    echo " -d          [divergent mode: measure signal at NDR_UP, NDR_DOWN, genebody (default: TSSR, genebody)]"
 	echo " -h          [help]"
     echo "[NOTE]"
     echo "             [genebody mode: TSSR/genebody]"
     echo "             [tesr mode: TSSR/TESR]"
-    echo "             [divergent mode: TSS_UP/TSS_DOWN/genebody]"
+    echo "             [divergent mode: NDR_UP/NDR_DOWN/genebody]"
 	echo
 	exit 0
 }
@@ -160,8 +160,13 @@ fi
 IS_BED=$(zless $GTFFILE | cut -f 2 | head -n 2 | tail -n 1 | perl -ane 'if($_=~/^[0-9]+$/) { print $_; }' | wc -l);
 
 if [ "$IS_BED" -gt 0 ]; then
-    #scp $GTFFILE $TMP.mostActiveTSS
-    tabEdit -i $GTFFILE -n 9 > $TMP.mostActiveTSS
+    ## reformat BED file so as it has similar format as in case of GTF file
+    WIDTH=$(zless $GTFFILE | perl -ane 'print $F[2]-$F[1]."\n";' | sort | head -n 1)
+    if [ "$WIDTH" -le 1 ]; then
+        bedtools slop -i $GTFFILE -g $GENOME_FILE -l 0 -r 3000 -s
+    else
+        zless $GTFFILE
+    fi | tabEdit -i stdin -n 9 | sortBed -i stdin > $TMP.mostActiveTSS
     NCOL=$(zless $TMP.mostActiveTSS | perl -ane 'print scalar(@F)."\n";' | sort -k 1r,1 | head -n 1)
     closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1)) > $TMP
     mv $TMP $TMP.mostActiveTSS
@@ -245,13 +250,13 @@ if [ ! -z "$BAMFILE" ]; then
     if [ ! -z "$TESR_MODE" ]; then
         paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW -S | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW -E | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $tesr_col=$tssr_col+'$BAMFILES_COUNT'; print "\t$F[$tssr_col]/$F[$tesr_col]"; } print "\n";' 
     elif [ ! -z "$DIVERGENT_MODE" ]; then
-        paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -N | bed2window -i stdin -w $WINDOW -l -s -m | bed2expr -i stdin -j $BAMFILE_STRANDAWARE -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -N | bed2window -i stdin -w $WINDOW -r -s -m | bed2expr -i stdin -j $BAMFILE_STRANDAWARE -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE_STRANDAWARE -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane '
+        paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -N | bed2window -i stdin -w $WINDOW -l -s -m | bed2expr -i stdin -j $BAMFILE -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -N | bed2window -i stdin -w $WINDOW -r -s -m | bed2expr -i stdin -j $BAMFILE -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW -v | bed2expr -i stdin -j $BAMFILE -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane '
         print "$F[0]"; 
         for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } 
-        for($i=0; $i<'$BAMFILES_STRANDAWARE_COUNT'; $i++) { 
+        for($i=0; $i<'$BAMFILES_COUNT'; $i++) { 
             $tss_neg_col=$i+'$NCOL'; 
-            $tss_pos_col=$tss_neg_col+'$BAMFILES_STRANDAWARE_COUNT'; 
-            $genebody_col=$tss_neg_col+'$BAMFILES_STRANDAWARE_COUNT'*2; 
+            $tss_pos_col=$tss_neg_col+'$BAMFILES_COUNT'; 
+            $genebody_col=$tss_neg_col+'$BAMFILES_COUNT'*2; 
             if($F[5]=~/^-/) { 
                 print "\t$F[$tss_pos_col]/$F[$tss_neg_col]/$F[$genebody_col]";
             } else {
