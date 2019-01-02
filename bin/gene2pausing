@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 <<"copyright_info"
-gene2pausing: measure pol2 pausing at most active TSS of genes
+gene2pausing: measure pol2 pausing at the most active TSS of genes
 Copyright (C) 2018  Sachin Pundhir (pundhir@binf.ku.dk)
 
 This program is free software: you can redistribute it and/or modify
@@ -26,7 +26,7 @@ CONFIG_FILTER="pausing"
 
 #### usage ####
 usage() {
-	echo Program: "gene2pausing (measure pol2 pausing at most active TSS of genes)"
+	echo Program: "gene2pausing (measure pol2 pausing at the most active TSS of genes)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: $VERSION
 	echo Contact: pundhir@binf.ku.dk
@@ -120,112 +120,18 @@ if [ ! -f "$GENOME_FILE" ]; then
 fi
 >&2 echo "done"
 
-## determine most active TSS for each gene
+## initialize argument
 ARG=""
 if [ ! -z "$ONLYPROTEINCODING" ]; then ARG=$(echo $ARG "-r "); fi
 if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
 if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-s "); fi
 if [ ! -z "$TESR_MODE" ]; then ARG=$(echo $ARG "-e "); fi
 
-## compute pol2 pausing
+## measure pol2 pausing
 if [ -z "$TR" ]; then
     gene2signalValues -i $GTFFILE -j $BAMFILE -g $GENOME -f $CONFIG_FILTER -w $WINDOW $ARG | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/$val[1]); } else { print "\t$_"; } } print "\n";'
 else
     gene2signalValues -i $GTFFILE -j $BAMFILE -g $GENOME -f $CONFIG_FILTER -w $WINDOW $ARG | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/($val[0]+$val[1])); } else { print "\t$_"; } } print "\n";'
 fi
-
-exit
-## check if input is BAM files or configuration file containing BAM file information
-INPUT=$(echo $BAMFILE | perl -ane '$_=~s/\,.*//g; print $_;')
-if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
-    ## read configuration file for nascent transcription data (gro-seq, cage etc)
-    INPUT=$(cat $BAMFILE | perl -ane '
-        if($_=~/^'$CONFIG_FILTER'_strandAware/) {
-            $file.="$F[1],";
-        } END {
-            $file=~s/\,$//g;
-            print "$file\n";
-        }'
-    )
-    BAMFILE_STRANDAWARE=$INPUT
-
-    ## read configuration file
-    INPUT=$(cat $BAMFILE | perl -ane '
-        if($_=~/^'$CONFIG_FILTER'/ && $_!~/strandAware/) {
-            $file.="$F[1],";
-        } END {
-            $file=~s/\,$//g;
-            print "$file\n";
-        }'
-    )
-    BAMFILE=$INPUT
-fi
-
-## create temporary BED file if input is from stdin
-TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-if [ "$GTFFILE" == "stdin" ]; then
-    while read LINE; do
-        echo "${LINE}"
-    done > $TMP.gtf
-    GTFFILE=$TMP.gtf
-fi
-
-## check, if input genomic coordinates are in BED format, and convert to GTF
-IS_BED=$(zless $GTFFILE | cut -f 2 | head -n 2 | tail -n 1 | perl -ane 'if($_=~/^[0-9]+$/) { print $_; }' | wc -l);
-
-if [ "$IS_BED" -gt 0 ]; then
-    scp $GTFFILE $TMP.mostActiveTSS
-else
-    ## determine most active TSS for each gene
-    ARG=""
-    if [ ! -z "$ONLYPROTEINCODING" ]; then ARG=$(echo $ARG "-r "); fi
-    if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
-    if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-s "); fi
-
-    gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW $ARG | sortBed -i stdin > $TMP.mostActiveTSS
-fi
-
-## format arguments 
-ARG=""
-if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
-if [ ! -z "$TESR_MODE" ]; then ARG=$(echo $ARG "-e "); fi
-if [ ! -z "$RAW" ]; then ARG=$(echo $ARG "-a "); fi
-if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); fi
-
-NCOL=$(zless $TMP.mostActiveTSS | head -n 1 | perl -ane 'print scalar(@F);') 
-
-if [ -z "$RAW" ]; then
-    RAW=0;
-fi
-
-## compute pol2 pausing using strand aware data
-if [ ! -z "$BAMFILE_STRANDAWARE" ]; then
-    if [ -z "$TR" ]; then
-        closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1)) | gene2signalValues -i stdin -j $BAMFILE -g $GENOME -w $WINDOW $ARG -r | perl -ane 'if('$RAW') { print $_; } else { print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/$val[1]); } else { print "\t$_"; } } print "\n"; }'
-    else
-        closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1)) | gene2signalValues -i stdin -j $BAMFILE -g $GENOME -w $WINDOW $ARG -r | perl -ane 'if('$RAW') { print $_; } else { print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/($val[0]+$val[1])); } else { print "\t$_"; } } print "\n"; }'
-    fi | perl -ane 'print "$F['$NCOL']"; foreach(@F['$NCOL'+1..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $TMP.pausingStrandAware
-fi
-
-## compute pol2 pausing
-if [ -z "$TR" ]; then
-    closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1)) | gene2signalValues -i stdin -j $BAMFILE -g $GENOME -w $WINDOW $ARG | perl -ane 'if('$RAW') { print $_; } else { print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/$val[1]); } else { print "\t$_"; } } print "\n"; }'
-else
-    closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1)) | gene2signalValues -i stdin -j $BAMFILE -g $GENOME -w $WINDOW $ARG | perl -ane 'if('$RAW') { print $_; } else { print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/($val[0]+$val[1])); } else { print "\t$_"; } } print "\n"; }'
-fi > $TMP.pausing
-
-if [ ! -z "$BAMFILE_STRANDAWARE" ]; then
-    paste $TMP.pausing $TMP.pausingStrandAware
-else
-    paste $TMP.pausing
-fi
-
-## remove temporary file, if exists
-if [ "$GTFFILE" == "stdin" ]; then
-    rm $TMP.gtf
-fi
-rm $TMP.mostActiveTSS
-rm $TMP.pausing
-rm $TMP.pausingStrandAware
 
 >&2 echo "All done.. bye"

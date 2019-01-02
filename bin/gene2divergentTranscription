@@ -38,6 +38,8 @@ usage() {
     echo "             [if multiple, separate them by a comma]"
     echo "             **OR**"
     echo "             [input configuration file containing bam file information]"
+    echo "             [<id> <bam file> (eg. divergent pol2_esc_Rep1.bam)]"
+    echo "             [<id> <bam file> (eg. divergent_strandAware groseq_esc_Rep1.bam)]"
     echo "             [<id> <bam file> (id should start with divergent)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
@@ -46,6 +48,7 @@ usage() {
     echo " -c <file>   [input mapped reads in BAM format for control sample (IgG)]"
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: divergent)]"
     echo " -s          [require same strandedness (GRO-seq)]"
+    echo " -a          [measure using raw read counts (default: RPKM normalized)]"
     echo "[OUTPUT]"
     echo "             [for each input bam file: \"... TSSR_coordinate signal_at_TSSR dist_closest_tss TSS_UP/TSS_DOWN/Genebody\"]"  
 	echo " -h          [help]"
@@ -54,7 +57,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:g:w:rc:f:sh ARG; do
+while getopts i:j:g:w:rc:f:sah ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
@@ -64,6 +67,7 @@ while getopts i:j:g:w:rc:f:sh ARG; do
         c) BAMFILECONTROL=$OPTARG;;
         f) CONFIG_FILTER=$OPTARG;;
         s) SAME_STRAND=1;;
+        a) RAW=1;;
 		h) HELP=1;;
 	esac
 done
@@ -109,60 +113,14 @@ if [ ! -f "$GENOME_FILE" ]; then
 fi
 >&2 echo "done"
 
-## check if input is BAM files or configuration file containing BAM file information
-INPUT=$(echo $BAMFILE | perl -ane '$_=~s/\,.*//g; print $_;')
-if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
-    ## read configuration file
-    INPUT=$(cat $BAMFILE | perl -ane '
-        if($_=~/^'$CONFIG_FILTER'/) {
-            $file.="$F[1],";
-        } END {
-            $file=~s/\,$//g;
-            print "$file\n";
-        }'
-    )
-    BAMFILE=$INPUT
-fi
-
-## create temporary BED file if input is from stdin
-TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-if [ "$GTFFILE" == "stdin" ]; then
-    while read LINE; do
-        echo "${LINE}"
-    done > $TMP.gtf
-    GTFFILE=$TMP.gtf
-fi
-
-## check, if input genomic coordinates are in BED format, and convert to GTF
-IS_BED=$(zless $GTFFILE | cut -f 2 | head -n 2 | tail -n 1 | perl -ane 'if($_=~/^[0-9]+$/) { print $_; }' | wc -l);
-
-if [ "$IS_BED" -gt 0 ]; then
-    scp $GTFFILE $TMP.mostActiveTSS
-else
-    ## determine most active TSS for each gene
-    ARG=""
-    if [ ! -z "$ONLYPROTEINCODING" ]; then ARG=$(echo $ARG "-r "); fi
-    if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
-    if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-s "); fi
-
-    gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW $ARG | sortBed -i stdin > $TMP.mostActiveTSS
-fi
-
-## compute divergent transcription
+## initialize arguments
 ARG=""
+if [ ! -z "$ONLYPROTEINCODING" ]; then ARG=$(echo $ARG "-r "); fi
 if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
-if [ ! -z "$TESR_MODE" ]; then ARG=$(echo $ARG "-e "); fi
+if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-s "); fi
 if [ ! -z "$RAW" ]; then ARG=$(echo $ARG "-a "); fi
-if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); fi
 
-NCOL=$(zless $TMP.mostActiveTSS | head -n 1 | perl -ane 'print scalar(@F);') 
-
-closestBed -a $TMP.mostActiveTSS -b $TMP.mostActiveTSS -d -t first -io | cut -f 1-$NCOL,$((NCOL*2+1)) | gene2signalValues -i stdin -j $BAMFILE -g $GENOME -w $WINDOW -d $ARG
-
-## remove temporary file, if exists
-if [ "$GTFFILE" == "stdin" ]; then
-    rm $TMP.gtf
-fi
-rm $TMP.mostActiveTSS
+## measure divergent transcription
+gene2signalValues -i $GTFFILE -j $BAMFILE -g $GENOME -f $CONFIG_FILTER -w $WINDOW $ARG -d
 
 >&2 echo "All done.. bye"
