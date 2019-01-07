@@ -277,7 +277,7 @@ if [ "$GTFFILE" == "stdin" ]; then
     rm $TMP.gtf
 fi
 
-rm $TMP.mostActiveTSS
+#rm $TMP.mostActiveTSS
 rm $TMP.signalValues
 rm $TMP.signalValuesStrandAware
 

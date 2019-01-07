@@ -148,20 +148,30 @@ fi
 ## compute coverage using control sample
 if [ ! -z "$INPUTBAMCONTROL" ]; then
     ARG=""
-    if [ ! -z "$INPUTSIZEFACTORS" ]; then ARG=$(echo $ARG "-s $INPUTSIZEFACTORS "); fi
-    if [ ! -z "$CPM" ]; then ARG=$(echo $ARG "-m "); fi
-    if [ ! -z "$FPKM" ]; then ARG=$(echo $ARG "-k "); fi
-    if [ ! -z "$REMOVE_DUPLICATE" ]; then ARG=$(echo $ARG "-d "); fi
-    if [ ! -z "$INPUTEXTENDS" ]; then ARG=$(echo $ARG "-e $INPUTEXTENDS "); fi
-    if [ ! -z "$AVG" ]; then ARG=$(echo $ARG "-v $AVG "); fi
-    if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); fi
-    if [ "$ADDONE" -eq 1 ]; then ARG=$(echo $ARG "-n "); fi
-    if [ ! -z "$GENOME" ]; then ARG=$(echo $ARG "-g $GENOME "); fi
-    if [ ! -z "$CONFIG_FILTER" ]; then ARG=$(echo $ARG "-f $CONFIG_FILTER "); fi
+    ARG_CONTROL=""
+    if [ ! -z "$INPUTSIZEFACTORS" ]; then ARG=$(echo $ARG "-s $INPUTSIZEFACTORS "); ARG_CONTROL=$(echo $ARG_CONTROL "-s 1 "); fi
+    if [ ! -z "$CPM" ]; then ARG=$(echo $ARG "-m "); ARG_CONTROL=$(echo $ARG_CONTROL "-m "); fi
+    if [ ! -z "$FPKM" ]; then ARG=$(echo $ARG "-k "); ARG_CONTROL=$(echo $ARG_CONTROL "-k "); fi
+    if [ ! -z "$REMOVE_DUPLICATE" ]; then ARG=$(echo $ARG "-d "); ARG_CONTROL=$(echo $ARG_CONTROL "-d "); fi
+    if [ ! -z "$INPUTEXTENDS" ]; then ARG=$(echo $ARG "-e $INPUTEXTENDS "); ARG_CONTROL=$(echo $ARG_CONTROL "-e 0 "); fi
+    if [ ! -z "$AVG" ]; then ARG=$(echo $ARG "-v $AVG "); ARG_CONTROL=$(echo $ARG_CONTROL "-v $AVG "); fi
+    if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); ARG_CONTROL=$(echo $ARG_CONTROL "-r "); fi
+    if [ "$ADDONE" -eq 1 ]; then ARG=$(echo $ARG "-n "); ARG_CONTROL=$(echo $ARG_CONTROL "-n "); fi
+    if [ ! -z "$GENOME" ]; then ARG=$(echo $ARG "-g $GENOME "); ARG_CONTROL=$(echo $ARG_CONTROL "-g $GENOME "); fi
+    if [ ! -z "$CONFIG_FILTER" ]; then ARG=$(echo $ARG "-f $CONFIG_FILTER "); ARG_CONTROL=$(echo $ARG_CONTROL "-f $CONFIG_FILTER "); fi
 
     INPUTBAMFILES=$(echo $INPUTBAMFILES | sed 's/\ /,/g')
     #echo "bed2expr -i $INPUTBEDFILE -j $INPUTBAMFILES $ARG"; exit
-    paste <(bed2expr -i $INPUTBEDFILE -j $INPUTBAMFILES $ARG) <(bed2expr -i $INPUTBEDFILE -j $INPUTBAMCONTROL $ARG | perl -ane 'print $F[scalar(@F)-1]."\n";') | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'-1; print "$F[0]"; foreach(@F[1..$field_count-1]) { print "\t$_"; } foreach(@F[$field_count..scalar(@F)-2]) { $_=$_-$F[scalar(@F)-1]; print "\t$_"; } print "\n";' 
+    paste <(bed2expr -i $INPUTBEDFILE -j $INPUTBAMFILES $ARG) <(bed2expr -i $INPUTBEDFILE -j $INPUTBAMCONTROL $ARG_CONTROL | perl -ane 'print $F[scalar(@F)-1]."\n";') | perl -ane '
+        $field_count=scalar(@F)-'$BAMFILES_COUNT'-1;
+        print "$F[0]"; foreach(@F[1..$field_count-1]) { print "\t$_"; }
+        foreach(@F[$field_count..scalar(@F)-2]) {
+            $_=$_-$F[scalar(@F)-1];
+            $sizefactors=sprintf("%d",'$INPUTSIZEFACTORS');
+            if($_<0 && $sizefactors==1) { $_=1; }
+            elsif($_<0) { $_=0.00001; }
+            print "\t$_";
+        } print "\n";' 
 else
     if [ ! -z "$INPUTSIZEFACTORS" ]; then
         ## check, if number of size factors and extends are equal to the number of input bam files

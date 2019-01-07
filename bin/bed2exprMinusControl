@@ -1,0 +1,114 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+AVG=0
+CONFIG_FILTER="tpm"
+
+#### usage ####
+usage() {
+	echo Program: "bed2exprMinusControl (normalize read counts by subtracting them with counts from control sample)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2exprMinusControl -i <file> -j <file(s)>"
+	echo "Options:"
+	echo " -i <file>   [input file containing genomic coordinates and read counts in BED format (can be stdin)]"
+    echo " -j <file>   [input mapped reads in BAM format for control sample]"
+    echo "             [if multiple separate by a comma]"
+    echo " -x <int>    [number of samples for which to normalize the read counts]"
+    echo "[OPTIONS]"
+    echo " -d          [remove duplicate reads]"
+    echo " -r          [require same strandedness]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+    echo "[NOTE]"
+    echo " In case of error: Could not open input BAM files, refer to:"
+    echo " https://groups.google.com/forum/#!msg/bedtools-discuss/_LNuoRWHn50/14MaqyzyzXsJ"
+    echo " i.e. make sure header of all input bam files is identical"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:x:drg::h ARG; do
+	case "$ARG" in
+		i) INPUTBEDFILE=$OPTARG;;
+        j) INPUTBAMCONTROLS=$OPTARG;;
+        x) BAMFILES_COUNT=$OPTARG;;
+        d) REMOVE_DUPLICATE=1;;
+        r) SAME_STRAND=1;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INPUTBEDFILE" -o -z "$INPUTBAMCONTROLS" -o -z "$BAMFILES_COUNT" -o "$HELP" ]; then
+	>&2 usage
+fi
+
+## populating files based on input genome
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+elif [ "$GENOME" == "rn5" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/rat.rn5.genome"
+else
+    >&2 echo "Presently the program only support analysis for mm9, hg19 or rn5"
+    >&2 echo
+    >&2 usage
+fi
+
+## parse input bam files in an array
+oIFS=$IFS
+IFS=","
+BAMCONTROLS=($INPUTBAMCONTROLS)
+BAMCONTROLS_COUNT=${#BAMCONTROLS[@]}
+IFS=$oIFS
+
+## parse bam files in an array
+IFS=","
+INPUTBAMCONTROLS=$(echo $INPUTBAMCONTROLS | sed 's/\,/ /g')
+IFS=$oIFS
+
+## initialize ADDONE based on -n parameter
+if [ -z "$ADDONE" ]; then
+    ADDONE=0
+fi
+
+## create temporary BED file if input is from stdin
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+if [ "$INPUTBEDFILE" == "stdin" ]; then
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
+    INPUTBEDFILE=$TMP
+fi
+
+## compute read counts
+if [ -z "$REMOVE_DUPLICATE" ]; then
+    if [ ! -z "$SAME_STRAND" ]; then
+        bedtools multicov -bams $INPUTBAMCONTROLS -bed $INPUTBEDFILE -q 10 -D -s
+    else
+        bedtools multicov -bams $INPUTBAMCONTROLS -bed $INPUTBEDFILE -q 10 -D
+    fi
+else
+    if [ ! -z "$SAME_STRAND" ]; then
+        bedtools multicov -bams $INPUTBAMCONTROLS -bed $INPUTBEDFILE -q 10 -s
+    else
+        bedtools multicov -bams $INPUTBAMCONTROLS -bed $INPUTBEDFILE -q 10
+    fi
+fi | perl -ane '$field_count=scalar(@F)-'$BAMCONTROLS_COUNT'; $sum=0; $count=0; foreach(@F[$field_count..scalar(@F)-1]) { $sum+=$_; $count++; } printf("%0.0f\n", $sum/$count);' > $TMP.bamControl
+
+paste $INPUTBEDFILE $TMP.bamControl | perl -ane '$field_count=scalar(@F)-'$BAMFILES_COUNT'-1; print "$F[0]"; foreach(@F[1..$field_count-1]) { print "\t$_"; } foreach(@F[$field_count..scalar(@F)-2]) { $_=$_-$F[scalar(@F)-1]; if($_<0) { $_=1; } print "\t$_"; } print "\n";'
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
+
+rm $TMP.bamControl
+
+exit
