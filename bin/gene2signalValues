@@ -149,7 +149,7 @@ if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
 
     ## read configuration file
     INPUT=$(cat $BAMFILE | perl -ane '
-        if($_=~/^'$CONFIG_FILTER'/ && $_!~/sameStrand/) {
+        if($_=~/^'$CONFIG_FILTER'/ && $_!~/sameStrand/ && $_!~/oppositeStrand/) {
             $file.="$F[1],";
         } END {
             $file=~s/\,$//g;
@@ -286,7 +286,7 @@ if [ ! -z "$BAMFILE_OPPOSITESTRAND" ]; then
 fi
 
 ## measure signal values using strand unaware data (eg. Pol2, histone etc)
-touch $TMP.signalValues
+zless $TMP.mostActiveTSS > $TMP.signalValues
 if [ ! -z "$BAMFILE" ]; then
     ## parse input bam files in an array
     oIFS=$IFS
