@@ -40,7 +40,8 @@ usage() {
     echo " -w <int>    [extend TSS downstream with input number of bases to define TSSR (default: 300)]"
     echo " -r          [only for protein coding genes (default: all genes)]"
     echo " -c <file>   [input mapped reads in BAM format for control sample (IgG)]"
-    echo " -s          [require same strandedness]"
+    echo " -s          [require same strand]"
+    echo " -S          [require opposite strand]"
     echo "[OUTPUT]"
     echo "             [chr start end name score strand gene coordinate (TSSR) signal (TSSR) distance (closest_tss)]"
 	echo " -h          [help]"
@@ -49,7 +50,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:g:w:rc:sh ARG; do
+while getopts i:j:g:w:rc:sSh ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
@@ -58,6 +59,7 @@ while getopts i:j:g:w:rc:sh ARG; do
         r) ONLYPROTEINCODING=1;;
         c) BAMFILECONTROL=$OPTARG;;
         s) SAME_STRAND=1;;
+        S) OPPOSITE_STRAND=1;;
 		h) HELP=1;;
 	esac
 done
@@ -116,6 +118,7 @@ fi
 ARG=""
 if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
 if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); fi
+if [ ! -z "$OPPOSITE_STRAND" ]; then ARG=$(echo $ARG "-R "); fi
 
 if [ ! -z "$ONLYPROTEINCODING" ]; then
     zless $GTFFILE | grep -w transcript | grep -w protein_coding 

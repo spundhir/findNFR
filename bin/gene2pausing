@@ -39,14 +39,16 @@ usage() {
     echo "             **OR**"
     echo "             [input configuration file containing bam file information]"
     echo "             [<id> <bam file> (eg. pausing pol2_esc_Rep1.bam)]"
-    echo "             [<id> <bam file> (eg. pausing_strandAware groseq_esc_Rep1.bam)]"
+    echo "             [<id> <bam file> (eg. pausing_sameStrand groseq_esc_Rep1.bam)]"
+    echo "             [<id> <bam file> (eg. pausing_oppositeStrand nasseq_esc_Rep1.bam)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
     echo " -w <int>    [extend TSS downstream with input number of bases to define TSSR (default: 300)]"
     echo " -r          [analyze protein coding genes only (default: all genes; only valid if input is in GTF format)]"
     echo " -c <file>   [input mapped reads in BAM format for control sample (IgG)]"
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: pausing)]"
-    echo " -s          [require same strandedness (GRO-seq)]"
+    echo " -s          [require same strand (GRO-seq)]"
+    echo " -S          [require opposite strand (Nascent-seq)]"
     echo "[OPTIONS: COMPUTE]"
     echo " -e          [use signal at TESR as B (default: genebody)]"
     echo " -t          [compute travelling rate (default: pausing rate)]"
@@ -63,7 +65,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:g:w:rc:f:seth ARG; do
+while getopts i:j:g:w:rc:f:sSeth ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
@@ -73,6 +75,7 @@ while getopts i:j:g:w:rc:f:seth ARG; do
         c) BAMFILECONTROL=$OPTARG;;
         f) CONFIG_FILTER=$OPTARG;;
         s) SAME_STRAND=1;;
+        S) OPPOSITE_STRAND=1;;
         e) TESR_MODE=1;;
         t) TR=1;;
 		h) HELP=1;;
@@ -125,6 +128,7 @@ ARG=""
 if [ ! -z "$ONLYPROTEINCODING" ]; then ARG=$(echo $ARG "-r "); fi
 if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
 if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-s "); fi
+if [ ! -z "$OPPOSITE_STRAND" ]; then ARG=$(echo $ARG "-S "); fi
 if [ ! -z "$TESR_MODE" ]; then ARG=$(echo $ARG "-e "); fi
 
 ## measure pol2 pausing

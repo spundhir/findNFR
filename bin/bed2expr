@@ -28,7 +28,8 @@ usage() {
     echo " -e <int>    [extend 3' end of reads by input number of bases (useful for ChIP-seq data)]"
     echo " -v <int>    [instead of giving expression for each replicate, output only the mean (deafult: 0)]"
     echo "             [assumes that consecutive input files are replicates 1 and 2, respectively]"
-    echo " -r          [require same strandedness]"
+    echo " -r          [require same strand]"
+    echo " -R          [require opposite strand]"
     echo " -n          [add 1 to all the raw expression counts - useful while taking log]"
     echo " -g <string> [genome (default: mm9)]"
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: tpm)]"
@@ -43,7 +44,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:s:mkde:v:rng:f:c:h ARG; do
+while getopts i:j:s:mkde:v:rRng:f:c:h ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         j) INPUTBAMFILES=$OPTARG;;
@@ -54,6 +55,7 @@ while getopts i:j:s:mkde:v:rng:f:c:h ARG; do
         e) INPUTEXTENDS=$OPTARG;;
         v) AVG=$OPTARG;;
         r) SAME_STRAND=1;;
+        R) OPPOSITE_STRAND=1;;
         n) ADDONE=1;;
         g) GENOME=$OPTARG;;
         f) CONFIG_FILTER=$OPTARG;;
@@ -156,6 +158,7 @@ if [ ! -z "$INPUTBAMCONTROL" ]; then
     if [ ! -z "$INPUTEXTENDS" ]; then ARG=$(echo $ARG "-e $INPUTEXTENDS "); ARG_CONTROL=$(echo $ARG_CONTROL "-e 0 "); fi
     if [ ! -z "$AVG" ]; then ARG=$(echo $ARG "-v $AVG "); ARG_CONTROL=$(echo $ARG_CONTROL "-v $AVG "); fi
     if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); ARG_CONTROL=$(echo $ARG_CONTROL "-r "); fi
+    if [ ! -z "$OPPOSITE_STRAND" ]; then ARG=$(echo $ARG "-R "); ARG_CONTROL=$(echo $ARG_CONTROL "-R "); fi
     if [ "$ADDONE" -eq 1 ]; then ARG=$(echo $ARG "-n "); ARG_CONTROL=$(echo $ARG_CONTROL "-n "); fi
     if [ ! -z "$GENOME" ]; then ARG=$(echo $ARG "-g $GENOME "); ARG_CONTROL=$(echo $ARG_CONTROL "-g $GENOME "); fi
     if [ ! -z "$CONFIG_FILTER" ]; then ARG=$(echo $ARG "-f $CONFIG_FILTER "); ARG_CONTROL=$(echo $ARG_CONTROL "-f $CONFIG_FILTER "); fi
@@ -197,12 +200,16 @@ else
         if [ -z "$REMOVE_DUPLICATE" ]; then
             if [ ! -z "$SAME_STRAND" ]; then
                 bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D -s
+            elif [ ! -z "$OPPOSITE_STRAND" ]; then
+                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D -S
             else
                 bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D
             fi
         else
             if [ ! -z "$SAME_STRAND" ]; then
                 bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -s
+            elif [ ! -z "$OPPOSITE_STRAND" ]; then
+                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -S
             else
                 bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10
             fi
@@ -224,6 +231,8 @@ else
         if [ -z "$REMOVE_DUPLICATE" ]; then
             if [ ! -z "$SAME_STRAND" ]; then
                 bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D -s
+            elif [ ! -z "$OPPOSITE_STRAND" ]; then
+                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D -S
             else
                 #echo "bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D"; exit;
                 bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D
@@ -231,6 +240,8 @@ else
         else
             if [ ! -z "$SAME_STRAND" ]; then
                 bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -s
+            elif [ ! -z "$OPPOSITE_STRAND" ]; then
+                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -S
             else
                 bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10
             fi
@@ -253,6 +264,8 @@ else
         if [ -z "$REMOVE_DUPLICATE" ]; then
             if [ ! -z "$SAME_STRAND" ]; then
                 bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D -s
+            elif [ ! -z "$OPPOSITE_STRAND" ]; then
+                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D -S
             else
                 #echo "bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D"; exit;
                 bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -D
@@ -260,6 +273,8 @@ else
         else
             if [ ! -z "$SAME_STRAND" ]; then
                 bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -s
+            elif [ ! -z "$OPPOSITE_STRAND" ]; then
+                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10 -S
             else
                 bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q 10
             fi
