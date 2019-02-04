@@ -162,8 +162,8 @@ fi
 ## create temporary BED file if input is from stdin
 <<"COMMENT"
 COMMENT
-#TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-TMP="VAmpr2lzRjsXS3gZG4fs1i9L4qryUvWH"
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+#TMP="VAmpr2lzRjsXS3gZG4fs1i9L4qryUvWH"
 if [ "$GTFFILE" == "stdin" ]; then
     while read LINE; do
         echo "${LINE}"
@@ -328,14 +328,14 @@ else
 fi
 
 ## print results to STDOUT
-paste $TMP.signalValues $TMP.signalValuesSameStrand $TMP.signalValuesOppositeStrand | sortBed -i stdin
+paste $TMP.signalValues $TMP.signalValuesSameStrand $TMP.signalValuesOppositeStrand | sortBed -i stdin | perl -ane '$F[3]=~s/\-[0-9]+$//g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sort -k 4,4 -k 9rg,9 -k 10rn,10 | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }'
 
 ## remove temporary file, if exists
 if [ "$GTFFILE" == "stdin" ]; then
     rm $TMP.gtf
 fi
 
-#rm $TMP.mostActiveTSS
+rm $TMP.mostActiveTSS
 rm $TMP.signalValues
 rm $TMP.signalValuesSameStrand
 rm $TMP.signalValuesOppositeStrand
