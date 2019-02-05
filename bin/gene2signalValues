@@ -55,9 +55,11 @@ usage() {
     echo " -d          [divergent mode: measure signal at NDR_UP, NDR_DOWN, genebody (default: TSSR, genebody)]"
 	echo " -h          [help]"
     echo "[NOTE]"
-    echo "             [genebody mode: TSSR/genebody]"
-    echo "             [tesr mode: TSSR/TESR]"
-    echo "             [divergent mode: NDR_UP/NDR_DOWN/genebody]"
+    echo "             [signal (genebody mode): TSSR/genebody]"
+    echo "             [signal (tesr mode): TSSR/TESR]"
+    echo "             [signal (divergent mode): NDR_UP/NDR_DOWN/genebody]"
+    echo "[OUTPUT]"
+    echo "             [chr start end name score strand gene coordinate (TSSR) signal (TSSR) distance (closest_tss) signal (per bam file)]"
 	echo
 	exit 0
 }

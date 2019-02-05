@@ -50,7 +50,7 @@ usage() {
     echo " -s          [require same strandedness (GRO-seq)]"
     echo " -a          [measure using raw read counts (default: RPKM normalized)]"
     echo "[OUTPUT]"
-    echo "             [\"... NDR_UP/NDR_DOWN/Genebody (per bam file)]"  
+    echo "             [chr start end name score strand gene coordinate (TSSR) signal (TSSR) distance (closest_tss) NDR_UP/NDR_DOWN/Genebody (per bam file)]"  
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -121,6 +121,6 @@ if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-s "); fi
 if [ ! -z "$RAW" ]; then ARG=$(echo $ARG "-a "); fi
 
 ## measure divergent transcription
-gene2signalValues -i $GTFFILE -j $BAMFILE -g $GENOME -f $CONFIG_FILTER -w $WINDOW $ARG -d
+gene2signalValues -i $GTFFILE -j $BAMFILE -g $GENOME -f $CONFIG_FILTER -w $WINDOW $ARG -d | perl -ane '$F[3]=~s/\-[0-9]+$//g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sort -k 4,4 -k 9rg,9 -k 10rn,10 | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }'
 
 >&2 echo "All done.. bye"
