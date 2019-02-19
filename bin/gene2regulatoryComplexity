@@ -73,8 +73,8 @@ usage() {
 	echo " -h          [help]"
     echo "[OUTPUT]"
     echo "             [chr start end gene score strand promoter_defined promoter dist_tss_up dist_tss_down signal_promoter (...) signal_distal (...)  weighted_signal_distal (...) chromatin_states (...)]"
-    echo "             [computed for each input BAM file: signal_promoter, signal_distal and weighted_signal]"
-    echo "             [eight chromatin states from ChromHMM: enhancer_active enhancer_poised enhancer_primed promoter_active promoter_bivalent repressed_heterochromatin repressed_polycomb transcribed]"
+    echo "             [per input BAM file: signal_promoter, signal_distal and weighted_signal]"
+    echo "             [chromatin states (8): enhancer_active enhancer_poised enhancer_primed promoter_active promoter_bivalent repressed_heterochromatin repressed_polycomb transcribed]"
 	echo
 	exit 0
 }
