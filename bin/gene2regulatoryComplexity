@@ -187,10 +187,11 @@ while read LINE; do
     TPM=$(echo $LINE | perl -ane 'if($F[0]!~/^rc/i || $_=~/^$/) { print "1"; } else { print "0" }')
     [ "$TPM" -eq "1" ] && continue;
 
-    ID=$(echo $LINE | perl -ane 'print "$F[0]"')
-    BAMFILE=$(echo $LINE | perl -ane 'print "$F[1]"')
-    CONTROLFILE=$(echo $LINE | perl -ane 'print "$F[2]"')
+    ID=$(echo $LINE | perl -ane 'print "$F[1]"')
+    BAMFILE=$(echo $LINE | perl -ane 'print "$F[2]"')
+    CONTROLFILE=$(echo $LINE | perl -ane 'print "$F[3]"')
     BROAD=$(echo $ID | perl -ane 'if($_!~/^$/ && ($_=~/h3k27me3/i || $_=~/h3k36me3/i || $_=~/h3k9me3/i || $_=~/h3k4me1/i)) { print "1"; } elsif($_!~/^$/) { print "0" }')
+
     if [ ! -s "$OUTDIR/peaks/$ID/PEAKS.BED" ]; then
         if [ -z "$CONTROLFILE" ]; then
             if [ "$BROAD" -eq 1 ]; then
@@ -224,7 +225,7 @@ echo "done"
 echo -n "Define gene promoter (`date`).. "
 if grep -qw h3k4me3 $CONFIGFILE; then
     if [ ! -s "$OUTDIR/GENES_PROMOTER.BED" ]; then
-        BAMFILE=$(grep -w h3k4me3 $CONFIGFILE | cut -f 2 -d " ")
+        BAMFILE=$(grep -w h3k4me3 $CONFIGFILE | cut -f 3 -d " ")
         gene2promoter -i $GENEFILE -j $BAMFILE -o $OUTDIR/peaks/h3k4me3 -n $WINDOW | sort -k 4,4 > $OUTDIR/GENES_PROMOTER.BED
     fi
 else
@@ -238,7 +239,7 @@ while read LINE; do
     TPM=$(echo $LINE | perl -ane 'if($F[0]!~/^rc/i || $_=~/^$/) { print "1"; } else { print "0" }')
     [ "$TPM" -eq "1" ] && continue;
 
-    ID=$(echo $LINE | perl -ane 'print "$F[0]"')
+    ID=$(echo $LINE | perl -ane 'print "$F[1]"')
     echo -e "$ID\t$OUTDIR/peaks/$ID/PEAKS.BED"
 done < $CONFIGFILE > $OUTDIR/chromatin_environment/peaks.config
 
@@ -246,9 +247,9 @@ while read LINE; do
     TPM=$(echo $LINE | perl -ane 'if($F[0]!~/^rc/i || $_=~/^$/ || $_!~/h3k/i) { print "1"; } else { print "0" }')
     [ "$TPM" -eq "1" ] && continue;
 
-    ID=$(echo $LINE | perl -ane 'print "$F[0]"')
-    FILE=$(echo $LINE | perl -ane '$F[1]=~s/^.*\///g; print $F[1];')
-    BAMPATH=$(echo $LINE | perl -ane '$F[1]=~s/\/[^\/]+$//g; print $F[1];')
+    ID=$(echo $LINE | perl -ane 'print "$F[1]"')
+    FILE=$(echo $LINE | perl -ane '$F[1]=~s/^.*\///g; print $F[2];')
+    BAMPATH=$(echo $LINE | perl -ane '$F[1]=~s/\/[^\/]+$//g; print $F[3];')
     echo -e "cell\t$ID\t$FILE"
 done < $CONFIGFILE > $OUTDIR/chromatin_environment/bam.config
 echo "done"
