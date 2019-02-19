@@ -164,8 +164,8 @@ fi
 ## create temporary BED file if input is from stdin
 <<"COMMENT"
 COMMENT
-TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-#TMP="VAmpr2lzRjsXS3gZG4fs1i9L4qryUvWH"
+#TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+TMP="VAmpr2lzRjsXS3gZG4fs1i9L4qryUvWH"
 if [ "$GTFFILE" == "stdin" ]; then
     while read LINE; do
         echo "${LINE}"

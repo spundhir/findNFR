@@ -25,6 +25,7 @@ SCORE_COL=5
 CHROMHMMPATH="/home/pundhir/software/ChromHMM"
 PROCESSOR=1
 STATES=15
+OUTDIR="."
 
 #### usage ####
 usage() {
@@ -34,43 +35,42 @@ usage() {
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: gene2distalEnvironment -i <file> -j <file> -k <dir> -l <file> -o <dir> [OPTIONS]"
 	echo "Options:"
-    echo " -i <file>   [configuration file containing list of histone peak files]"
-    echo "             [format: each line corresponds to absolute path of peak files corresponding to one epigenetic mark, eg.]"
-    echo "             [        <ID><SPACE|TAB>h3k27me3_peaks.bed]"
-    echo "             [        <ID><SPACE|TAB>h3k4me3_peaks.bed]"
-    echo "             [        <ID><SPACE|TAB>h3k4me1_peaks.bed]"
-    echo " -j <file>   [configuration file containing list of histone bam files]"
-    echo "             [format: each line corresponds to name of bam file for a single epigenetic mark, eg.]"
-    echo "             [        <CELL><TAB><ID><TAB>h3k27me3.bam]"
-    echo "             [        <CELL><TAB><ID><TAB>h3k4me3.bam]"
-    echo " -k <dir>    [absolute path to bam files provided in bam configuration file (-k)]"
+    echo " -i <file>   [configuration file containing list of peak files]"
+    echo "             [<id> <bedfile> (eg. h3k27me3 <PATH>/h3k27me3_peaks.bed]"
 	echo " -l <file>   [input genomic coordinates of promoters in BED format (can be stdin)]"
-    echo " -o <dir>    [output directory to store results]"
     echo "[OPTIONS]"
+    echo " -o <dir>    [output directory to store results (default: current directory)]"
     echo " -g <string> [genome (default: mm9)]"
-    echo " -c <int>    [column containing score information in histone peak files (default: 5)]"
+    echo " -c <int>    [column containing score information in peak files (default: 5)]"
     echo " -e <file>   [input genomic coordinates of enhancers in BED format]"
     echo "             [if provided, peaks overlapping enhancers will be used for analysis]"
     echo "[OPTIONS: ChromHMM]"
+    echo " -j <file>   [configuration file containing list of bam files]"
+    echo "             [<cell> <id> <bamfile> (eg. cell h3k27me3 h3k27me3_esc_Rep1.bam]"
+    echo " -k <dir>    [absolute path to bam files provided in bam configuration file (-j)]"
     echo " -t <dir>    [absolute path to ChromHMM jar file (default: /home/pundhir/software/ChromHMM)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
     echo " -s <int>    [number of ChromHMM states (default: 15)"
 	echo " -h          [help]"
+    echo "[OUTPUT]"
+    echo "               [chr start end gene score strand promoter_defined promoter dist_tss_up dist_tss_down signal_distal (...) weighted_signal_distal (...) chromatin_states (...)]"
+    echo "               [computed for each input peak: signal_distal weighted_signal_distal]"
+    echo "               [eight chromatin states from ChromHMM: enhancer_active enhancer_poised enhancer_primed promoter_active promoter_bivalent repressed_heterochromatin repressed_polycomb transcribed]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:k:l:o:g:c:e:t:p:s:h ARG; do
+while getopts i:l:o:g:c:e:j:k:t:p:s:h ARG; do
 	case "$ARG" in
         i) PEAKCONFIGFILE=$OPTARG;;
-        j) BAMCONFIGFILE=$OPTARG;;
-        k) BAMPATH=$OPTARG;;
 		l) PROMOTERFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         g) GENOME=$OPTARG;;
         c) SCORE_COL=$OPTARG;;
         e) ENHANCERFILE=$OPTARG;;
+        j) BAMCONFIGFILE=$OPTARG;;
+        k) BAMPATH=$OPTARG;;
         t) CHROMHMMPATH=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
         s) STATES=$OPTARG;;
@@ -86,7 +86,7 @@ fi
 >&2 echo
 >&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
 ## usage, if necessary file and directories are given/exist
-if [ ! -f "$PEAKCONFIGFILE" -o ! -f "$BAMCONFIGFILE" -o ! -d "$BAMPATH" -o -z "$PROMOTERFILE" ]; then
+if [ ! -f "$PEAKCONFIGFILE" -o -z "$PROMOTERFILE" ]; then
     echo
     echo "Error: one or more required paramter values not provided"
     echo
@@ -140,8 +140,14 @@ fi
 
 ## annotate peaks using genome segments defined by ChromHMM
 >&2 echo -n "Annotated peaks using genome segments defined by ChromHMM (`date`).. "
+ARG=""
 if [ ! -f "$OUTDIR/DISTALPEAKS.BED" ]; then
-    regions2classify -i $PEAKCONFIGFILE -j $BAMCONFIGFILE -k $BAMPATH -o $OUTDIR/chromhmm -g $GENOME -c $SCORE_COL -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/DISTALPEAKS.BED
+    if [ -f "$BAMCONFIGFILE" -a -d "$BAMPATH" ]; then
+        regions2classify -i $PEAKCONFIGFILE -j $BAMCONFIGFILE -k $BAMPATH -o $OUTDIR/chromhmm -g $GENOME -c $SCORE_COL -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/DISTALPEAKS.BED
+        ARG="-s 4"
+    else
+        regions2classify -i $PEAKCONFIGFILE -o $OUTDIR/chromhmm -g $GENOME -c $SCORE_COL -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/DISTALPEAKS.BED
+    fi
 fi
 >&2 echo "done"
 
@@ -152,10 +158,10 @@ COL=$(zless $OUTDIR/DISTALPEAKS.BED | grep -v start | head -n 1 | perl -ane '$co
 if [ -f "$ENHANCERFILE" ]; then
     TMP_SUB=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     intersectBed -a <(zless $OUTDIR/DISTALPEAKS.BED | grep -v start) -b $ENHANCERFILE -u > $TMP_SUB
-    bed2weightedSignal -i $PROMOTERFILE -j $TMP_SUB -g $GENOME -c $COL -s 4
+    bed2weightedSignal -i $PROMOTERFILE -j $TMP_SUB -g $GENOME -c $COL $ARG
     rm $TMP_SUB
 else
-    bed2weightedSignal -i $PROMOTERFILE -j $OUTDIR/DISTALPEAKS.BED -g $GENOME -c $COL -s 4
+    bed2weightedSignal -i $PROMOTERFILE -j $OUTDIR/DISTALPEAKS.BED -g $GENOME -c $COL $ARG
 fi
 >&2 echo "done"
 
