@@ -248,8 +248,8 @@ while read LINE; do
     [ "$TPM" -eq "1" ] && continue;
 
     ID=$(echo $LINE | perl -ane 'print "$F[1]"')
-    FILE=$(echo $LINE | perl -ane '$F[1]=~s/^.*\///g; print $F[2];')
-    BAMPATH=$(echo $LINE | perl -ane '$F[1]=~s/\/[^\/]+$//g; print $F[2];')
+    FILE=$(echo $LINE | perl -ane '$F[2]=~s/^.*\///g; print $F[2];')
+    BAMPATH=$(echo $LINE | perl -ane '$F[2]=~s/\/[^\/]+$//g; print $F[2];')
     echo -e "cell\t$ID\t$FILE"
 done < $CONFIGFILE > $OUTDIR/chromatin_environment/bam.config
 echo "done"
@@ -263,6 +263,7 @@ echo "done"
 
 ## gene2distalEnvironment (regions2classify, bed2weightedSignal)
 echo -n "Compute distal environment (`date`).. "
+#echo "cat $OUTDIR/GENES_PROMOTER.BED | gene2distalEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l stdin -o $OUTDIR/chromatin_environment/distal -g $GENOME -c 5 -t $CHROMHMMPATH -p $PROCESSOR -s $STATES"; exit
 if [ -z "$ENHANCERFILE" -a ! -f "$OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED" ]; then
     cat $OUTDIR/GENES_PROMOTER.BED | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[1]\t$F[8]\t$F[9]\n";' | gene2distalEnvironment -i $OUTDIR/chromatin_environment/peaks.config -j $OUTDIR/chromatin_environment/bam.config -k $BAMPATH -l stdin -o $OUTDIR/chromatin_environment/distal -g $GENOME -c 5 -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED 
 elif [ ! -f "$OUTDIR/chromatin_environment/DISTAL_ENVIRONMENT.BED" ]; then
@@ -271,6 +272,8 @@ fi
 echo "done"
 
 ## gene2chromatinInteractions (to-do)
+
+## gene2tfEnvironment (to-do)
 
 echo -n "Compile all the results together in one file (`date`).. "
 NCOL_PROMOTER=$(zless $OUTDIR/GENES_PROMOTER.BED | head -n 1 | perl -ane 'print scalar(@F);')
