@@ -249,7 +249,7 @@ while read LINE; do
 
     ID=$(echo $LINE | perl -ane 'print "$F[1]"')
     FILE=$(echo $LINE | perl -ane '$F[1]=~s/^.*\///g; print $F[2];')
-    BAMPATH=$(echo $LINE | perl -ane '$F[1]=~s/\/[^\/]+$//g; print $F[3];')
+    BAMPATH=$(echo $LINE | perl -ane '$F[1]=~s/\/[^\/]+$//g; print $F[2];')
     echo -e "cell\t$ID\t$FILE"
 done < $CONFIGFILE > $OUTDIR/chromatin_environment/bam.config
 echo "done"
