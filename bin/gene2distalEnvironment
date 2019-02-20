@@ -140,11 +140,9 @@ fi
 
 ## annotate peaks using genome segments defined by ChromHMM
 >&2 echo -n "Annotated peaks using genome segments defined by ChromHMM (`date`).. "
-ARG=""
 if [ ! -f "$OUTDIR/DISTALPEAKS.BED" ]; then
     if [ -f "$BAMCONFIGFILE" -a -d "$BAMPATH" ]; then
         regions2classify -i $PEAKCONFIGFILE -j $BAMCONFIGFILE -k $BAMPATH -o $OUTDIR/chromhmm -g $GENOME -c $SCORE_COL -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/DISTALPEAKS.BED
-        ARG="-s 4"
     else
         regions2classify -i $PEAKCONFIGFILE -o $OUTDIR/chromhmm -g $GENOME -c $SCORE_COL -t $CHROMHMMPATH -p $PROCESSOR -s $STATES > $OUTDIR/DISTALPEAKS.BED
     fi
@@ -154,6 +152,11 @@ fi
 ## assign annotated peaks to genes and compute weighted signal
 >&2 echo -n "Assign annotated peaks to genes and compute weighted signal (`date`).. "
 COL=$(zless $OUTDIR/DISTALPEAKS.BED | grep -v start | head -n 1 | perl -ane '$col="7"; for($i=8; $i<=scalar(@F); $i++) { $col.=",$i"; } print $col;')
+
+ARG=""
+if [ -f "$BAMCONFIGFILE" -a -d "$BAMPATH" ]; then
+    ARG="-s 4"
+fi
 
 if [ -f "$ENHANCERFILE" ]; then
     TMP_SUB=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)

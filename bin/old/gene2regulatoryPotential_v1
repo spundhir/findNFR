@@ -3,7 +3,6 @@
 
 GENOME="mm9"
 MIN_N_CLASS=1
-CONFIG_FILTER="chrEnv"
 
 #### usage ####
 usage() {
@@ -17,12 +16,8 @@ usage() {
     echo "             [format: chr start end name score strand (..)]"
 	echo " -j <file>   [input enhancer coordinates in BED format (can be stdin)]"
     echo "             [format: chr start end name score strand class (..)]"
-    echo " -k <file>   [configuration file containing list of BAM files used to compute regulatory complexity]"
-    echo "             [<id> <bamfile> (eg. chrEnv h3k27me3_esc_Rep1.bam)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
-    echo " -f <string> [filter bam files from configuration file based on input indentifier (default: chrEnv)]"
-    echo "[OPTIONS: class-based analysis]"
     echo " -c          [perform separate analysis for each enhancer class]"
     echo " -n <int>    [minimum number of enhancers within each class (default: 1)]"
 	echo " -h          [help]"
@@ -31,13 +26,11 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:k:g:f:cnh ARG; do
+while getopts i:j:g:cnh ARG; do
     case "$ARG" in
     i) GENE_FILE=$OPTARG;;
     j) ENHANCER_FILE=$OPTARG;;
-    k) CONFIG_FILE=$OPTARG;;
     g) GENOME=$OPTARG;;
-    f) CONFIG_FILTER=$OPTARG;;
     c) CLASS=1;;
     n) MIN_N_CLASS=$OPTARG;;
     h) HELP=1;;
@@ -45,7 +38,7 @@ while getopts i:j:k:g:f:cnh ARG; do
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ ! -f "$GENE_FILE" -o -z "$ENHANCER_FILE" -o -z "$CONFIG_FILE" -o "$HELP" ]; then
+if [ ! -f "$GENE_FILE" -o -z "$ENHANCER_FILE" -o "$HELP" ]; then
 	usage
 fi
 

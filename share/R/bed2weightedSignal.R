@@ -98,12 +98,12 @@ for(i in unlist(strsplit(opt$scoreCol, ","))) {
     j=j+1
 }
 
-j=ncol(df)+1
-for(i in unlist(strsplit(opt$scoreCol, ","))) {
-    i <- as.numeric(i)
-    df[,j] <- apply(df, 1, function(x) compute_count_signal(x[i]))
-    j=j+1
-}
+#j=ncol(df)+1
+#for(i in unlist(strsplit(opt$scoreCol, ","))) {
+#    i <- as.numeric(i)
+#    df[,j] <- apply(df, 1, function(x) compute_count_signal(x[i]))
+#    j=j+1
+#}
 
 if(!is.null(opt$segmentCol)) {
     opt$segmentCol <- as.numeric(opt$segmentCol)
