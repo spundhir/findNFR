@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 <<"copyright_info"
-gene2regulatoryComplexity: predict regulatory complexity of genes
+gene2chromatinEnvironment: predict chromatin environment of genes
 Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
 
 This program is free software: you can redistribute it and/or modify
@@ -40,16 +40,16 @@ STATES=15
 
 #### usage ####
 usage() {
-	echo Program: "gene2regulatoryComplexity (predict regulatory complexity of genes)"
+	echo Program: "gene2chromatinEnvironment (predict chromatin environment of genes)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: $VERSION
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: gene2regulatoryComplexity -i <file> -j <file> [OPTIONS]"
+	echo "Usage: gene2chromatinEnvironment -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input genomic coordinates of genes in BED format]"
     echo "             [format: chr start end name score strand]"
-    echo " -j <file>   [configuration file containing list of BAM files used to compute regulatory complexity]"
-    echo "             [<chrEnv> <id> <bamfile> <bamfileControl (optional)> (eg. RC h3k27me3 <PATH>/h3k27me3_esc_Rep1.bam]"
+    echo " -j <file>   [configuration file containing list of BAM files used to compute chromatin environment]"
+    echo "             [<chrEnv> <id> <bamfile> <bamfileControl (optional)> (eg. chrEnv h3k27me3 <PATH>/h3k27me3_esc_Rep1.bam]"
     echo "[OPTIONS]"
     echo " -o <dir>    [output directory to store results (default: analysis)"
     echo " -m <string> [genome (default: mm9)]"
