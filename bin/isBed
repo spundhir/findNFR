@@ -1,0 +1,47 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+#### usage ####
+usage() {
+	echo Program: "isBed (check if input file is in BED format)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: isBed -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file (can be stdin)]"
+    echo " -h          [help]"
+    echo "[OUTPUT]"
+	echo "             [0: file is in BED format]"
+    echo "             [1: file is not in BED format]"
+	exit 0
+}
+
+#### parse options ####
+while getopts i:h ARG; do
+    case "$ARG" in
+    i) INFILE=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$INFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo -e "${LINE}"
+    done > $TMP
+    INFILE=$TMP
+fi
+
+echo $(zless $INFILE | perl -ane 'BEGIN { $status=0; } if($F[1]!~/^[0-9]+$/ && $F[2]!~/^[0-9]+$/ && $status==0) { $status=1; last } END { print "$status\n"; }')
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi

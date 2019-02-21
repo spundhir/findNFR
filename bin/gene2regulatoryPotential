@@ -18,8 +18,9 @@ usage() {
     echo "             [format: chr start end name score strand (..)]"
 	echo " -j <file>   [input enhancer coordinates in BED format (can be stdin)]"
     echo "             [format: chr start end name score strand class (..)]"
-    echo " -k <file>   [configuration file containing list of BAM files used to compute regulatory complexity]"
+    echo " -k <file>   [configuration file containing list of BAM/BED files used to compute regulatory complexity]"
     echo "             [<id> <bamfile> (eg. RP h3k27me3_esc_Rep1.bam)]"
+    echo "             [<id> <bedfile> (eg. RP h3k4me3_esc_Rep1.bed)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: RP)]"
@@ -30,6 +31,9 @@ usage() {
     echo " -c          [perform separate analysis for each enhancer class]"
     echo " -n <int>    [minimum number of enhancers within each class (default: 1)]"
 	echo " -h          [help]"
+    echo "[NOTE]"
+    echo "             [bed file format, if score is to be used in calculations]"
+    echo "             [chr start name score strand]"
 	echo
 	exit 0
 }
@@ -67,44 +71,114 @@ else
 fi
 
 if [ -z "$CLASS" ]; then
+    #####################################
     ## create temporary output directory
+    #####################################
     #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     TMP="xajcIXJtLKpFbP72GH1SZk4MEzxAjVyN"
     if [ ! -d "$TMP" ]; then mkdir $TMP; fi
 
+    #####################################
+    ## check, if BED file exists in input config file
+    #####################################
+    BEDFILES=()
+    while read LINE; do
+        if [ "$(isBed -i $LINE)" -eq "0" ]; then
+            BEDFILES+=($LINE)
+        fi;
+    done < <(zless $CONFIG_FILE  | perl -ane 'print "$F[1]\n";')
+
+    #####################################
+    ## create configuration file containing only BAM files
+    #####################################
+    while read LINE; do
+        if [ "$(isBam -i $LINE)" -eq "0" ]; then
+            echo -e "$CONFIG_FILTER\t$LINE"
+        fi;
+    done < <(zless $CONFIG_FILE  | perl -ane 'print "$F[1]\n";') > $TMP/BAM.CONFIG
+    CONFIG_FILE="$TMP/BAM.CONFIG"
+
+    #####################################
     ## define gene promoters
+    #####################################
     if [ ! -z "$H3K4ME3_FILE" ]; then
         gene2promoter -i $PROMOTER_FILE -j $H3K4ME3_FILE -o $TMP -n $WINDOW | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $TMP/PROMOTER.BED
-        PROMOTER_FILE="$TMP/PROMOTER.BED"
+    elif [ "$(zless $PROMOTER_FILE | cut -f 8 | grep -E '\:[0-9]+\-[0-9]+' | wc -l)" -ge "1" -a "$(zless $PROMOTER_FILE | cut -f 7 | grep 'Y\|N' | wc -l)" -ge "1" ]; then
+        zless $PROMOTER_FILE | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $TMP/PROMOTER.BED
+    else
+        zless $PROMOTER_FILE | bed2window -i stdin -x -w 250 > $TMP/PROMOTER.BED
     fi
 
+    #####################################
     ## define enhancers
+    #####################################
     if [ "$ENHANCER_FILE" == "stdin" ]; then
         while read LINE; do
             echo ${LINE}
         done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP/ENHANCER.BED
         ENHANCER_FILE="$TMP/ENHANCER.BED"
+    else
+        zless $ENHANCER_FILE > $TMP/ENHANCER.BED
+        ENHANCER_FILE="$TMP/ENHANCER.BED"
     fi
 
-    ## compute signal values at promoters
-    if [ ! -s "$TMP/PROMOTER.BED.tpm" ]; then
-        bed2expr -i $PROMOTER_FILE -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER > $TMP/PROMOTER.BED.tpm
+    #####################################
+    ## compute proximal regulatory potential of genes using BAM files
+    #####################################
+    if [ ! -s "$TMP/PROMOTER.BED.proximalRP" ]; then
+        bed2expr -i $TMP/PROMOTER.BED -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER > $TMP/PROMOTER.BED.proximalRP
     fi
 
-    ## compute signal values at enhancers
+    #####################################
+    ## compute proximal regulatory potential of genes using BED files
+    #####################################
+    if [ "${#BEDFILES[@]}" -gt 0 ]; then
+        for (( i=0; i<${#BEDFILES[@]}; i++ )); do
+            >&2 echo ${BEDFILES[$i]}
+            NCOL=$(head -n 1 $TMP/PROMOTER.BED.proximalRP | perl -ane 'print scalar(@F);')
+            intersectBed -a $TMP/PROMOTER.BED.proximalRP -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $(($NCOL+4+$i)) -o sum -n $NCOL > $TMP/$TMP/PROMOTER.BED.proximalRP.tmp
+            mv $TMP/$TMP/PROMOTER.BED.proximalRP.tmp $TMP/$TMP/PROMOTER.BED.proximalRP
+        done
+    fi
+    
+    #####################################
+    ## compute distal regulatory potential of genes using BAM files
+    #####################################
     if [ ! -s "$TMP/ENHANCER.BED.tpm" ]; then
-        bed2expr -i $ENHANCER_FILE -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER > $TMP/ENHANCER.BED.tpm
+        bed2expr -i $TMP/ENHANCER.BED -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER > $TMP/ENHANCER.BED.tpm
     fi
 
+    #####################################
+    ## compute distal regulatory potential of genes using BED files
+    #####################################
+    if [ "${#BEDFILES[@]}" -gt 0 ]; then
+        for (( i=0; i<${#BEDFILES[@]}; i++ )); do
+            >&2 echo ${BEDFILES[$i]}
+            NCOL=$(head -n 1 $TMP/PROMOTER.BED.proximalRP | perl -ane 'print scalar(@F);')
+            intersectBed -a $TMP/PROMOTER.BED.proximalRP -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $(($NCOL+4+$i)) -o sum -n $NCOL > $TMP/$TMP/PROMOTER.BED.proximalRP.tmp
+            mv $TMP/$TMP/PROMOTER.BED.proximalRP.tmp $TMP/$TMP/PROMOTER.BED.proximalRP
+        done
+    fi
+    
+    #####################################
     ## determine score column information
+    #####################################
     NCOL_PROMOTER_FILE=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F);')
     NCOL_ENHANCER_FILE=$(head -n 1 $ENHANCER_FILE | perl -ane 'print scalar(@F);')
     NCOL_SCORE_COL=$(zless $TMP/ENHANCER.BED.tpm | grep -v start | head -n 1 | perl -ane 'for($i='$((NCOL_ENHANCER_FILE+1))'; $i<=scalar(@F); $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
     #echo -e "$NCOL_PROMOTER_FILE\t$NCOL_ENHANCER_FILE\t$NCOL_SCORE_COL"; exit
 
-    ## compute weighted signal and arrange final output
-    bed2weightedSignal -i $PROMOTER_FILE -j $TMP/ENHANCER.BED.tpm -g $GENOME -c $NCOL_SCORE_COL > $TMP/PROMOTER.BED.ws
-    paste $TMP/PROMOTER.BED.tpm $TMP/PROMOTER.BED.ws
+    #####################################
+    ## compute total and weighted signal
+    #####################################
+    if [ ! -s "$TMP/PROMOTER.BED.distalRP" ]; then
+        bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/ENHANCER.BED.tpm -g $GENOME -c $NCOL_SCORE_COL > $TMP/PROMOTER.BED.distalRP
+    fi
+
+    #####################################
+    ## arrange final output
+    #####################################
+    paste $PROMOTER_FILE <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
 else
     TMP_ENHANCER=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     if [ ! -z "$CLASS" -a "$NCOL_SCORE_COL" -eq 1 ]; then

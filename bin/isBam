@@ -1,0 +1,37 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+#### usage ####
+usage() {
+	echo Program: "isBam (check if input file is in BAM format)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: isBam -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file]"
+    echo " -h          [help]"
+    echo "[OUTPUT]"
+	echo "             [0: file is in BAM format]"
+    echo "             [1: file is not in BAM format]"
+	exit 0
+}
+
+#### parse options ####
+while getopts i:h ARG; do
+    case "$ARG" in
+    i) INFILE=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INFILE" -o "$HELP" ]; then
+	usage
+fi
+
+if [ "$(samtools view -H $INFILE 2>/dev/null | wc -l)" -gt "0" ]; then
+    echo 0
+else
+    echo 1
+fi
