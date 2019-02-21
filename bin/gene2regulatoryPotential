@@ -86,7 +86,7 @@ if [ -z "$CLASS" ]; then
         if [ "$(isBed -i $LINE)" -eq "0" ]; then
             BEDFILES+=($LINE)
         fi;
-    done < <(zless $CONFIG_FILE  | perl -ane 'print "$F[1]\n";')
+    done < <(zless $CONFIG_FILE  | perl -ane 'if($F[0]=~/^'$CONFIG_FILTER'/) { print "$F[1]\n"; }')
 
     #####################################
     ## create configuration file containing only BAM files
@@ -95,7 +95,7 @@ if [ -z "$CLASS" ]; then
         if [ "$(isBam -i $LINE)" -eq "0" ]; then
             echo -e "$CONFIG_FILTER\t$LINE"
         fi;
-    done < <(zless $CONFIG_FILE  | perl -ane 'print "$F[1]\n";') > $TMP/BAM.CONFIG
+    done < <(zless $CONFIG_FILE  | perl -ane 'if($F[0]=~/^'$CONFIG_FILTER'/) { print "$F[1]\n"; }') > $TMP/BAM.CONFIG
     CONFIG_FILE="$TMP/BAM.CONFIG"
 
     #####################################
