@@ -166,7 +166,10 @@ if [ -z "$CLASS" ]; then
     ## arrange final output
     #####################################
     NCOL_PROMOTER_FILE=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F);')
-    paste <(bed2longestRegion -i $PROMOTER_FILE) <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
+    ## problm with chrMT
+    #paste <(bed2longestRegion -i $PROMOTER_FILE) <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
+    paste $TMP/PROMOTER.BED <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
+    
 else
     TMP_ENHANCER=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     if [ ! -z "$CLASS" -a "$NCOL_SCORE_COL" -eq 1 ]; then
