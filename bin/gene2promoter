@@ -43,7 +43,7 @@ usage() {
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: gene2promoter -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
-	echo " -i <file>   [input genomic coordinates of genes in BED format]"
+	echo " -i <file>   [input genomic coordinates of genes in BED format (can be stdin)]"
     echo " -j <file>   [h3k4me3 modification data in BAM format]"
     echo "             [if multiple, please separate them by a comma]"
     echo "[OPTIONS]"

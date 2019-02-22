@@ -79,7 +79,7 @@ if [ -z "$CLASS" ]; then
     if [ ! -d "$TMP" ]; then mkdir $TMP; fi
 
     #####################################
-    ## check, if BED file exists in input config file
+    ## check, if BED file(s) exist in input config file
     #####################################
     BEDFILES=()
     while read LINE; do
@@ -101,12 +101,14 @@ if [ -z "$CLASS" ]; then
     #####################################
     ## define gene promoters
     #####################################
-    if [ ! -z "$H3K4ME3_FILE" ]; then
-        gene2promoter -i $PROMOTER_FILE -j $H3K4ME3_FILE -o $TMP -n $WINDOW | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $TMP/PROMOTER.BED
-    elif [ "$(zless $PROMOTER_FILE | cut -f 8 | grep -E '\:[0-9]+\-[0-9]+' | wc -l)" -ge "1" -a "$(zless $PROMOTER_FILE | cut -f 7 | grep 'Y\|N' | wc -l)" -ge "1" ]; then
-        zless $PROMOTER_FILE | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $TMP/PROMOTER.BED
-    else
-        zless $PROMOTER_FILE | bed2window -i stdin -x -w 250 > $TMP/PROMOTER.BED
+    if [ ! -s "$TMP/PROMOTER.BED" ]; then
+        if [ ! -z "$H3K4ME3_FILE" ]; then
+            bed2longestRegion -i $PROMOTER_FILE | gene2promoter -i stdin -j $H3K4ME3_FILE -o $TMP -n $WINDOW | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $TMP/PROMOTER.BED
+        elif [ "$(zless $PROMOTER_FILE | cut -f 8 | grep -E '\:[0-9]+\-[0-9]+' | wc -l)" -ge "1" -a "$(zless $PROMOTER_FILE | cut -f 7 | grep 'Y\|N' | wc -l)" -ge "1" ]; then
+            bed2longestRegion -i $PROMOTER_FILE | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $TMP/PROMOTER.BED
+        else
+            bed2longestRegion -i $PROMOTER_FILE | bed2window -i stdin -x -w 250 > $TMP/PROMOTER.BED
+        fi
     fi
 
     #####################################
@@ -155,7 +157,7 @@ if [ -z "$CLASS" ]; then
 
         NCOL_ENHANCER_FILE=$(head -n 1 $ENHANCER_FILE | perl -ane 'print scalar(@F);')
         NCOL_SCORE_COL=$(zless $TMP/ENHANCER.BED.tpm | grep -v start | head -n 1 | perl -ane 'for($i='$((NCOL_ENHANCER_FILE+1))'; $i<=scalar(@F); $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
-        #echo -e "$NCOL_PROMOTER_FILE\t$NCOL_ENHANCER_FILE\t$NCOL_SCORE_COL"; exit
+        #echo -e "$NCOL_ENHANCER_FILE\t$NCOL_SCORE_COL"; exit
 
         bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/ENHANCER.BED.tpm -g $GENOME -c $NCOL_SCORE_COL > $TMP/PROMOTER.BED.distalRP
     fi

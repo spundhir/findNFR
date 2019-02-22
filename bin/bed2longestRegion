@@ -1,0 +1,50 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+#### usage ####
+usage() {
+	echo Program: "bed2longestRegion (filter longest region for each name in a BED file)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2longestRegion -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file (can be stdin)]"
+    echo "             [chr start end name score strand]"
+    echo " -h          [help]"
+	exit 0
+}
+
+#### parse options ####
+while getopts i:h ARG; do
+    case "$ARG" in
+    i) INFILE=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$INFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo -e "${LINE}"
+    done > $TMP
+    INFILE=$TMP
+fi
+
+NCOL=$(head -n 1 $INFILE | perl -ane 'print scalar(@F);')
+if [ "$NCOL" -ge "4" ]; then
+    zless $INFILE | perl -ane '$len=$F[2]-$F[1]; chomp($_); print "$_\t$len\n";' | sort -k 4,4 -k $((NCOL+1))rn,$((NCOL+1)) | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }' | cut -f 1-$((NCOL))
+else
+    zless $INFILE
+fi
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
