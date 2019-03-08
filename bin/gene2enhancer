@@ -1,0 +1,116 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+gene2enhancer: associate genes with closest enhancers
+Copyright (C) 2017  Sachin Pundhir (pundhir@binf.ku.dk)
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+GENOME="mm9"
+SCORE_COL=5
+
+#### usage ####
+usage() {
+	echo Program: "gene2enhancer (associate genes with closest enhancers)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: gene2enhancer -i <file> -j <file>"
+	echo "Options:"
+	echo " -i <file>     [input file containing genomic coordinates of genes in BED format (can be stdin)]"
+    echo "               [format: chr start end gene_name score strand (..)]"
+	echo " -j <file>     [input file containing genomic coordinates of enhancers in BED format]"
+    echo "               [format: chr start end name score strand (..)]"
+    echo "[OPTIONS]"
+    echo " -g <string>   [genome (default: mm9)]"
+    echo " -c <int>      [column containing score information in enhancer file; -j argument (default: 5)]"
+    echo "               [if multiple, please separate them by a comma or hyphen]"
+	echo " -h            [help]"
+    echo "[NOTE]"
+    echo " Peaks overlapping with gene promoters will be excluded from analysis (1000 bp up-stream to TSS)]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:c:s:vyh ARG; do
+	case "$ARG" in
+		i) PROMOTERFILE=$OPTARG;;
+		j) ENHANCERFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        c) SCORE_COL=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$PROMOTERFILE" -o ! -f "$ENHANCERFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+elif [ "$GENOME" == "rn5" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/rat.rn5.genome"
+else
+    echo "Presently the program only support analysis for mm9, hg19 or rn5"
+    echo
+    usage
+fi
+
+## create temporary BED file if input is from stdin
+#TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+TMP="SSvWjPiElECr4pnScNyxXgzTs9TCAAeB"
+if [ "$PROMOTERFILE" == "stdin" ]; then
+    while read LINE; do
+        echo -e "${LINE}"
+    done
+else
+    zless $PROMOTERFILE
+fi | bed2window -i stdin -w 1000 -t > $TMP
+PROMOTERFILE=$TMP
+
+## check, if input files are in correct format
+if [ "$(isBed -i $PROMOTERFILE -s)" -eq 1 ]; then
+    echo "ERROR: $PROMOTERFILE is not in correct BED format. Please check!!"
+    usage
+fi
+
+if [ "$(isBed -i $ENHANCERFILE -s)" -eq 1 ]; then
+    echo "ERROR: $ENHANCERFILE is not in correct BED format. Please check!!"
+    usage
+fi
+
+## reformat score columns based on number of fields in region file
+NCOL_PROMOTER=$(zless $PROMOTERFILE | head -n 1 | perl -ane 'print scalar(@F);')
+NCOL_ENHANCER=$(zless $ENHANCERFILE | head -n 1 | perl -ane 'print scalar(@F);')
+
+SCORE_COL=$(echo $SCORE_COL | perl -ane '@matches=$_=~/[0-9]+\-[0-9]+/g; for($i=0; $i<scalar(@matches); $i++) { @t=split(/\-/,$matches[$i]); $seq=$t[0]; while($t[0]<$t[1]) { $t[0]++; $seq="$seq,$t[0]"; } $_=~s/$matches[$i]/$seq/g; } print $_;')
+
+## compute signal at each input region
+DISTANCE_COL=$(($NCOL_PROMOTER+$NCOL_ENHANCER+1))
+
+<<"COMMENT"
+COMMENT
+TMP_CLOSESTBED=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+closestBed -a <(zless $ENHANCERFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL,$DISTANCE_COL -o mean -n $NCOL_PROMOTER
+
+## remove temporary file, if exists
+rm $TMP;
+
+exit

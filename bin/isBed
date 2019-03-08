@@ -10,6 +10,9 @@ usage() {
 	echo "Usage: isBed -i <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input file (can be stdin)]"
+    echo "[OPTIONS]"
+    echo " -s          [check for six column format (default three column)]"
+    echo "             [chr start end name score strand]"
     echo " -h          [help]"
     echo "[OUTPUT]"
 	echo "             [0: file is in BED format]"
@@ -18,9 +21,10 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:h ARG; do
+while getopts i:sh ARG; do
     case "$ARG" in
     i) INFILE=$OPTARG;;
+    s) SIXCOL=1;;
     h) HELP=1;;
     esac
 done
@@ -39,7 +43,11 @@ if [ "$INFILE" == "stdin" ]; then
     INFILE=$TMP
 fi
 
-echo $(zless $INFILE | perl -ane 'BEGIN { $status=0; } if($F[1]!~/^[0-9]+$/ && $F[2]!~/^[0-9]+$/ && $status==0) { $status=1; last } END { print "$status\n"; }')
+if [ -z "$SIXCOL" ]; then
+    echo $(zless $INFILE | perl -ane 'BEGIN { $status=0; } if($F[1]!~/^[0-9]+$/ && $F[2]!~/^[0-9]+$/ && $status==0) { $status=1; last } END { print "$status\n"; }')
+else
+    echo $(zless $INFILE | perl -ane 'BEGIN { $status=0; } if($F[1]!~/^[0-9]+$/ && $F[2]!~/^[0-9]+$/ && $F[4]!~/^[0-9]+$/ && $status==0) { $status=1; last } END { print "$status\n"; }')
+fi
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
