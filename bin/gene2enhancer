@@ -41,7 +41,7 @@ usage() {
     echo "               [eg. active, primed etc]"
 	echo " -h            [help]"
     echo "[OUTPUT]"
-    echo "               [<gene coor> total_signal_distal (...) weighted_signal_distal (...) enhancers_count]"
+    echo "               [<gene coor> total_signal_distal (...) weighted_signal_distal (...) enhancers_count class_frequency_info (if -l)]"
     echo "               [computed for each score col: total_signal_distal weighted_signal_distal]"
     echo "[NOTE]"
     echo " Peaks overlapping with gene promoters will be excluded from analysis (1000 bp up-stream to TSS)]"
@@ -80,8 +80,8 @@ else
 fi
 
 ## create temporary BED file if input is from stdin
-#TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-TMP="SSvWjPiElECr4pnScNyxXgzTs9TCAAeB"
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+#TMP="SSvWjPiElECr4pnScNyxXgzTs9TCAAeB"
 if [ "$PROMOTERFILE" == "stdin" ]; then
     while read LINE; do
         echo -e "${LINE}"
