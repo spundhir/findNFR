@@ -43,8 +43,8 @@ usage() {
     echo " -y            [compute using both overlap and closest approach (default is closest approach)]"
 	echo " -h            [help]"
     echo "[OUTPUT]"
-    echo "               [chr start end gene score strand promoter_defined promoter dist_tss_up dist_tss_down signal_distal (...) weighted_signal_distal (...) chromatin_states (...)]"
-    echo "               [computed for each input peak: signal_distal weighted_signal_distal]"
+    echo "               [chr start end gene score strand promoter_defined promoter dist_tss_up dist_tss_down total_signal_distal (...) weighted_signal_distal (...) chromatin_states (...)]"
+    echo "               [computed for each input peak: total_signal_distal weighted_signal_distal]"
     echo "               [eight chromatin states from ChromHMM: enhancer_active enhancer_poised enhancer_primed promoter_active promoter_bivalent repressed_heterochromatin repressed_polycomb transcribed]"
 	echo
 	exit 0

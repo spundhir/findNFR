@@ -37,7 +37,12 @@ usage() {
     echo " -g <string>   [genome (default: mm9)]"
     echo " -c <int>      [column containing score information in enhancer file; -j argument (default: 5)]"
     echo "               [if multiple, please separate them by a comma or hyphen]"
+    echo " -l <int>      [column containing class information in enhancer file; -j argument]"
+    echo "               [eg. active, primed etc]"
 	echo " -h            [help]"
+    echo "[OUTPUT]"
+    echo "               [<gene coor> total_signal_distal (...) weighted_signal_distal (...) enhancers_count]"
+    echo "               [computed for each score col: total_signal_distal weighted_signal_distal]"
     echo "[NOTE]"
     echo " Peaks overlapping with gene promoters will be excluded from analysis (1000 bp up-stream to TSS)]"
 	echo
@@ -45,12 +50,13 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:g:c:s:vyh ARG; do
+while getopts i:j:g:c:l:s:vyh ARG; do
 	case "$ARG" in
 		i) PROMOTERFILE=$OPTARG;;
 		j) ENHANCERFILE=$OPTARG;;
         g) GENOME=$OPTARG;;
         c) SCORE_COL=$OPTARG;;
+        l) CLASS_COL=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -108,7 +114,14 @@ DISTANCE_COL=$(($NCOL_PROMOTER+$NCOL_ENHANCER+1))
 <<"COMMENT"
 COMMENT
 TMP_CLOSESTBED=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-closestBed -a <(zless $ENHANCERFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL,$DISTANCE_COL -o mean -n $NCOL_PROMOTER
+if [ ! -z "$CLASS_COL" ]; then
+    closestBed -a <(zless $ENHANCERFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL,$DISTANCE_COL,$CLASS_COL -o collapse -n $NCOL_PROMOTER | $FINDNFRPATH/share/R/bed2weightedSignal.R -i stdin -s $SCORE_COL -d $(($DISTANCE_COL-$NCOL_PROMOTER)) -w 10000 -t $((($DISTANCE_COL-$NCOL_PROMOTER)+1)) 
+else
+    closestBed -a <(zless $ENHANCERFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER | $FINDNFRPATH/share/R/bed2weightedSignal.R -i stdin -s $SCORE_COL -d $(($DISTANCE_COL-$NCOL_PROMOTER)) -w 10000
+fi
+#echo -e "$SCORE_COL\t$DISTANCE_COL\t$NCOL_PROMOTER\t$NCOL_ENHANCER"
+#echo -e $(($DISTANCE_COL-$NCOL_PROMOTER))
+#echo -e $((($DISTANCE_COL-$NCOL_PROMOTER)+1))
 
 ## remove temporary file, if exists
 rm $TMP;

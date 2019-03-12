@@ -18,7 +18,7 @@ usage() {
     echo "             [format: chr start end name score strand (..)]"
 	echo " -j <file>   [input enhancer coordinates in BED format (can be stdin)]"
     echo "             [format: chr start end name score strand (class ..)]"
-    echo " -k <file>   [configuration file containing list of BAM/BED files used to compute regulatory complexity]"
+    echo " -k <file>   [configuration file containing list of BAM/BED files used to compute regulatory potential]"
     echo "             [<id> <bamfile> (eg. RP h3k27me3_esc_Rep1.bam)]"
     echo "             [<id> <bedfile> (eg. RP h3k4me3_esc_Rep1.bed)]"
     echo "[OPTIONS]"
@@ -33,7 +33,7 @@ usage() {
 	echo " -h          [help]"
     echo "[NOTE]"
     echo "             [bed file format, if score is to be used in calculations]"
-    echo "             [chr start name score strand]"
+    echo "             [chr start end name score strand]"
 	echo
 	exit 0
 }
