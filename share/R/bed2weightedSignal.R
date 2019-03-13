@@ -77,23 +77,27 @@ compute_weighted_signal <- function(signal, distance, mu) {
 #############################################
 ## compute total signal
 #############################################
-j=ncol(df)+1
-for(i in unlist(strsplit(opt$scoreCol, ","))) {
-    i <- as.numeric(i)
-    df[,j] <- apply(df, 1, function(x) compute_total_signal(x[i]))
-    j=j+1
-}
+#j=ncol(df)+1
+#for(i in unlist(strsplit(opt$scoreCol, ","))) {
+#    i <- as.numeric(i)
+#    df[,j] <- apply(df, 1, function(x) compute_total_signal(x[i]))
+#    j=j+1
+#}
+TOTAL <- apply(df[,as.numeric(unlist(strsplit(opt$scoreCol,",")))], 2, function(y) unlist(lapply(y, function(x) sum(as.numeric(unlist(strsplit(as.character(x),",")))))))
+df <- cbind(df, TOTAL)
 
 #############################################
 ## compute weighted signal
 #############################################
-j=ncol(df)+1
-for(i in unlist(strsplit(opt$scoreCol, ","))) {
-    i <- as.numeric(i)
-    ## MU is set to 2kb
-    df[,j] <- apply(df, 1, function(x) compute_weighted_signal(x[i], x[opt$distanceCol], 2))
-    j=j+1
-}
+#j=ncol(df)+1
+#for(i in unlist(strsplit(opt$scoreCol, ","))) {
+#    i <- as.numeric(i)
+#    ## MU is set to 2kb
+#    df[,j] <- apply(df, 1, function(x) compute_weighted_signal(x[i], x[opt$distanceCol], 2))
+#    j=j+1
+#}
+WS <- apply(df[,as.numeric(unlist(strsplit(opt$scoreCol,",")))], 2, function(x) unlist(lapply(seq(1:length(x)), function(y) compute_weighted_signal(x[y], df[y,opt$distanceCol], 2))))
+df <- cbind(df, WS)
 
 #############################################
 ## compute enhancer count
@@ -124,9 +128,11 @@ if(!is.null(opt$segmentCol)) {
 #df_output <- df[,c(which(!seq(1:ncol(df)) %in% c(as.numeric(unlist(strsplit(opt$scoreCol, ","))), opt$distanceCol, opt$segmentCol)))]
 if(!is.null(opt$segmentCol)) {
     #print(c(1:(as.numeric(unlist(strsplit(opt$scoreCol, ",")))[1]-1),(opt$distanceCol+1):ncol(df)))
-    df_output <- df[,c(1:(as.numeric(unlist(strsplit(opt$scoreCol, ",")))[1]-1),(opt$distanceCol+2):ncol(df))]
+    #df_output <- df[,c(1:(as.numeric(unlist(strsplit(opt$scoreCol, ",")))[1]-1),(opt$distanceCol+2):ncol(df))]
+    df_output <- cbind(df[,c(1:(as.numeric(unlist(strsplit(opt$scoreCol, ",")))[1]-1))], TOTAL, WS, COUNT, df_segments)
 } else {
-    df_output <- df[,c(1:(as.numeric(unlist(strsplit(opt$scoreCol, ",")))[1]-1),(opt$distanceCol+1):ncol(df))]
+    #df_output <- df[,c(1:(as.numeric(unlist(strsplit(opt$scoreCol, ",")))[1]-1),(opt$distanceCol+1):ncol(df))]
+    df_output <- cbind(df[,c(1:(as.numeric(unlist(strsplit(opt$scoreCol, ",")))[1]-1))], TOTAL, WS, COUNT)
 }
 
 #############################################
