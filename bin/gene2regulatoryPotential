@@ -114,12 +114,12 @@ if [ -z "$CLASS" ]; then
     #####################################
     ## define enhancers
     #####################################
-    if [ "$ENHANCER_FILE" == "stdin" ]; then
+    if [ "$ENHANCER_FILE" == "stdin" -a ! -s "$TMP/ENHANCER.BED" ]; then
         while read LINE; do
             echo ${LINE}
         done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP/ENHANCER.BED
         ENHANCER_FILE="$TMP/ENHANCER.BED"
-    else
+    elif [ ! -s "$TMP/ENHANCER.BED" ]; then
         zless $ENHANCER_FILE > $TMP/ENHANCER.BED
         ENHANCER_FILE="$TMP/ENHANCER.BED"
     fi
@@ -168,7 +168,7 @@ if [ -z "$CLASS" ]; then
     NCOL_PROMOTER_FILE=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F);')
     ## problm with chrMT
     #paste <(bed2longestRegion -i $PROMOTER_FILE) <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
-    paste $TMP/PROMOTER.BED <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
+    paste $TMP/PROMOTER.BED <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | grep -v COUNT | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
     
 else
     TMP_ENHANCER=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
