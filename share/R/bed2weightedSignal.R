@@ -83,8 +83,13 @@ compute_weighted_signal <- function(signal, distance, mu) {
 #    df[,j] <- apply(df, 1, function(x) compute_total_signal(x[i]))
 #    j=j+1
 #}
-TOTAL <- apply(df[,as.numeric(unlist(strsplit(opt$scoreCol,",")))], 2, function(y) unlist(lapply(y, function(x) sum(as.numeric(unlist(strsplit(as.character(x),",")))))))
-df <- cbind(df, TOTAL)
+if(length(length(unlist(strsplit(opt$scoreCol,",")))) > 1) {
+    TOTAL <- apply(df[,as.numeric(unlist(strsplit(opt$scoreCol,",")))], 2, function(y) unlist(lapply(y, function(x) sum(as.numeric(unlist(strsplit(as.character(x),",")))))))
+    df <- cbind(df, TOTAL)
+} else {
+    TOTAL <- unlist(lapply(df[,c(as.numeric(opt$scoreCol))], function(x) sum(as.numeric(unlist(strsplit(as.character(x),","))))))
+    df <- cbind(df, TOTAL)
+}
 
 #############################################
 ## compute weighted signal
@@ -96,13 +101,18 @@ df <- cbind(df, TOTAL)
 #    df[,j] <- apply(df, 1, function(x) compute_weighted_signal(x[i], x[opt$distanceCol], 2))
 #    j=j+1
 #}
-WS <- apply(df[,as.numeric(unlist(strsplit(opt$scoreCol,",")))], 2, function(x) unlist(lapply(seq(1:length(x)), function(y) compute_weighted_signal(x[y], df[y,opt$distanceCol], 2))))
-df <- cbind(df, WS)
+if(length(length(unlist(strsplit(opt$scoreCol,",")))) > 1) {
+    WS <- apply(df[,as.numeric(unlist(strsplit(opt$scoreCol,",")))], 2, function(x) unlist(lapply(seq(1:length(x)), function(y) compute_weighted_signal(x[y], df[y,opt$distanceCol], 2))))
+    df <- cbind(df, WS)
+} else {
+    WS <-  unlist(lapply(seq(1:length(df[,c(as.numeric(opt$scoreCol))])), function(y) compute_weighted_signal(df[y,c(as.numeric(opt$scoreCol))], df[y,opt$distanceCol], 2)))
+    df <- cbind(df, WS)
+}
 
 #############################################
 ## compute enhancer count
 #############################################
-COUNT <- unlist(lapply(df[,opt$distanceCol], function(x) length(unlist(strsplit(as.character(x), ",")))))
+COUNT <- unlist(lapply(df[,10], function(x) length(unlist(strsplit(as.character(x), ","))[!is.na(unlist(strsplit(as.character(x), ",")))])))
 df <- cbind(df, COUNT)
 
 #############################################
@@ -111,11 +121,12 @@ df <- cbind(df, COUNT)
 if(!is.null(opt$segmentCol)) {
     opt$segmentCol <- as.numeric(opt$segmentCol)
     segments <- unique(unlist(lapply(df[,opt$segmentCol], function(x) unique(unlist(strsplit(as.character(x), ","))))))
+    segments <- segments[!is.na(segments)]
     #segments <- c("enhancer_active", "enhancer_poised", "enhancer_primed", "promoter_active", 
     #            "promoter_bivalent", "repressed_heterochromatin", "repressed_polycomb", "transcribed")
 
     df_segments <- t(apply(df, 1, function(x) merge(plyr::count(segments), plyr::count(unlist(strsplit(as.character(x[opt$segmentCol]),","))), by="x", all=T)$freq.y[1:length(segments)]))
-    colnames(df_segments) <- plyr::count(unlist(strsplit(as.character(df[,opt$segmentCol]),",")))$x
+    colnames(df_segments) <- plyr::count(unlist(strsplit(as.character(df[,opt$segmentCol]),",")))$x[!is.na(plyr::count(unlist(strsplit(as.character(df[,opt$segmentCol]),",")))$x)]
 
     df <- cbind(df, df_segments)
     #df <- df[,c(1:(opt$segmentCol-1),(opt$distanceCol+1):ncol(df))]

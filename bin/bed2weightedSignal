@@ -32,20 +32,19 @@ usage() {
 	echo " -i <file>     [input file containing genomic coordinates of promoters in BED format (can be stdin)]"
     echo "               [format: chr start end gene_name score strand (..)]"
 	echo " -j <file>     [input file containing genomic coordinates of peaks in BED format]"
-    echo "               [format: chr start end name score strand (..)]"
+    echo "               [format: chr start end name score strand (class ..)]"
     echo "[OPTIONS]"
     echo " -g <string>   [genome (default: mm9)]"
     echo " -c <int>      [column containing score information in peak file; -j argument (default: 5)]"
     echo "               [if multiple, please separate them by a comma]"
-    echo " -s <int>      [column containing genome segment information computed by ChromHMM (Optional)]"
+    echo " -s <int>      [column containing class information in peak file; -j argument (Optional)]"
     echo "[OPTIONS: Approach]"
-    echo " -v            [compute using overlap approach (default is closest approach)]"
-    echo " -y            [compute using both overlap and closest approach (default is closest approach)]"
+    echo " -v            [use peaks proximal (overlapping) to gene promoters (default: distal peaks only)]"
+    echo " -y            [use peaks proximal (overlapping) as well as distal (non-overlapping) to gene promoters (default: distal peaks only)]"
 	echo " -h            [help]"
     echo "[OUTPUT]"
-    echo "               [chr start end gene_name score strand (..) total_signal_distal (..) weighted_signal_distal (..) enhancer_count chromatin_states (..)]"
-    echo "               [computed for each input peak: total_signal_distal weighted_signal_distal]"
-    echo "               [eight chromatin states from ChromHMM: enhancer_active enhancer_poised enhancer_primed promoter_active promoter_bivalent repressed_heterochromatin repressed_polycomb transcribed]"
+    echo "               [chr start end gene_name score strand (..) total_signal (..) weighted_signal_distal (..) peaks_count class_frequency_info (if -s)]"
+    echo "               [computed for each input peak: total_signal_distal, weighted_signal_distal]"
 	echo
 	exit 0
 }
@@ -100,66 +99,75 @@ SCORE_COLS=($SCORE_COL)
 IFS=$oIFS
 
 ## compute signal at each input region
-if [ ! -z "$OVERLAP_APPROACH" ]; then
-    SCORE_COL=$((${SCORE_COLS[0]}+$NCOL_PROMOTER))
-    for(( i=1; i<${#SCORE_COLS[@]}; i++)); do
-        SCORE_COL="$SCORE_COL,$((${SCORE_COLS[$i]}+$NCOL_PROMOTER))"
-    done
-
-    intersectBed -a $PROMOTERFILE -b <(zless $PEAKFILE | grep -v start) -wao | intersectBed2uniq -i stdin -c $SCORE_COL -o sum -n $NCOL_PROMOTER
-else
-    DISTANCE_COL=$(($NCOL_PROMOTER+$NCOL_PEAKS+1))
+#if [ ! -z "$OVERLAP_APPROACH" ]; then
+#    SCORE_COL=$((${SCORE_COLS[0]}+$NCOL_PROMOTER))
+#    for(( i=1; i<${#SCORE_COLS[@]}; i++)); do
+#        SCORE_COL="$SCORE_COL,$((${SCORE_COLS[$i]}+$NCOL_PROMOTER))"
+#    done
+#
+#    intersectBed -a $PROMOTERFILE -b <(zless $PEAKFILE | grep -v start) -wao | intersectBed2uniq -i stdin -c $SCORE_COL -o sum -n $NCOL_PROMOTER
+#else
+DISTANCE_COL=$(($NCOL_PROMOTER+$NCOL_PEAKS+1))
 
 <<"COMMENT"
 COMMENT
-    TMP_CLOSESTBED=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    if [ ! -z "$OVERLAP_CLOSEST_APPROACH" ]; then
-        if [ ! -z "$SEGMENT_COL" ]; then
-            closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first | closestBed2uniq -i stdin -c $SEGMENT_COL,$SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
-            N=$((${#SCORE_COLS[@]}+2))
-        else
-            closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first | closestBed2uniq -i stdin -c $SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
-            N=$((${#SCORE_COLS[@]}+1))
-        fi
-    else
-        if [ ! -z "$SEGMENT_COL" ]; then
-            closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first -io | closestBed2uniq -i stdin -c $SEGMENT_COL,$SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
-            N=$((${#SCORE_COLS[@]}+2))
-        else
-            closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
-            N=$((${#SCORE_COLS[@]}+1))
-        fi
-    fi
-
-    TMP_ANNOTATEDPROMOTERFILE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    if [ ! -s "$TMP_ANNOTATEDPROMOTERFILE" ]; then
-        cat $PROMOTERFILE | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$TMP_CLOSESTBED' -m 1`; if($match=~/^$/) { chomp($_); print "$_"; for($i=0; $i<'$N'; $i++) { print "\tNA"; } print "\n"; } else { chomp($match); print "$match\n"; }' > $TMP_ANNOTATEDPROMOTERFILE
-    fi
-    
+TMP_CLOSESTBED=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+if [ ! -z "$OVERLAP_CLOSEST_APPROACH" ]; then
     if [ ! -z "$SEGMENT_COL" ]; then
-        SEGMENT_COL=$(($NCOL_PROMOTER+1))
-        SCORE_COL=$(($NCOL_PROMOTER+2))
+        closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first | closestBed2uniq -i stdin -c $SEGMENT_COL,$SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
+        N=$((${#SCORE_COLS[@]}+2))
     else
-        SCORE_COL=$(($NCOL_PROMOTER+1))
+        closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first | closestBed2uniq -i stdin -c $SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
+        N=$((${#SCORE_COLS[@]}+1))
     fi
-    j=$SCORE_COL
-    for(( i=1; i<${#SCORE_COLS[@]}; i++)); do
-        j=$(($j+1))
-        SCORE_COL="$SCORE_COL,$j"
-    done
-    DISTANCE_COL=$(zless $TMP_ANNOTATEDPROMOTERFILE | head -n 1 | perl -ane 'print scalar(@F);')
-
-    #echo -e "$SCORE_COL\t$DISTANCE_COL\t$SEGMENT_COL";
-
+elif [ ! -z "$OVERLAP_APPROACH" ]; then
     if [ ! -z "$SEGMENT_COL" ]; then
-        $FINDNFRPATH/share/R/bed2weightedSignal.R -i $TMP_ANNOTATEDPROMOTERFILE -s $SCORE_COL -d $DISTANCE_COL -t $SEGMENT_COL
+        closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t all | perl -ane 'if($F[scalar(@F)-1]==0) { print $_; }' | closestBed2uniq -i stdin -c $SEGMENT_COL,$SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
+        N=$((${#SCORE_COLS[@]}+2))
     else
-        $FINDNFRPATH/share/R/bed2weightedSignal.R -i $TMP_ANNOTATEDPROMOTERFILE -s $SCORE_COL -d $DISTANCE_COL
+        closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t all | perl -ane 'if($F[scalar(@F)-1]==0) { print $_; }' | closestBed2uniq -i stdin -c $SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
+        N=$((${#SCORE_COLS[@]}+1))
     fi
-
-    rm $TMP_CLOSESTBED
-    rm $TMP_ANNOTATEDPROMOTERFILE
+else
+    if [ ! -z "$SEGMENT_COL" ]; then
+        closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first -io | closestBed2uniq -i stdin -c $SEGMENT_COL,$SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
+        N=$((${#SCORE_COLS[@]}+2))
+    else
+        closestBed -a <(zless $PEAKFILE | grep -v start | sortBed -i stdin) -b <(sortBed -i $PROMOTERFILE) -d -t first -io | closestBed2uniq -i stdin -c $SCORE_COL,$DISTANCE_COL -o collapse -n $NCOL_PROMOTER > $TMP_CLOSESTBED
+        N=$((${#SCORE_COLS[@]}+1))
+    fi
 fi
+
+TMP_ANNOTATEDPROMOTERFILE=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+if [ ! -s "$TMP_ANNOTATEDPROMOTERFILE" ]; then
+    cat $PROMOTERFILE | perl -ane '$match=`grep -E \"\\s+$F[3]\\s+\" '$TMP_CLOSESTBED' -m 1`; if($match=~/^$/) { chomp($_); print "$_"; for($i=0; $i<'$N'; $i++) { print "\tNA"; } print "\n"; } else { chomp($match); print "$match\n"; }' > $TMP_ANNOTATEDPROMOTERFILE
+fi
+
+if [ ! -z "$SEGMENT_COL" ]; then
+    SEGMENT_COL=$(($NCOL_PROMOTER+1))
+    SCORE_COL=$(($NCOL_PROMOTER+2))
+else
+    SCORE_COL=$(($NCOL_PROMOTER+1))
+fi
+
+j=$SCORE_COL
+for(( i=1; i<${#SCORE_COLS[@]}; i++)); do
+    j=$(($j+1))
+    SCORE_COL="$SCORE_COL,$j"
+done
+DISTANCE_COL=$(zless $TMP_ANNOTATEDPROMOTERFILE | head -n 1 | perl -ane 'print scalar(@F);')
+
+#echo -e "$SCORE_COL\t$DISTANCE_COL\t$SEGMENT_COL";
+
+if [ ! -z "$SEGMENT_COL" ]; then
+    $FINDNFRPATH/share/R/bed2weightedSignal.R -i $TMP_ANNOTATEDPROMOTERFILE -s $SCORE_COL -d $DISTANCE_COL -t $SEGMENT_COL
+else
+    $FINDNFRPATH/share/R/bed2weightedSignal.R -i $TMP_ANNOTATEDPROMOTERFILE -s $SCORE_COL -d $DISTANCE_COL
+fi
+
+rm $TMP_CLOSESTBED
+rm $TMP_ANNOTATEDPROMOTERFILE
+#fi
 
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then

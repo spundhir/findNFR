@@ -5,6 +5,7 @@ GENOME="mm9"
 CONFIG_FILTER="RP"
 WINDOW=1000
 MIN_N_CLASS=1
+SEGMENT_COL=7
 
 #### usage ####
 usage() {
@@ -16,46 +17,47 @@ usage() {
 	echo "Options:"
 	echo " -i <file>   [input gene coordinates in BED format]"
     echo "             [format: chr start end name score strand (..)]"
-	echo " -j <file>   [input enhancer coordinates in BED format (can be stdin)]"
+	echo " -j <file>   [input peak coordinates in BED format (can be stdin)]"
     echo "             [format: chr start end name score strand (class ..)]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo "[OPTIONS: signal-based analysis]"
     echo " -k <file>   [configuration file containing list of BAM/BED files used to compute regulatory potential]"
     echo "             [<id> <bamfile> (eg. RP h3k27me3_esc_Rep1.bam)]"
     echo "             [<id> <bedfile> (eg. RP h3k4me3_esc_Rep1.bed)]"
-    echo "[OPTIONS]"
-    echo " -g <string> [genome (default: mm9)]"
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: RP)]"
+    echo "[OPTIONS: class-based analysis]"
+    echo " -n <int>    [minimum number of peaks within each class (default: 1)]"
+    echo " -s <int>    [column containing class information in peak file (default: 7)]"
     echo "[OPTIONS: gene2promoter]"
     echo " -m <file>   [h3k4me3 modification data in BAM format. Used to refine promoter region]"
     echo " -w <int>    [assign h3k4me3 peak to a gene as promoter region, if within this distance to TSS (default: 1000 bp)]"
-    echo "[OPTIONS: class-based analysis]"
-    echo " -c          [perform separate analysis for each enhancer class]"
-    echo " -n <int>    [minimum number of enhancers within each class (default: 1)]"
 	echo " -h          [help]"
-    echo "[NOTE]"
-    echo "             [bed file format, if score is to be used in calculations]"
-    echo "             [chr start end name score strand]"
+    echo "[OUTPUT]"
+    echo "             [chr start end gene_name score strand (..) signal_promoter (..) total_signal_distal (..) weighted_signal_distal (..) enhancer_count]"
+    echo "             [computed for each input peak: signal_promoter, total_signal_distal, weighted_signal_distal]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:k:g:f:m:cnh ARG; do
+while getopts i:j:g:k:f:n:s:m:w:h ARG; do
     case "$ARG" in
     i) PROMOTER_FILE=$OPTARG;;
-    j) ENHANCER_FILE=$OPTARG;;
-    k) CONFIG_FILE=$OPTARG;;
+    j) PEAK_FILE=$OPTARG;;
     g) GENOME=$OPTARG;;
+    k) CONFIG_FILE=$OPTARG;;
     f) CONFIG_FILTER=$OPTARG;;
+    n) MIN_N_CLASS=$OPTARG;;
+    s) SEGMENT_COL=$OPTARG;;
     m) H3K4ME3_FILE=$OPTARG;;
     w) WINDOW=$OPTARG;;
-    c) CLASS=1;;
-    n) MIN_N_CLASS=$OPTARG;;
     h) HELP=1;;
     esac
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ ! -f "$PROMOTER_FILE" -o -z "$ENHANCER_FILE" -o -z "$CONFIG_FILE" -o "$HELP" ]; then
+if [ ! -f "$PROMOTER_FILE" -o -z "$PEAK_FILE" -o "$HELP" ]; then
 	usage
 fi
 
@@ -70,7 +72,8 @@ else
     usage
 fi
 
-if [ -z "$CLASS" ]; then
+## initiate analysis
+if [ ! -z "$CONFIG_FILE" ]; then
     #####################################
     ## create temporary output directory
     #####################################
@@ -91,11 +94,13 @@ if [ -z "$CLASS" ]; then
     #####################################
     ## create configuration file containing only BAM files
     #####################################
-    while read LINE; do
-        if [ "$(isBam -i $LINE)" -eq "0" ]; then
-            echo -e "$CONFIG_FILTER\t$LINE"
-        fi;
-    done < <(zless $CONFIG_FILE  | perl -ane 'if($F[0]=~/^'$CONFIG_FILTER'/) { print "$F[1]\n"; }') > $TMP/BAM.CONFIG
+    if [ ! -s "$TMP/BAM.CONFIG" ]; then
+        while read LINE; do
+            if [ "$(isBam -i $LINE)" -eq "0" ]; then
+                echo -e "$CONFIG_FILTER\t$LINE"
+            fi;
+        done < <(zless $CONFIG_FILE  | perl -ane 'if($F[0]=~/^'$CONFIG_FILTER'/) { print "$F[1]\n"; }') > $TMP/BAM.CONFIG
+    fi 
     CONFIG_FILE="$TMP/BAM.CONFIG"
 
     #####################################
@@ -112,17 +117,18 @@ if [ -z "$CLASS" ]; then
     fi
 
     #####################################
-    ## define enhancers
+    ## define peaks
     #####################################
-    if [ "$ENHANCER_FILE" == "stdin" -a ! -s "$TMP/ENHANCER.BED" ]; then
-        while read LINE; do
-            echo ${LINE}
-        done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP/ENHANCER.BED
-        ENHANCER_FILE="$TMP/ENHANCER.BED"
-    elif [ ! -s "$TMP/ENHANCER.BED" ]; then
-        zless $ENHANCER_FILE > $TMP/ENHANCER.BED
-        ENHANCER_FILE="$TMP/ENHANCER.BED"
+    if [ ! -s "$TMP/PEAK.BED" ]; then
+        if [ "$PEAK_FILE" == "stdin" -a ! -s "$TMP/PEAK.BED" ]; then
+            while read LINE; do
+                echo ${LINE}
+            done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP/PEAK.BED
+        elif [ ! -s "$TMP/PEAK.BED" ]; then
+            zless $PEAK_FILE > $TMP/PEAK.BED
+        fi
     fi
+    PEAK_FILE="$TMP/PEAK.BED"
 
     #####################################
     ## compute proximal regulatory potential of genes using BAM and BED files
@@ -143,66 +149,99 @@ if [ -z "$CLASS" ]; then
     ## compute distal regulatory potential of genes using BAM and BED files
     #####################################
     if [ ! -s "$TMP/PROMOTER.BED.distalRP" ]; then
-        if [ ! -s "$TMP/ENHANCER.BED.tpm" ]; then
-            bed2expr -i $TMP/ENHANCER.BED -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER > $TMP/ENHANCER.BED.tpm
+        if [ ! -s "$TMP/PEAK.BED.tpm" ]; then
+            bed2expr -i $TMP/PEAK.BED -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER > $TMP/PEAK.BED.tpm
 
             if [ "${#BEDFILES[@]}" -gt 0 ]; then
                 for (( i=0; i<${#BEDFILES[@]}; i++ )); do
-                    NCOL=$(head -n 1 $TMP/ENHANCER.BED.tpm | perl -ane 'print scalar(@F);')
-                    intersectBed -a $TMP/ENHANCER.BED.tpm -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $((NCOL+5)) -o sum -n $NCOL > $TMP/ENHANCER.BED.tpm.tmp
-                    mv $TMP/ENHANCER.BED.tpm.tmp $TMP/ENHANCER.BED.tpm
+                    NCOL=$(head -n 1 $TMP/PEAK.BED.tpm | perl -ane 'print scalar(@F);')
+                    intersectBed -a $TMP/PEAK.BED.tpm -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $((NCOL+5)) -o sum -n $NCOL > $TMP/PEAK.BED.tpm.tmp
+                    mv $TMP/PEAK.BED.tpm.tmp $TMP/PEAK.BED.tpm
                 done
             fi
         fi
 
-        NCOL_ENHANCER_FILE=$(head -n 1 $ENHANCER_FILE | perl -ane 'print scalar(@F);')
-        NCOL_SCORE_COL=$(zless $TMP/ENHANCER.BED.tpm | grep -v start | head -n 1 | perl -ane 'for($i='$((NCOL_ENHANCER_FILE+1))'; $i<=scalar(@F); $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
-        #echo -e "$NCOL_ENHANCER_FILE\t$NCOL_SCORE_COL"; exit
+        NCOL_PEAK_FILE=$(head -n 1 $PEAK_FILE | perl -ane 'print scalar(@F);')
+        NCOL_SCORE_COL=$(zless $TMP/PEAK.BED.tpm | grep -v start | head -n 1 | perl -ane 'for($i='$((NCOL_PEAK_FILE+1))'; $i<=scalar(@F); $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
+        #echo -e "$NCOL_PEAK_FILE\t$NCOL_SCORE_COL"; exit
 
-        bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/ENHANCER.BED.tpm -g $GENOME -c $NCOL_SCORE_COL > $TMP/PROMOTER.BED.distalRP
+        bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.tpm -g $GENOME -c $NCOL_SCORE_COL > $TMP/PROMOTER.BED.distalRP
     fi
 
     #####################################
     ## arrange final output
     #####################################
     NCOL_PROMOTER_FILE=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F);')
-    ## problm with chrMT
+    ## problem with chrMT
     #paste <(bed2longestRegion -i $PROMOTER_FILE) <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
     paste $TMP/PROMOTER.BED <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | grep -v COUNT | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
     
 else
-    TMP_ENHANCER=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    if [ ! -z "$CLASS" -a "$NCOL_SCORE_COL" -eq 1 ]; then
-        COUNT=1
-        for CLASS in $(cat $ENHANCER_FILE | cut -f 7 | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
-            cat $ENHANCER_FILE | perl -ane 'if($F[6]=~/^'$CLASS'$/) { print $_; }' | cut -f 1-6 > $TMP_ENHANCER.$COUNT
-            bed2weightedSignal -i $PROMOTER_FILE -j $TMP_ENHANCER.$COUNT -g $GENOME -y | cut -f $(($NCOL_PROMOTER_FILE+1)),$(($NCOL_PROMOTER_FILE+2)),$(($NCOL_PROMOTER_FILE+3)) > $TMP_ENHANCER.$COUNT.RC
-            COMMAND="$COMMAND $TMP_ENHANCER.$COUNT.RC"
-            COUNT=$(($COUNT+1))
-        done
-    elif [ "$NCOL_SCORE_COL" -gt 1 ]; then
-        for ((COUNT=0; COUNT < $NCOL_SCORE_COL; COUNT++ )); do
-            cat $ENHANCER_FILE | perl -ane '@score=split(/\,/,$F[4]); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$score['$COUNT']\t$F[5]\t$F[6]\n";' | cut -f 1-6 > $TMP_ENHANCER.$COUNT
-            if [ "$COUNT" -eq $((NCOL_SCORE_COL-1)) ]; then
-                bed2weightedSignal -i $PROMOTER_FILE -j $TMP_ENHANCER.$COUNT -g $GENOME -y | cut -f $(($NCOL_PROMOTER_FILE+1)),$(($NCOL_PROMOTER_FILE+2)),$(($NCOL_PROMOTER_FILE+3)) > $TMP_ENHANCER.$COUNT.RC
-            else
-                bed2weightedSignal -i $PROMOTER_FILE -j $TMP_ENHANCER.$COUNT -g $GENOME -y | cut -f $(($NCOL_PROMOTER_FILE+1)),$(($NCOL_PROMOTER_FILE+2)) > $TMP_ENHANCER.$COUNT.RC
-            fi
-            COMMAND="$COMMAND $TMP_ENHANCER.$COUNT.RC"
-        done
-    else
-        bed2weightedSignal -i $PROMOTER_FILE -j $ENHANCER_FILE -g $GENOME -y | cut -f $(($NCOL_PROMOTER_FILE+1)),$(($NCOL_PROMOTER_FILE+2)),$(($NCOL_PROMOTER_FILE+3)) > $TMP_ENHANCER.RC
-        COMMAND="$COMMAND $TMP_ENHANCER.RC"
-    fi
-    #echo $COMMAND; exit
-    eval $COMMAND
+    #####################################
+    ## create temporary output directory
+    #####################################
+    #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    TMP="QdZ35xRqFNlRohAikVUkHSzHSSaQ9I4a"
+    if [ ! -d "$TMP" ]; then mkdir $TMP; fi
 
-    ## remove temporary file
-    if [ ! -z "$TMP" ]; then
-        rm $TMP
+    #####################################
+    ## define gene promoters
+    #####################################
+    if [ ! -s "$TMP/PROMOTER.BED" ]; then
+        if [ ! -z "$H3K4ME3_FILE" ]; then
+            bed2longestRegion -i $PROMOTER_FILE | gene2promoter -i stdin -j $H3K4ME3_FILE -o $TMP -n $WINDOW | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $TMP/PROMOTER.BED
+        elif [ "$(zless $PROMOTER_FILE | cut -f 8 | grep -E '\:[0-9]+\-[0-9]+' | wc -l)" -ge "1" -a "$(zless $PROMOTER_FILE | cut -f 7 | grep 'Y\|N' | wc -l)" -ge "1" ]; then
+            bed2longestRegion -i $PROMOTER_FILE | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $TMP/PROMOTER.BED
+        else
+            bed2longestRegion -i $PROMOTER_FILE | bed2window -i stdin -x -w 250 > $TMP/PROMOTER.BED
+        fi
     fi
 
-    rm $TMP_GENE
-    rm $TMP_ENHANCER*
+    #####################################
+    ## define peaks with class frequency > MIN_N_CLASS
+    #####################################
+    if [ ! -s "$TMP/PEAK.BED.sig" ]; then
+        if [ "$PEAK_FILE" == "stdin" -a ! -s "$TMP/PEAK.BED" ]; then
+            while read LINE; do
+                echo ${LINE}
+            done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP/PEAK.BED
+            PEAK_FILE="$TMP/PEAK.BED"
+        elif [ ! -s "$TMP/PEAK.BED" ]; then
+            zless $PEAK_FILE > $TMP/PEAK.BED
+            PEAK_FILE="$TMP/PEAK.BED"
+        fi
+
+        for CLASS in $(cat $PEAK_FILE | cut -f $SEGMENT_COL | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
+            zless $PEAK_FILE | perl -ane 'if($F['$((SEGMENT_COL-1))']=~/^'$CLASS'$/) { print $_; }'
+        done > $TMP/PEAK.BED.sig
+    fi
+
+    #####################################
+    ## compute proximal regulatory potential of genes using peak classes
+    #####################################
+    if [ ! -s "$TMP/PROMOTER.BED.proximalRPClass" ]; then
+        bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.sig -g $GENOME -c 5 -s $SEGMENT_COL -v > $TMP/PROMOTER.BED.proximalRPClass
+    fi
+
+    #####################################
+    ## compute distal regulatory potential of genes using peak classes
+    #####################################
+    if [ ! -s "$TMP/PROMOTER.BED.distalRPClass" ]; then
+        bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.sig -g $GENOME -c 5 -s $SEGMENT_COL > $TMP/PROMOTER.BED.distalRPClass
+    fi
+
+    #####################################
+    ## arrange final output
+    #####################################
+    NCOL_PROMOTER_FILE=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F);')
+    ## problem with chrMT
+    #paste <(bed2longestRegion -i $PROMOTER_FILE) <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
+    paste $TMP/PROMOTER.BED <(zless $TMP/PROMOTER.BED.proximalRPClass | grep -v COUNT | cut -f $((NCOL_PROMOTER_FILE+4))-10000000) <(zless $TMP/PROMOTER.BED.distalRPClass | grep -v COUNT | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
+    
 fi
+
+## remove temporary file
+#if [ ! -z "$TMP" ]; then
+#    rm -r $TMP
+#fi
 
