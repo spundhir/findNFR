@@ -236,7 +236,7 @@ else
     NCOL_PROMOTER_FILE=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F);')
     ## problem with chrMT
     #paste <(bed2longestRegion -i $PROMOTER_FILE) <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
-    paste $TMP/PROMOTER.BED <(zless $TMP/PROMOTER.BED.proximalRPClass | grep -v COUNT | cut -f $((NCOL_PROMOTER_FILE+4))-10000000) <(zless $TMP/PROMOTER.BED.distalRPClass | grep -v COUNT | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
+    paste <(cat <(echo -ne "chr\tstart\tend\tname\tscore\tstrand"; for((i=6; i<$NCOL_PROMOTER_FILE; i++)); do echo -ne "\tfield$i"; done; echo) $TMP/PROMOTER.BED) <(zless $TMP/PROMOTER.BED.proximalRPClass | cut -f $((NCOL_PROMOTER_FILE+4))-10000000) <(zless $TMP/PROMOTER.BED.distalRPClass | cut -f $((NCOL_PROMOTER_FILE+4))-10000000)
     
 fi
 
