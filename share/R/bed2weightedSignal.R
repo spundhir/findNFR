@@ -83,7 +83,7 @@ compute_weighted_signal <- function(signal, distance, mu) {
 #    df[,j] <- apply(df, 1, function(x) compute_total_signal(x[i]))
 #    j=j+1
 #}
-if(length(length(unlist(strsplit(opt$scoreCol,",")))) > 1) {
+if(length(unlist(strsplit(opt$scoreCol,","))) > 1) {
     TOTAL <- apply(df[,as.numeric(unlist(strsplit(opt$scoreCol,",")))], 2, function(y) unlist(lapply(y, function(x) sum(as.numeric(unlist(strsplit(as.character(x),",")))))))
     df <- cbind(df, TOTAL)
 } else {
@@ -101,7 +101,7 @@ if(length(length(unlist(strsplit(opt$scoreCol,",")))) > 1) {
 #    df[,j] <- apply(df, 1, function(x) compute_weighted_signal(x[i], x[opt$distanceCol], 2))
 #    j=j+1
 #}
-if(length(length(unlist(strsplit(opt$scoreCol,",")))) > 1) {
+if(length(unlist(strsplit(opt$scoreCol,","))) > 1) {
     WS <- apply(df[,as.numeric(unlist(strsplit(opt$scoreCol,",")))], 2, function(x) unlist(lapply(seq(1:length(x)), function(y) compute_weighted_signal(x[y], df[y,opt$distanceCol], 2))))
     df <- cbind(df, WS)
 } else {
