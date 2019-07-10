@@ -1,12 +1,14 @@
 #!/usr/bin/env Rscript
 suppressPackageStartupMessages(library("optparse"))
+suppressPackageStartupMessages(library("session"))
 
 ## parse command line arguments
 option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file containing score values (can be stdin) (format: <gene coor> score (...) distance [class]; scores can be comma separated)"),
     make_option(c("-s", "--scoreCol"), help="column in input file that contains score information. If multiple, separate them by a comma"),
     make_option(c("-d", "--distanceCol"), help="column in input file that contains distance information"),
-    make_option(c("-t", "--segmentCol"), help="column in input file that contains enhancer class information (eg. computed by ChromHMM | active, primed etc)"),
+    make_option(c("-t", "--segmentCol"), help="column in input file that contains enhancer class or TF binding information (eg. ChromHMM | active, primed | TF binding)"),
+    make_option(c("-b", "--segmentColBinary"), help="show enhancer class information as binary (present, bound or otherwise) per unique class"),
     make_option(c("-w", "--weight"), default=1000, help="weight parameter, higher it is less steep would be the reduction in signal with increase in distance to TSS (default: %default)")
 )
 
@@ -130,6 +132,17 @@ if(!is.null(opt$segmentCol)) {
 
     df <- cbind(df, df_segments)
     #df <- df[,c(1:(opt$segmentCol-1),(opt$distanceCol+1):ncol(df))]
+
+    j <- 1
+    CLASS <- unique(unlist(lapply(colnames(df_segments), function(x) unlist(strsplit(x, "_")))))
+    df_segments_binary <- data.frame(matrix("N", nrow=nrow(df_segments), ncol=length(CLASS)))
+    df_segments_binary <- data.frame(lapply(df_segments_binary, as.character), stringsAsFactors=FALSE)
+
+    for(i in CLASS) {
+        colnames(df_segments_binary)[j] <- sprintf("%s_bound", i)
+        df_segments_binary[grep(i, apply(df_segments, 1, function(x) names(which(!is.na(x))))),j] <- "Y"
+        j <- j+1
+    }
 }
 
 #############################################
@@ -137,7 +150,9 @@ if(!is.null(opt$segmentCol)) {
 #############################################
 #print(which(!seq(1:ncol(df)) %in% c(as.numeric(unlist(strsplit(opt$scoreCol, ","))), opt$distanceCol, opt$segmentCol)))
 #df_output <- df[,c(which(!seq(1:ncol(df)) %in% c(as.numeric(unlist(strsplit(opt$scoreCol, ","))), opt$distanceCol, opt$segmentCol)))]
-if(!is.null(opt$segmentCol)) {
+if(!is.null(opt$segmentCol) & !is.null(opt$segmentColBinary)) {
+    df_output <- cbind(df[,c(1:(as.numeric(unlist(strsplit(opt$scoreCol, ",")))[1]-1))], TOTAL, WS, COUNT, df_segments_binary)
+} else if(!is.null(opt$segmentCol)) {
     #print(c(1:(as.numeric(unlist(strsplit(opt$scoreCol, ",")))[1]-1),(opt$distanceCol+1):ncol(df)))
     #df_output <- df[,c(1:(as.numeric(unlist(strsplit(opt$scoreCol, ",")))[1]-1),(opt$distanceCol+2):ncol(df))]
     df_output <- cbind(df[,c(1:(as.numeric(unlist(strsplit(opt$scoreCol, ",")))[1]-1))], TOTAL, WS, COUNT, df_segments)
@@ -153,4 +168,5 @@ write.table(df_output, "", sep="\t", row.names=F, col.names=T, quote=F)
 
 #barplot(df_output[order(-df$weighted_signal),]$weighted_signal)
 
+save.session("test.session")
 q()
