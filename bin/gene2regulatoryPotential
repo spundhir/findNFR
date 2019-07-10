@@ -238,6 +238,10 @@ else
         else
             bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.sig -g $GENOME -c 5 -s $SEGMENT_COL > $TMP/PROMOTER.BED.distalRPClass
         fi
+
+        # reformat file header
+        cat <(grep -w "^V1" $TMP/PROMOTER.BED.distalRPClass | perl -ane 'print "$F[0]_dis\t"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"."_dis" } print "\n";') <(grep -wv "^V1" $TMP/PROMOTER.BED.distalRPClass) > $TMP/PROMOTER.BED.distalRPClass.tmp
+        mv $TMP/PROMOTER.BED.distalRPClass.tmp $TMP/PROMOTER.BED.distalRPClass
     fi
 
     #####################################
