@@ -38,6 +38,7 @@ usage() {
     echo " -c <int>      [column containing score information in peak file; -j argument (default: 5)]"
     echo "               [if multiple, please separate them by a comma]"
     echo " -s <int>      [column containing class information in peak file; -j argument (Optional)]"
+    echo " -b            [use class information to compute TF binding or class present information]"
     echo "[OPTIONS: Approach]"
     echo " -v            [use peaks proximal (overlapping) to gene promoters (default: distal peaks only)]"
     echo " -y            [use peaks proximal (overlapping) as well as distal (non-overlapping) to gene promoters (default: distal peaks only)]"
@@ -50,13 +51,14 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:g:c:s:vyh ARG; do
+while getopts i:j:g:c:s:bvyh ARG; do
 	case "$ARG" in
 		i) PROMOTERFILE=$OPTARG;;
 		j) PEAKFILE=$OPTARG;;
         g) GENOME=$OPTARG;;
         c) SCORE_COL=$OPTARG;;
         s) SEGMENT_COL=$OPTARG;;
+        b) SEGMENT_COL_BINARY=1;;
         v) OVERLAP_APPROACH=1;;
         y) OVERLAP_CLOSEST_APPROACH=1;;
 		h) HELP=1;;
@@ -159,7 +161,9 @@ DISTANCE_COL=$(zless $TMP_ANNOTATEDPROMOTERFILE | head -n 1 | perl -ane 'print s
 
 #echo -e "$SCORE_COL\t$DISTANCE_COL\t$SEGMENT_COL";
 
-if [ ! -z "$SEGMENT_COL" ]; then
+if [ ! -z "$SEGMENT_COL" -a ! -z "$SEGMENT_COL_BINARY" ]; then
+    $FINDNFRPATH/share/R/bed2weightedSignal.R -i $TMP_ANNOTATEDPROMOTERFILE -s $SCORE_COL -d $DISTANCE_COL -t $SEGMENT_COL -b
+elif [ ! -z "$SEGMENT_COL" ]; then
     $FINDNFRPATH/share/R/bed2weightedSignal.R -i $TMP_ANNOTATEDPROMOTERFILE -s $SCORE_COL -d $DISTANCE_COL -t $SEGMENT_COL
 else
     $FINDNFRPATH/share/R/bed2weightedSignal.R -i $TMP_ANNOTATEDPROMOTERFILE -s $SCORE_COL -d $DISTANCE_COL

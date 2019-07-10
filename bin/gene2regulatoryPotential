@@ -29,6 +29,7 @@ usage() {
     echo "[OPTIONS: class-based analysis]"
     echo " -n <int>    [minimum number of peaks within each class (default: 1)]"
     echo " -s <int>    [column containing class information in peak file (default: 7)]"
+    echo " -b          [use class information to compute TF binding or class present information]"
     echo "[OPTIONS: gene2promoter]"
     echo " -m <file>   [h3k4me3 modification data in BAM format. Used to refine promoter region]"
     echo " -w <int>    [assign h3k4me3 peak to a gene as promoter region, if within this distance to TSS (default: 1000 bp)]"
@@ -41,7 +42,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:g:k:f:n:s:m:w:h ARG; do
+while getopts i:j:g:k:f:n:s:bm:w:h ARG; do
     case "$ARG" in
     i) PROMOTER_FILE=$OPTARG;;
     j) PEAK_FILE=$OPTARG;;
@@ -50,6 +51,7 @@ while getopts i:j:g:k:f:n:s:m:w:h ARG; do
     f) CONFIG_FILTER=$OPTARG;;
     n) MIN_N_CLASS=$OPTARG;;
     s) SEGMENT_COL=$OPTARG;;
+    b) SEGMENT_COL_BINARY=1;;
     m) H3K4ME3_FILE=$OPTARG;;
     w) WINDOW=$OPTARG;;
     h) HELP=1;;
@@ -220,14 +222,22 @@ else
     ## compute proximal regulatory potential of genes using peak classes
     #####################################
     if [ ! -s "$TMP/PROMOTER.BED.proximalRPClass" ]; then
-        bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.sig -g $GENOME -c 5 -s $SEGMENT_COL -v > $TMP/PROMOTER.BED.proximalRPClass
+        if [ ! -z "$SEGMENT_COL_BINARY" ]; then
+            bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.sig -g $GENOME -c 5 -s $SEGMENT_COL -v -b > $TMP/PROMOTER.BED.proximalRPClass
+        else
+            bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.sig -g $GENOME -c 5 -s $SEGMENT_COL -v > $TMP/PROMOTER.BED.proximalRPClass
+        fi
     fi
 
     #####################################
     ## compute distal regulatory potential of genes using peak classes
     #####################################
     if [ ! -s "$TMP/PROMOTER.BED.distalRPClass" ]; then
-        bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.sig -g $GENOME -c 5 -s $SEGMENT_COL > $TMP/PROMOTER.BED.distalRPClass
+        if [ ! -z "$SEGMENT_COL_BINARY" ]; then
+            bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.sig -g $GENOME -c 5 -s $SEGMENT_COL -b > $TMP/PROMOTER.BED.distalRPClass
+        else
+            bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.sig -g $GENOME -c 5 -s $SEGMENT_COL > $TMP/PROMOTER.BED.distalRPClass
+        fi
     fi
 
     #####################################

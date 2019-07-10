@@ -8,7 +8,7 @@ option_list <- list(
     make_option(c("-s", "--scoreCol"), help="column in input file that contains score information. If multiple, separate them by a comma"),
     make_option(c("-d", "--distanceCol"), help="column in input file that contains distance information"),
     make_option(c("-t", "--segmentCol"), help="column in input file that contains enhancer class or TF binding information (eg. ChromHMM | active, primed | TF binding)"),
-    make_option(c("-b", "--segmentColBinary"), action="store_true", help="show enhancer class information as binary (present, bound or otherwise) per unique class"),
+    make_option(c("-b", "--segmentColBinary"), action="store_true", help="use class information to compute TF binding or class present information"),
     make_option(c("-w", "--weight"), default=1000, help="weight parameter, higher it is less steep would be the reduction in signal with increase in distance to TSS (default: %default)")
 )
 
