@@ -169,8 +169,8 @@ else
     $FINDNFRPATH/share/R/bed2weightedSignal.R -i $TMP_ANNOTATEDPROMOTERFILE -s $SCORE_COL -d $DISTANCE_COL
 fi
 
-rm $TMP_CLOSESTBED
-rm $TMP_ANNOTATEDPROMOTERFILE
+#rm $TMP_CLOSESTBED
+#rm $TMP_ANNOTATEDPROMOTERFILE
 #fi
 
 ## remove temporary file, if exists
