@@ -238,7 +238,7 @@ echo "done"
 
 echo -n "Compute size factor for each replicate (`date`).. "
 if [ ${#BAMFILEa[@]} -gt 1 ]; then
-    if [ ! -e "$OUTDIR/sizeFactor" ]; then
+    if [ ! -e "$OUTDIR/sizeFactor" -o -s "$OUTDIR/sizeFactor" ]; then
         estimateSizeFactor.pl -o b -b $BAMFILEs -x $GENOME_PEAKREGION -r $OUTDIR/sizeFactorCount -e $EXTENDs -g $GENOME -p $FINDNFRPATH/share/R/
         estimateSizeFactor.pl -o c -r $OUTDIR/sizeFactorCount -p $FINDNFRPATH/share/R/ > $OUTDIR/sizeFactor
     fi
