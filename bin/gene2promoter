@@ -44,6 +44,7 @@ usage() {
 	echo "Usage: gene2promoter -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input genomic coordinates of genes in BED format (can be stdin)]"
+    echo "             [format: chr start end name score strand]"
     echo " -j <file>   [h3k4me3 modification data in BAM format]"
     echo "             [if multiple, please separate them by a comma]"
     echo "[OPTIONS]"
@@ -152,6 +153,14 @@ if [ "$GENEFILE" == "stdin" ]; then
         echo ${LINE}
     done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/$TMP
     GENEFILE=$OUTDIR/$TMP
+fi
+
+>&2 echo
+>&2 echo -n "Check, if input gene coordinate file is in correct format (`date`).. "
+if [ "$(isBed -i $GENEFILE -s)" -eq 1 ]; then
+    >&2 echo
+    >&2 echo "input gene coordinate file, $GENFILE is not in correct format"
+    usage
 fi
 
 >&2 echo -n "Predict peaks on H3K4me3 data (`date`).. "

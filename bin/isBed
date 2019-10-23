@@ -44,9 +44,9 @@ if [ "$INFILE" == "stdin" ]; then
 fi
 
 if [ -z "$SIXCOL" ]; then
-    echo $(zless $INFILE | perl -ane 'BEGIN { $status=0; } if($F[1]!~/^[0-9]+$/ && $F[2]!~/^[0-9]+$/ && $status==0) { $status=1; last } END { print "$status\n"; }')
+    echo $(zless $INFILE | perl -ane 'BEGIN { $status=0; } if(($F[1]!~/^[0-9]+$/ || $F[2]!~/^[0-9]+$/) && $status==0) { $status=1; last } END { print "$status\n"; }')
 else
-    echo $(zless $INFILE | perl -ane 'BEGIN { $status=0; } if($F[1]!~/^[0-9]+$/ && $F[2]!~/^[0-9]+$/ && $F[4]!~/^[0-9]+$/ && $status==0) { $status=1; last } END { print "$status\n"; }')
+    echo $(zless $INFILE | perl -ane 'BEGIN { $status=0; } if(($F[1]!~/^[0-9]+$/ || $F[2]!~/^[0-9]+$/ || scalar(@F)<6) && $F[4]!~/^[0-9]+$/ && $status==0) { $status=1; last } END { print "$status\n"; }')
 fi
 
 ## remove temporary file, if exists
