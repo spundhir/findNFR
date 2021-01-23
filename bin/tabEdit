@@ -67,8 +67,9 @@ else
     if [ "$INFILE" == "stdin" ]; then
         TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
         while read LINE; do
-            echo ${LINE}
-        done | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";' > $TMP
+            echo -e "${LINE}"
+        done > $TMP 
+        #perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";' > $TMP
         INFILE=$TMP
     fi
 

@@ -8,7 +8,7 @@ option_list <- list(
     make_option(c("-m", "--customClass"), help="file containing custom class information to categorize promoters (format: gene_name class)"),
     make_option(c("-c", "--directionalityCol"), default=8, help="column using which to define the promoter directionality classes (default: %default)"),
     make_option(c("-p", "--plotCol"), help="column for which profile needs to be plotted (default: all columns)"),
-    make_option(c("-o", "--outFile"), help="output pdf file")
+    make_option(c("-o", "--outFile"), help="output pdf file, if null matrix will be STDOUT")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)

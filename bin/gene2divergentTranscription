@@ -49,6 +49,8 @@ usage() {
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: divergent)]"
     echo " -s          [require same strandedness (GRO-seq)]"
     echo " -a          [measure using raw read counts (default: RPKM normalized)]"
+    echo "[NOTE]"
+    echo "             [NDR: TSS-100 to TSS+10]"
     echo "[OUTPUT]"
     echo "             [chr start end name score strand gene coordinate (TSSR) signal (TSSR) distance (closest_tss) NDR_UP/NDR_DOWN/Genebody (per bam file)]"  
 	echo " -h          [help]"

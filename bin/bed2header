@@ -1,0 +1,66 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+#### usage ####
+usage() {
+	echo Program: "bed2header (add header to a BED file)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2header -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file (can be stdin)]"
+    echo " -r          [only header (default: input file with header)]"
+    echo " -h          [help]"
+	exit 0
+}
+
+#### parse options ####
+while getopts i:rh ARG; do
+    case "$ARG" in
+    i) INFILE=$OPTARG;;
+    r) HEADER=1;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$INFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo -e "${LINE}"
+    done > $TMP
+    INFILE=$TMP
+fi
+
+NCOL=$(head -n 1 $INFILE | perl -ane 'print scalar(@F);')
+if [ "$(isBed -i $INFILE)" -eq 0 ]; then
+    perl -e '$header{0}="chr";
+             $header{1}="start";
+             $header{2}="end";
+             $header{3}="name";
+             $header{4}="score";
+             $header{5}="strand";
+             for($i=6; $i<'${NCOL}'; $i++) { 
+                $header{$i}="description$i";
+             }
+             print "$header{0}";
+             for($i=1; $i<'${NCOL}'; $i++) { 
+                print "\t$header{$i}";
+             }
+             print "\n";'
+fi
+
+if [ -z "$HEADER" ]; then
+    zless $INFILE
+fi
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi

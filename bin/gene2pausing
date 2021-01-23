@@ -21,8 +21,10 @@ copyright_info
 
 VERSION="0.01"
 GENOME="mm9"
-WINDOW=300
+WINDOW_TSS=300
+WINDOW_TES=3000
 CONFIG_FILTER="pausing"
+RAW=0;
 
 #### usage ####
 usage() {
@@ -43,12 +45,14 @@ usage() {
     echo "             [<id> <bam file> (eg. pausing_oppositeStrand nasseq_esc_Rep1.bam)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
-    echo " -w <int>    [extend TSS downstream with input number of bases to define TSSR (default: 300)]"
+    echo " -w <int>    [extend TSS/TES downstream/upstream with input number of bases to define TSSR/TESR (default: 300)]"
+    echo " -W <int>    [extend TES downstream with input number of bases to define genebody (default: 3000)]"
     echo " -r          [analyze protein coding genes only (default: all genes; only valid if input is in GTF format)]"
     echo " -c <file>   [input mapped reads in BAM format for control sample (IgG)]"
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: pausing)]"
     echo " -s          [require same strand (GRO-seq)]"
     echo " -S          [require opposite strand (Nascent-seq)]"
+    echo " -R          [output raw signal values (default: pausing values)" 
     echo "[OPTIONS: COMPUTE]"
     echo " -e          [use signal at TESR as B (default: genebody)]"
     echo " -t          [compute travelling rate (default: pausing rate)]"
@@ -58,6 +62,8 @@ usage() {
 	echo " -h          [help]"
     echo "[NOTE]"
     echo "             [parameters are set as per details from Day et al. 2016 Genome Biology]"
+    echo "             [TSSR: TSS-50 to TSS+w]"
+    echo "             [TESR: TES-w to TES+50]"
     echo "[OUTPUT]"
     echo "             [chr start end name score strand gene coordinate (TSSR) signal (TSSR) distance (closest_tss) pausing (per bam file)]"
 	echo
@@ -65,17 +71,19 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:g:w:rc:f:sSeth ARG; do
+while getopts i:j:g:w:W:rc:f:sSReth ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
         g) GENOME=$OPTARG;;
-        w) WINDOW=$OPTARG;;
+        w) WINDOW_TSS=$OPTARG;;
+        W) WINDOW_TES=$OPTARG;;
         r) ONLYPROTEINCODING=1;;
         c) BAMFILECONTROL=$OPTARG;;
         f) CONFIG_FILTER=$OPTARG;;
         s) SAME_STRAND=1;;
         S) OPPOSITE_STRAND=1;;
+        R) RAW=1;;
         e) TESR_MODE=1;;
         t) TR=1;;
 		h) HELP=1;;
@@ -133,9 +141,10 @@ if [ ! -z "$TESR_MODE" ]; then ARG=$(echo $ARG "-e "); fi
 
 ## measure pol2 pausing
 if [ -z "$TR" ]; then
-    gene2signalValues -i $GTFFILE -j $BAMFILE -g $GENOME -f $CONFIG_FILTER -w $WINDOW $ARG | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/$val[1]); } else { print "\t$_"; } } print "\n";'
+    #echo "gene2signalValues -i $GTFFILE -j $BAMFILE -g $GENOME -f $CONFIG_FILTER -w $WINDOW_TSS -W $WINDOW_TES $ARG"; exit
+    gene2signalValues -i $GTFFILE -j $BAMFILE -g $GENOME -f $CONFIG_FILTER -w $WINDOW_TSS -W $WINDOW_TES $ARG | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/ && '$RAW' == 0) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/$val[1]); } else { print "\t$_"; } } print "\n";'
 else
-    gene2signalValues -i $GTFFILE -j $BAMFILE -g $GENOME -f $CONFIG_FILTER -w $WINDOW $ARG | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/($val[0]+$val[1])); } else { print "\t$_"; } } print "\n";'
+    gene2signalValues -i $GTFFILE -j $BAMFILE -g $GENOME -f $CONFIG_FILTER -w $WINDOW_TSS -W $WINDOW_TES $ARG | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { if($_=~/[0-9\.]+\/[0-9\.]+/ && '$RAW' == 0) { @val=split(/\//,$_); printf("\t%0.5f", $val[0]/($val[0]+$val[1])); } else { print "\t$_"; } } print "\n";'
 fi | perl -ane '$F[3]=~s/\-[0-9]+$//g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sort -k 4,4 -k 9rg,9 -k 10rn,10 | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }'
 
 >&2 echo "All done.. bye"

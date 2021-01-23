@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 copyright_info
 
 ## DEPENDENCIES
-EXTEND=0
 GENOME="mm9"
+EXTEND_VALUE=0
+PROCESSORS=1
 
 #### usage ####
 usage() {
@@ -34,22 +35,32 @@ usage() {
 	echo " -i <file>   [input BAM file]"
 	echo "[OPTIONS]:"
     echo " -o <dir>    [output directory (default: bam file location)]"
-    echo " -k          [keep bedGraph file also]"
-    echo " -e <int>    [extend 3' end of reads by input number of bases (useful for ChIP-seq data)]"
     echo " -g <string> [genome (default: mm9)]"
+    echo " -k          [keep bedGraph file also]"
+    echo " -e          [extend 3' end of reads (useful for ChIP-seq data)]"
+    echo " -c          [scale the coverage to TPM]"
+    echo " -C          [scale the coverage to 1x]"
+    echo " -z <float>  [scale the coverage by input factor (computed using DESeq2 or spike-in data)]"
+    echo " -b          [also output the BED file]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:ke:g:h ARG; do
+while getopts i:o:g:kecCz:bp:h ARG; do
 	case "$ARG" in
 		i) BAMFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
-        k) KEEP=1;;
-        e) EXTEND=$OPTARG;;
         g) GENOME=$OPTARG;;
+        k) KEEP=1;;
+        e) EXTEND=1;;
+        c) SCALE=1;;
+        C) SCALE1x=1;;
+        z) SCALE_FACTOR=$OPTARG;;
+        b) BED=1;;
+        p) PROCESSORS=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -59,6 +70,7 @@ if [ ! -f "$BAMFILE" -o "$HELP" ]; then
 	usage
 fi
 
+echo -n "Populating files based on input genome, $GENOME (`date`).. "
 ## populating files based on input genome
 GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
 GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
@@ -70,30 +82,114 @@ if [ ! -f "$GENOME_FILE" ]; then
     echo
     usage
 fi
+GENOME_MACS2=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -m)
+GENOME_SIZE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -s)
+echo done
+
+## determine read extension parameter, if required
+if [ ! -z "$EXTEND" ]; then
+    echo -n "Determing read extension parameter (`date`).. "
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    macs2 predictd -i $BAMFILE -g $GENOME_MACS2 --rfile $TMP.predictd &>$TMP
+    EXTEND_VALUE=$(cat $TMP | grep "predicted fragment length" | perl -ane 'print $F[scalar(@F)-2];')
+
+    if [ -z "$EXTEND_VALUE" ]; then
+        echo
+        echo "Extend value is not computed correctly.. exiting"
+        echo
+        exit
+    fi
+
+    if [ ! -z "$TMP" ]; then
+        rm $TMP
+        rm $TMP.predictd
+    fi
+
+    echo "$EXTEND_VALUE - done"
+fi
+<<"COMMENT"
+COMMENT
+
+## create index file of bam file, if does not exit
+if [ ! -e "$BAMFILE.bai" ]; then
+    samtools index $BAMFILE
+fi
 
 ## retrieve file name
+echo -n "Converting bam to bigwig format (`date`).. "
 if [ ! -z "$OUTDIR" ]; then
+    if [ ! -d "$OUTDIR" ]; then
+        mkdir -p $OUTDIR
+    fi
+
     ID=`echo $BAMFILE | perl -ane '$_=~s/^.+\///g; $_=~s/\..+$//g; print $_;'`;
 
     ## create bigwig files for viualization at the UCSC genome browser
-    bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split > $OUTDIR/$ID.bedGraph
+    if [ ! -z "$SCALE_FACTOR" ]; then
+        #SCALE_FACTOR=$(echo $SCALE_FACTOR | perl -ane 'printf("%0.6f", 1/$_);')
+        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $OUTDIR/$ID.bedGraph
 
-    bedGraphToBigWig $OUTDIR/$ID.bedGraph $GENOME_FILE $OUTDIR/$ID.bw
+        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR
+    elif [ ! -z "$SCALE" ]; then
+        #MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
+        #SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
+        #EXTEND_VALUE=$(echo $EXTEND_VALUE | perl -ane 'printf("%0.0f", $_/2);')
+        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $OUTDIR/$ID.bedGraph
 
-    if [ -z "$KEEP" ]; then
-        rm $OUTDIR/$ID.bedGraph 
+        ## use deeptools instead
+        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates --normalizeUsing RPKM -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+    elif [ ! -z "$SCALE1x" ]; then
+        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates --normalizeUsing RPGC --effectiveGenomeSize $GENOME_SIZE -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+    else
+        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split > $OUTDIR/$ID.bedGraph
+        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+    fi
+
+    if [ -e "$ID.bedGraph" ]; then
+        bedGraphToBigWig $OUTDIR/$ID.bedGraph $GENOME_FILE $OUTDIR/$ID.bw
+
+        if [ -z "$KEEP" ]; then
+            rm $OUTDIR/$ID.bedGraph 
+        fi
     fi
 else
     ID=`echo $BAMFILE | perl -ane '$_=~s/\.bam*//g; print $_;'`;
 
     ## create bigwig files for viualization at the UCSC genome browser
-    bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split > $ID.bedGraph
+    if [ ! -z "$SCALE_FACTOR" ]; then
+        #SCALE_FACTOR=$(echo $SCALE_FACTOR | perl -ane 'printf("%0.6f", 1/$_);')
+        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $ID.bedGraph
 
-    bedGraphToBigWig $ID.bedGraph $GENOME_FILE $ID.bw
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR
+    elif [ ! -z "$SCALE" ]; then
+        #MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
+        #SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
+        #EXTEND_VALUE=$(echo $EXTEND_VALUE | perl -ane 'printf("%0.0f", $_/2);')
+        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $ID.bedGraph
 
-    if [ -z "$KEEP" ]; then
-        rm $ID.bedGraph 
+        ## use deeptools instead
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeUsing RPKM -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+    elif [ ! -z "$SCALE1x" ]; then
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeUsing RPGC --effectiveGenomeSize $GENOME_SIZE -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+    else
+        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split > $ID.bedGraph
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+
+    fi
+
+    if [ -e "$ID.bedGraph" ]; then
+        bedGraphToBigWig $ID.bedGraph $GENOME_FILE $ID.bw
+
+        if [ -z "$KEEP" ]; then
+            rm $ID.bedGraph 
+        fi
     fi
 fi
+
+if [ ! -z "$BED" ]; then
+    ID=`echo $BAMFILE | perl -ane '$_=~s/\.bam*//g; print $_;'`;
+    bedtools bamtobed -i $BAMFILE > $ID.bed
+fi
+echo "done"
 
 #bigWigCmd = "./src/bamToBed -i " + name + "/mapped.bam " + "| ./src/slopBed -i stdin -g src/" + chromFile + " -s -l -0 -r " + str(args.fragment_length[0]-readLength) + " | ./src/genomeCoverageBed -bg -i stdin -g src/" + chromFile + "| ./src/wigToBigWig stdin src/" + chromFile + " " + name + "/mapped.bw"

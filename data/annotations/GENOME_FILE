@@ -1,6 +1,7 @@
-mm9 mouse.mm9.genome
-mm10    mouse.mm10.genome
-hg19    human.hg19.genome
-hg38    human.hg38.genome
-danRer7 zebrafish.danRer7.genome
-rn5 rat.rn5.genome
+## genome size source: https://deeptools.readthedocs.io/en/develop/content/feature/effectiveGenomeSize.html & https://www.biostars.org/p/178995/
+mm9 mouse.mm9.genome    mm  2620345972  /scratch/genomes/annotations/BED/mm9_ensembl_gene.bed   /scratch/genomes/annotations/BED/mm9_ensembl_tss.bed    /scratch/genomes/annotations/GTF/mm9_ensembl.gtf   /scratch/genomes/annotations/MISC/CpG_mm9.bed    /scratch/genomes/annotations/BED/mm9_cage_tss.bed 
+mm10    mouse.mm10.genome   mm  2652783500  /scratch/genomes/annotations/BED/mm10_ensembl_gene.bed  /scratch/genomes/annotations/BED/mm9_ensembl_tss.bed    /scratch/genomes/annotations/GTF/mm10_ensembl.gtf    /scratch/genomes/annotations/MISC/CpG_mm10.bed /scratch/genomes/annotations/BED/mm10_cage_tss.bed
+hg19    human.hg19.genome   hs  2864785220  /scratch/genomes/annotations/BED/hg19_ensembl_gene.bed  /scratch/genomes/annotations/BED/mm9_ensembl_tss.bed    /scratch/genomes/annotations/GTF/hg19_ensembl.gtf    /scratch/genomes/annotations/MISC/CpG_hg19.bed /scratch/genomes/annotations/BED/hg19_cage_tss.bed
+hg38    human.hg38.genome   hs  2913022398  /scratch/genomes/annotations/BED/hg38_ensembl_gene.bed  /scratch/genomes/annotations/BED/mm9_ensembl_tss.bed    /scratch/genomes/annotations/GTF/hg38_ensembl.gtf    /scratch/genomes/annotations/MISC/CpG_hg38.bed /scratch/genomes/annotations/BED/hg38_cage_tss.bed
+danRer7 zebrafish.danRer7.genome    1369631918  1369631918  NA  NA  NA  NA NA
+rn5 rat.rn5.genome  2197995070  2197995070  NA  NA  NA  NA  NA

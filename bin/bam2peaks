@@ -487,7 +487,7 @@ echo "done"
 
 echo -n "Compute normalized peak scores (`date`).. "
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-Rscript $FINDNFRPATH/share/R/score2normalize.R -i $OUTDIR/PEAKS.BED > $TMP
+Rscript $FINDNFRPATH/share/R/score2normalize.R -i $OUTDIR/PEAKS.BED > $TMP ## rank scaled_rank percentile_rank
 mv $TMP $OUTDIR/PEAKS.BED
 
 Rscript $FINDNFRPATH/share/R/score2normalize.R -i $OUTDIR/ALLPEAKS.BED > $TMP
@@ -520,7 +520,7 @@ echo -n "Convert input bam to bigWig format to visualize in UCSC browser (`date`
 for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
     ID=$(echo ${BAMFILEa[$i]} | perl -ane '$_=~s/\.bam.*//g; print $_;');
     if [ ! -s "$ID.bw" ]; then
-        bam2bwForChIP -i ${BAMFILEa[$i]} -e ${EXTENDa[$i]} -g $GENOME &
+        bam2bwForChIPv1 -i ${BAMFILEa[$i]} -e ${EXTENDa[$i]} -g $GENOME &
     else
         echo -n "($ID.bw already exists..) "
     fi

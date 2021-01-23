@@ -1,0 +1,65 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "bam2spikeInScale (determine spikeIn scaling factor using mapped reads to spiked genome)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bam2spikeInScale -i <file>"
+	echo "Options:"
+    echo " -i <file>   [input mapped reads in BAM format]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+    #echo " -u          [use only uniquely mapped reads (using xs: tag)]"
+    #echo "             [only valid for bowtie2 output (FOR TESTING)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:g:uh ARG; do
+	case "$ARG" in
+        i) INPUTBAMFILE=$OPTARG;;
+        u) UNIQUE=1;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INPUTBAMFILE" -o "$HELP" ]; then
+	>&2 usage
+fi
+
+## populating files based on input genome
+if [ "$GENOME" == "mm9" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
+elif [ "$GENOME" == "hg19" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
+elif [ "$GENOME" == "rn5" ]; then
+    GENOME_FILE="/home/pundhir/project/genome_annotations/rat.rn5.genome"
+else
+    >&2 echo "Presently the program only support analysis for mm9, hg19 or rn5"
+    >&2 echo
+    >&2 usage
+fi
+
+## determine spikeIn normalization values
+if [ ! -z "$UNIQUE" ]; then
+    SCALE=$(samtools view $INPUTBAMFILE | grep -v XS: | wc -l | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);'); 
+else
+    if [ "$(samtools flagstat $INPUTBAMFILE | grep 'properly paired (' | cut -f 1 -d " ")" -gt 0 ]; then
+        SCALE=$(samtools flagstat $INPUTBAMFILE | grep "properly paired (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
+    elif [ "$(samtools flagstat $INPUTBAMFILE | grep 'mapped (' | cut -f 1 -d " ")" -gt 0 ]; then
+        SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane 'printf("%0.6f", 1000000/$_);');
+    fi
+fi
+
+echo $SCALE
+
+exit

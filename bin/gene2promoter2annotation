@@ -1,0 +1,208 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+gene2promoter2annotation: associate gene annotation to promoters
+Copyright (C) 2020  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+VERSION="0.01"
+GENOME="mm9"
+PROCESSOR=1
+OUTDIR="."
+
+#### usage ####
+usage() {
+	echo Program: "gene2promoter2annotation (associate gene annotation to promoters)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: $VERSION
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: gene2promoter2annotation -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file containing genomic coordinates of TSS in BED format (can be stdin)]"
+    echo "             [format: chr start end name score strand promoter_defined promoter_coordinate up_bp down_bp]"
+    echo "             [down_bp is the distance by which core promoter is extended downstream to TSS, computed using gene2promoter)]"
+    echo "             [note: 'name' should be unique]"
+    echo "[OPTIONS]"
+    echo " -o <dir>    [output directory to store intermediate files (default: .)"
+    echo " -g <string> [genome (default: mm9)]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
+    echo "[OPTIONS: gene annotations]"
+    echo " -k <file>   [h3k27me3 modification data in BAM format]"
+    echo "             [if multiple, please separate them by a comma]"
+    echo "             [used to define bivalent promoters]"
+    echo " -l <file>   [input file containing Pol II pausing information]"
+    echo " -m <file>   [input file containing sequence motif information]"
+	echo " -h          [help]"
+    echo "[OUTPUT]"
+    echo "             [chr start end name score strand promoter_defined promoter_coordinate up_bp down_bp]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:o:g:p:k:l:m:h ARG; do
+	case "$ARG" in
+		i) PROMOTER_FILE=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        k) BIVALENT_FILE=$OPTARG;;
+        l) POL2FILE=$OPTARG;;
+        m) MOTIFFILE=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+>&2 echo
+if [ "$HELP" ]; then
+    usage
+fi
+
+>&2 echo
+>&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
+## usage, if necessary file and directories are given/exist
+if [ -z "$PROMOTER_FILE" ]; then
+    >&2 echo
+    >&2 echo "Error: one or more required paramter values not provided"
+    >&2 echo
+	usage
+fi
+>&2 echo "done"
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+
+## create temporary BED file if input is from stdin
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+TMP="qSatMFYRKyc98k5C2yNm9I3D6jZA8pwS"
+if [ "$PROMOTER_FILE" == "stdin" ]; then
+    while read LINE; do
+        echo -e "${LINE}"
+    done > $TMP
+    PROMOTER_FILE=$TMP
+fi
+NCOL=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F)."\n";')
+echo -ne "$(grep '^#' $PROMOTER_FILE)\tpromoter_width\tpromoter_class\tdist_to_tss"
+
+## refine TSS based on CAGE peaks
+TSS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -T)
+if [ -f "$TSS_FILE" ]; then
+    closestBed -a <(grep -v start $PROMOTER_FILE | perl -ane '@coor=split(/[:-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]"; foreach(@F[3..scalar(@F)-1]) { print "\t$_"; } print "\t$F[0]:$F[1]-$F[2]\n";' | sortBed -i stdin) -b <(zless $TSS_FILE | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F-1)]==0) { print "$F['$((NCOL+1))']\t$F['$((NCOL+2))']\t$F['$((NCOL+3))']"; } else { @coor=split(/[:-]/,$F['$((NCOL))']); print "$coor[0]\t$coor[1]\t$coor[2]"; } foreach(@F[3..'$((NCOL-1))']) { print "\t$_"; } print "\n";' > ${TMP}.cage
+    PROMOTER_FILE="${TMP}.cage"
+else
+    touch ${TMP}.cage
+fi
+
+## distance to closest TSS
+>&2 echo -n "Determine distance to closest TSS (`date`).. "
+closestBed -a <(sortBed -i $PROMOTER_FILE) -b <(sortBed -i $PROMOTER_FILE) -d -t first -io | perl -ane '$class="narrow"; @coor=split(/[:-]+/,$F[7]); $promoter_width=($coor[2]-$coor[1]); if($promoter_width > 500 && $promoter_width <=1000) { $class="medium"; } elsif($promoter_width > 1000) { $class="broad"; } foreach(@F[0..9]) { print "$_\t"; } print "$promoter_width\t$class\t".$F[scalar(@F)-1]."\n";' > ${TMP}.distance
+>&2 echo "done"
+
+## gene length
+GENE_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -e)
+if [ -f "$GENE_FILE" ]; then
+    >&2 echo -n "Determine gene length (`date`).. "
+    echo -ne "\tgene_coordinate\tgene_length" 
+    while read LINE; do
+        GENE=$(echo "${LINE}" | cut -f 4)
+        GENE_LENGTH=$(grep -w $GENE $GENE_FILE | perl -ane 'BEGIN { $len=0; $gene_coor="$F[0]:$F[1]-$F[2]"; } if($F[2]-$F[1] > $len) { $len=$F[2]-$F[1]; $gene_coor="$F[0]:$F[1]-$F[2]"; } END { print "$gene_coor\t$len"; }');
+        echo -e "${LINE}\t$GENE_LENGTH";
+    done < <(grep -v "^#" $PROMOTER_FILE) > ${TMP}.length
+    >&2 echo "done"
+else
+    touch ${TMP}.length
+fi
+
+## gene CpG island length
+CPG_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -c)
+if [ ! -z "$CPG_FILE" ]; then
+    echo -ne "\tCpG_island_length"
+    >&2 echo -n "Determine CpG island length (`date`).. "
+    intersectBed -a $PROMOTER_FILE -b <(cut -f 1-3,5 $CPG_FILE) -wao |  intersectBed2uniq -i stdin -o sum -c $((NCOL+4)) -n $NCOL > ${TMP}.cpg
+    >&2 echo "done"
+else
+    touch ${TMP}.cpg
+fi
+
+## gene phylogenetic conservation
+if [ "$GENOME" == "mm9" -o "$GENOME" == "mm10" -o "$GENOME" == "hg19" -o "$GENOME" == "hg38" ]; then
+    echo -ne "\tmean_conservation_score\tmax_conservation_score"
+    >&2 echo -n "Determine phylogenetic conservation (`date`).. "
+    bed2window -i $PROMOTER_FILE -w 500 | bed2conservation -i stdin -g $GENOME > ${TMP}.conservation
+    >&2 echo "done"
+else
+    touch ${TMP}.conservation
+fi
+
+## define bivalent promoters
+if [ ! -z "$BIVALENT_FILE" ]; then
+    #echo -e "\tH3K27me3_ChIPCount\tH3K27me3_Score"
+    echo -e "\tpromoter_activity"
+    >&2 echo -n "Determine H3K27me3 peaks (`date`).. "
+    mkdir -p $OUTDIR/h3k27me3_peaks
+    BIVALENT_FILE=$(echo $BIVALENT_FILE | sed 's/\,/ /g')
+    if [ ! -s "$OUTDIR/h3k27me3_peaks/PEAKS.BED" ]; then
+        epic2 -t $BIVALENT_FILE -gn $GENOME -fdr 0.05 -o $OUTDIR/h3k27me3_peaks/PEAKS.BED
+    fi
+    intersectBed -a $PROMOTER_FILE -b $OUTDIR/h3k27me3_peaks/PEAKS.BED -wao | intersectBed2uniq -i stdin -o sum -c $((NCOL+4)),$((NCOL+5)) -n ${NCOL} | perl -ane '$activity="inactive"; if($F['$((NCOL))'] > 0) { if($F[6]=~/^Y$/) { $activity="bivalent"; } else {  $activity="repressed"; } } elsif($F[6]=~/^Y$/) { $activity="active"; } foreach(@F[0..'$((NCOL-1))']) { print "$_\t"; } print "$activity\n";' > ${TMP}.bivalent
+    >&2 echo "done"
+else
+    touch ${TMP}.bivalent
+fi
+
+<<"COMMENT"
+>&2 echo -n "Determine Pol II pausing (`date`).. "
+if [ ! -z "$POL2FILE" ]; then
+fi
+>&2 echo "done"
+
+>&2 echo -n "Determine sequence motif compositon (`date`).. "
+if [ ! -z "$MOTIFFILE" ]; then
+fi
+>&2 echo "done"
+COMMENT
+
+join -j 1 <(join -j 1 <(join -j 1 <(join -1 4 -2 1 <(less ${TMP}.distance | sort -k 4,4) <(less ${TMP}.length | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1)) <(less ${TMP}.cpg | cut -f 4,$((NCOL+1)) | sort -k 1,1)) <(less ${TMP}.conservation | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1)) <(less ${TMP}.bivalent | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1) | tabEdit -i stdin -t | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";'
+
+rm ${TMP}.cage
+rm ${TMP}.distance
+rm ${TMP}.length
+rm ${TMP}.cpg
+rm ${TMP}.conservation
+rm ${TMP}.bivalent

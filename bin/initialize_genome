@@ -32,16 +32,30 @@ usage() {
 	echo " -i <file>   [input file containing genome information]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
+    echo " -m          [macs2 genome parameter, -g]"
+    echo " -s          [effective genome size]"
+    echo " -e          [file having genomic coordinates of genes in BED format]"
+    echo " -t          [file having genomic coordinates of genes TSS (ensembl) in BED format]"
+    echo " -n          [file having genomic coordinates of genes in GTF format]"
+    echo " -c          [file having genomic coordinates of CpG islands]"
+    echo " -T          [file having genomic coordinates of all TSS (cage) in BED format]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:g:h ARG; do
+while getopts i:g:msetncTh ARG; do
 	case "$ARG" in
 		i) FILE=$OPTARG;;
         g) GENOME=$OPTARG;;
+        m) MACS2=1;;
+        s) GSIZE=1;;
+        e) GENE_COOR_BED=1;;
+        t) TSS_COOR_BED=1;;
+        n) GENE_COOR_GTF=1;;
+        c) CPG_COOR_BED=1;;
+        T) TSS_COOR_BED_CAGE=1;;
 		h) HELP=1;;
 	esac
 done
@@ -52,6 +66,22 @@ if [ ! -f "$FILE" -o "$HELP" ]; then
 fi
 
 ## determine genome file location
-grep -w $GENOME $FILE | perl -ane 'print "$F[1]";'
+if [ ! -z "$MACS2" ]; then
+    grep -w $GENOME $FILE | perl -ane 'print "$F[2]";'
+elif [ ! -z "$GSIZE" ] ; then
+    grep -w $GENOME $FILE | perl -ane 'print "$F[3]";'
+elif [ ! -z "$GENE_COOR_BED" ] ; then
+    grep -w $GENOME $FILE | perl -ane 'print "$F[4]";'
+elif [ ! -z "$TSS_COOR_BED" ] ; then
+    grep -w $GENOME $FILE | perl -ane 'print "$F[5]";'
+elif [ ! -z "$GENE_COOR_GTF" ] ; then
+    grep -w $GENOME $FILE | perl -ane 'print "$F[6]";'
+elif [ ! -z "$CPG_COOR_BED" ] ; then
+    grep -w $GENOME $FILE | perl -ane 'print "$F[7]";'
+elif [ ! -z "$TSS_COOR_BED_CAGE" ] ; then
+    grep -w $GENOME $FILE | perl -ane 'print "$F[8]";'
+else
+    grep -w $GENOME $FILE | perl -ane 'print "$F[1]";'
+fi
 
 exit

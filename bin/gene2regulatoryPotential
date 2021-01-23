@@ -17,7 +17,7 @@ usage() {
 	echo "Options:"
 	echo " -i <file>   [input gene coordinates in BED format]"
     echo "             [format: chr start end name score strand (..)]"
-	echo " -j <file>   [input peak coordinates in BED format (can be stdin)]"
+	echo " -j <file>   [input CRE coordinates in BED format (can be stdin)]"
     echo "             [format: chr start end name score strand (class ..)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
@@ -27,8 +27,8 @@ usage() {
     echo "             [<id> <bedfile> (eg. RP h3k4me3_esc_Rep1.bed)]"
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: RP)]"
     echo "[OPTIONS: class-based analysis]"
-    echo " -n <int>    [minimum number of peaks within each class (default: 1)]"
-    echo " -s <int>    [column containing class information in peak file (default: 7)]"
+    echo " -n <int>    [minimum number of CRE within each class (default: 1)]"
+    echo " -s <int>    [column containing class information in CRE coordinate file (default: 7)]"
     echo " -b          [use class information to compute TF binding or class present information]"
     echo "[OPTIONS: gene2promoter]"
     echo " -m <file>   [h3k4me3 modification data in BAM format. Used to refine promoter region]"
@@ -79,8 +79,8 @@ if [ ! -z "$CONFIG_FILE" ]; then
     #####################################
     ## create temporary output directory
     #####################################
-    #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    TMP="xajcIXJtLKpFbP72GH1SZk4MEzxAjVyN"
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    #TMP="xajcIXJtLKpFbP72GH1SZk4MEzxAjVyN"
     if [ ! -d "$TMP" ]; then mkdir $TMP; fi
 
     #####################################
@@ -182,8 +182,8 @@ else
     #####################################
     ## create temporary output directory
     #####################################
-    #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    TMP="QdZ35xRqFNlRohAikVUkHSzHSSaQ9I4a"
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    #TMP="QdZ35xRqFNlRohAikVUkHSzHSSaQ9I4a"
     if [ ! -d "$TMP" ]; then mkdir $TMP; fi
 
     #####################################
