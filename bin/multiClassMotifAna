@@ -29,7 +29,7 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
     echo "             => chr start end name score strand class"
     echo " -o <dir>    [output directory]"
     echo "[OPTIONS]"
-    echo " -s <file>   [input file having PWM of TFBS motifs]"
+    echo " -s <file>   [input file having PWM of TFBS motifs (genome specific)]"
     echo "             [default: /localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs]"
     echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
     echo " -r <int>    [number fo processors to use (default: 1)]"
@@ -117,18 +117,22 @@ if [ "$GENOME" == "mm9" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm9.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
     GENOME_MOTIF="mm9r"
+    TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
 elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg19.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
+    TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoHuman_eukaryote.homer"
 elif [ "$GENOME" == "mm10" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm10.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
     GENOME_MOTIF="mm10r"
+    TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
 elif [ "$GENOME" == "hg38" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg38.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
     GENOME_MOTIF="hg38r"
+    TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoHuman_eukaryote.homer"
 elif [ "$GENOME" == "danRer7" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"   
