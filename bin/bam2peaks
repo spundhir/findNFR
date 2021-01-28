@@ -58,14 +58,15 @@ usage() {
     echo "             [if multiple, please separate them by a comma]"
     echo " -v <int>    [merge peaks separated by input distance (default: 0)]"
     echo " -d <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
-    echo " -b          [predict broad peaks]" 
+    echo " -b          [predict broad peaks]"
+    echo " -N          [normalize by sequencing depth (#mapped reads)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:m:p:c:e:x:s:g:t:l:v:d:bh ARG; do
+while getopts i:o:m:p:c:e:x:s:g:t:l:v:d:bNh ARG; do
 	case "$ARG" in
 		i) BAMFILEs=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -81,6 +82,7 @@ while getopts i:o:m:p:c:e:x:s:g:t:l:v:d:bh ARG; do
         v) MERGEDISTANCE=$OPTARG;;
         d) DISTRIBUTION=$OPTARG;;
         b) BROAD=1;;
+        N) DEPTHNORM=1;;
 		h) HELP=1;;
 	esac
 done
@@ -238,10 +240,14 @@ echo "done"
 
 echo -n "Compute size factor for each replicate (`date`).. "
 if [ ${#BAMFILEa[@]} -gt 1 ]; then
-    if [ ! -e "$OUTDIR/sizeFactor" -o -s "$OUTDIR/sizeFactor" ]; then
-        estimateSizeFactor.pl -o b -b $BAMFILEs -x $GENOME_PEAKREGION -r $OUTDIR/sizeFactorCount -e $EXTENDs -g $GENOME -p $FINDNFRPATH/share/R/
-        estimateSizeFactor.pl -o c -r $OUTDIR/sizeFactorCount -p $FINDNFRPATH/share/R/ > $OUTDIR/sizeFactor
-    fi
+    #if [ ! -e "$OUTDIR/sizeFactor" -o -s "$OUTDIR/sizeFactor" ]; then
+    #    estimateSizeFactor.pl -o b -b $BAMFILEs -x $GENOME_PEAKREGION -r $OUTDIR/sizeFactorCount -e $EXTENDs -g $GENOME -p $FINDNFRPATH/share/R/
+    #    estimateSizeFactor.pl -o c -r $OUTDIR/sizeFactorCount -p $FINDNFRPATH/share/R/ > $OUTDIR/sizeFactor
+    #fi
+    touch $OUTDIR/sizeFactorCount
+    for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
+        perl -e 'print "'${BAMFILEa[$i]}'\t1\n";' 
+    done > $OUTDIR/sizeFactor
 else
     touch $OUTDIR/sizeFactorCount
     perl -e 'print "'${BAMFILEa[0]}'\t1\n";' > $OUTDIR/sizeFactor
@@ -268,8 +274,11 @@ BEDFILEs=""
 for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
     ID=`echo ${BAMFILEa[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.gz$//g; print $_;'`;
 
-    if [ ! -s "$OUTDIR/$ID.bed" ]; then
+    if [ ! -s "$OUTDIR/$ID.bed" -a -z "$DEPTHNORM" ]; then
         bam2bedForChIP -i ${BAMFILEa[$i]} -s ${SIZEFACTORa[$i]} -d -e -g $GENOME > $OUTDIR/$ID.bed
+    elif [ ! -s "$OUTDIR/$ID.bed" -a ! -z "$DEPTHNORM" ]; then
+        TOTAL_MAPPED_READS=$(samtools idxstats ${BAMFILEa[$i]} | perl -ane '$sum+=$F[2]; END { print "$sum\n"; }')
+        bam2bedForChIP -i ${BAMFILEa[$i]} -s ${SIZEFACTORa[$i]} -d -e -g $GENOME | perl -ane '$F[4] = sprintf("%0.2f", ($F[4]*10000000)/'$TOTAL_MAPPED_READS'); print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $OUTDIR/$ID.bed 
     else
         echo -n "($OUTDIR/$ID.bed already exists).. "
     fi
@@ -311,8 +320,6 @@ echo "#timestamp: $DATE
 #input BAM file(s): $BAMFILEs
 #output directory: $OUTDIR
 #output directory for control peaks: $OUTDIR/$CONTROLDIR
-#minimum reads in block group: $MINCLUSTERHEIGHT
-#minimum reads in block: $MINBLOCKHEIGHT
 #minimum distance between the blocks: $DISTANCE
 #scale to define blocks: $SCALE
 #block height: $BLOCKHEIGHT
@@ -331,6 +338,15 @@ if [ -z "$PARALLEL" ]; then
     echo -n "Predict peaks for each replicate (`date`).. "
     ALLPEAKFILEs=""
     for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
+        ## compute optimal MINCLUSTERHEIGHT and MINBLOCKHEIGHT parameter
+        if [ ! -z "$DEPTHNORM" ]; then
+            TOTAL_MAPPED_READS=$(samtools idxstats ${BAMFILEa[$i]} | perl -ane '$sum+=$F[2]; END { print "$sum\n"; }')
+            MINCLUSTERHEIGHT=$(perl -e 'printf("%0.2f", ('$MINCLUSTERHEIGHT'*10000000)/'$TOTAL_MAPPED_READS');')
+            MINBLOCKHEIGHT=$(perl -e 'printf("%0.2f", ('$MINBLOCKHEIGHT'*10000000)/'$TOTAL_MAPPED_READS');')
+        fi
+        echo "${BAMFILEa[$i]}: #minimum reads in block group: $MINCLUSTERHEIGHT" >> $OUTDIR/PARAMETERS
+        echo "${BAMFILEa[$i]}: #minimum reads in block: $MINBLOCKHEIGHT" >> $OUTDIR/PARAMETERS
+
         if [ ! -d "$OUTDIR/rep$i/fitDistr/" ]; then
             mkdir $OUTDIR/rep$i/fitDistr/
         fi
@@ -368,6 +384,15 @@ else
 
     echo -n "Predict peaks for each replicate (`date`).. "
     for(( i=0; i<${#BEDFILEa[@]}; i++ )); do
+        ## compute optimal MINCLUSTERHEIGHT and MINBLOCKHEIGHT parameter
+        if [ ! -z "$DEPTHNORM" ]; then
+            TOTAL_MAPPED_READS=$(samtools idxstats ${BAMFILEa[$i]} | perl -ane '$sum+=$F[2]; END { print "$sum\n"; }')
+            MINCLUSTERHEIGHT=$(perl -e 'printf("%0.2f", ('$MINCLUSTERHEIGHT'*10000000)/'$TOTAL_MAPPED_READS');')
+            MINBLOCKHEIGHT=$(perl -e 'printf("%0.2f", ('$MINBLOCKHEIGHT'*10000000)/'$TOTAL_MAPPED_READS');')
+        fi
+        echo "${BAMFILEa[$i]}: #minimum reads in block group: $MINCLUSTERHEIGHT" >> $OUTDIR/PARAMETERS
+        echo "${BAMFILEa[$i]}: #minimum reads in block: $MINBLOCKHEIGHT" >> $OUTDIR/PARAMETERS
+
         if [ ! -s "$OUTDIR/rep$i/fitDistr/INPUT.BG" ]; then
             if [ ! -d "$OUTDIR/rep$i/fitDistr/" ]; then
                 mkdir $OUTDIR/rep$i/fitDistr/

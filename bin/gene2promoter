@@ -65,6 +65,7 @@ usage() {
     echo " -t <float>  [FDR at which to consider a peak as significant (default: 0.05)]"
     echo " -v <int>    [merge peaks separated by input distance (default: 0)]"
     echo " -d <int>    [distribution to use for data fit (pois or nbinom) (default: nbinom)]"
+    echo " -N          [normalize by sequencing depth (#mapped reads)]"
 	echo " -h          [help]"
     echo "[OUTPUT]"
     echo "             [chr start end name score strand promoter_defined promoter_coordinate up_bp down_bp]"
@@ -73,7 +74,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:o:m:p:k:n:r:c:e:x:s:g:t:v:d:h ARG; do
+while getopts i:j:o:m:p:k:n:r:c:e:x:s:g:t:v:d:Nh ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
@@ -91,6 +92,7 @@ while getopts i:j:o:m:p:k:n:r:c:e:x:s:g:t:v:d:h ARG; do
         t) PVALUE=$OPTARG;;
         v) MERGEDISTANCE=$OPTARG;;
         d) DISTRIBUTION=$OPTARG;;
+        N) DEPTHNORM=1;;
 		h) HELP=1;;
 	esac
 done
@@ -160,11 +162,15 @@ if [ "$GENEFILE" == "stdin" ]; then
 fi
 
 >&2 echo -n "Predict peaks on H3K4me3 data (`date`).. "
+ARG=""
+if [ ! -z "$DEPTHNORM" ]; then
+    ARG=" -N";
+fi
 if [ ! -s "$OUTDIR/PEAKS.BED" ]; then
     if [ -z "$CONTROLFILE" ]; then
-        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION &>$OUTDIR/logs/bam2peaks.log
+        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION $ARG &>$OUTDIR/logs/bam2peaks.log
     else
-        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE &>$OUTDIR/logs/bam2peaks.log
+        bam2peaks -i $BAMFILE -o $OUTDIR -m $GENOME -p $PROCESSOR -c $MINCLUSTERHEIGHT -e $MINBLOCKHEIGHT -x $DISTANCE -s $SCALE -g $BLOCKHEIGHT -t $PVALUE -v $MERGEDISTANCE -d $DISTRIBUTION -l $CONTROLFILE $ARG &>$OUTDIR/logs/bam2peaks.log
     fi
 fi
 >&2 echo "done"
