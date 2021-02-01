@@ -278,8 +278,6 @@ for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
         bam2bedForChIP -i ${BAMFILEa[$i]} -s ${SIZEFACTORa[$i]} -d -e -g $GENOME > $OUTDIR/$ID.bed
     elif [ ! -s "$OUTDIR/$ID.bed" -a ! -z "$DEPTHNORM" ]; then
         bam2bedForChIP -i ${BAMFILEa[$i]} -s ${SIZEFACTORa[$i]} -d -e -g $GENOME > $OUTDIR/$ID.bed
-        #TOTAL_MAPPED_READS=$(samtools idxstats ${BAMFILEa[$i]} | perl -ane '$sum+=$F[2]; END { print "$sum\n"; }')
-        #bam2bedForChIP -i ${BAMFILEa[$i]} -s ${SIZEFACTORa[$i]} -d -e -g $GENOME | perl -ane '$F[4] = sprintf("%0.2f", ($F[4]*10000000)/'$TOTAL_MAPPED_READS'); print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $OUTDIR/$ID.bed 
     else
         echo -n "($OUTDIR/$ID.bed already exists).. "
     fi
@@ -342,8 +340,6 @@ if [ -z "$PARALLEL" ]; then
         ## compute optimal MINCLUSTERHEIGHT and MINBLOCKHEIGHT parameter
         if [ ! -z "$DEPTHNORM" ]; then
             TOTAL_MAPPED_READS=$(samtools idxstats ${BAMFILEa[$i]} | perl -ane '$sum+=$F[2]; END { print "$sum\n"; }')
-            #MINCLUSTERHEIGHT=$(perl -e 'printf("%0.2f", ('$MINCLUSTERHEIGHT'*10000000)/'$TOTAL_MAPPED_READS');')
-            #MINBLOCKHEIGHT=$(perl -e 'printf("%0.2f", ('$MINBLOCKHEIGHT'*10000000)/'$TOTAL_MAPPED_READS');')
             MINCLUSTERHEIGHT=$(perl -e 'printf("%0.2f", '$TOTAL_MAPPED_READS'/10000000);')
             MINBLOCKHEIGHT=$(perl -e 'printf("%0.2f", '$TOTAL_MAPPED_READS'/10000000);')
         fi
@@ -390,8 +386,6 @@ else
         ## compute optimal MINCLUSTERHEIGHT and MINBLOCKHEIGHT parameter
         if [ ! -z "$DEPTHNORM" ]; then
             TOTAL_MAPPED_READS=$(samtools idxstats ${BAMFILEa[$i]} | perl -ane '$sum+=$F[2]; END { print "$sum\n"; }')
-            #MINCLUSTERHEIGHT=$(perl -e 'printf("%0.2f", ('$MINCLUSTERHEIGHT'*10000000)/'$TOTAL_MAPPED_READS');')
-            #MINBLOCKHEIGHT=$(perl -e 'printf("%0.2f", ('$MINBLOCKHEIGHT'*10000000)/'$TOTAL_MAPPED_READS');')
             MINCLUSTERHEIGHT=$(perl -e 'printf("%0.2f", '$TOTAL_MAPPED_READS'/10000000);')
             MINBLOCKHEIGHT=$(perl -e 'printf("%0.2f", '$TOTAL_MAPPED_READS'/10000000);')
         fi

@@ -91,13 +91,14 @@ usage() {
     echo " -x          [strand-specific coverage calculation]"
     echo " -g <string> [genome (default: mm9)]"
     echo " -X <int>    [number of processors to use (default: 1)"
+    echo " -U          [overwrite deepToolsMatrix file]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:O:L:m:r:Q:z:Z:Fxg:X:h ARG; do
+while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:O:L:m:r:Q:z:Z:Fxg:X:Uh ARG; do
 	case "$ARG" in
 		i) REGIONFILE=$OPTARG;;
 		j) BWDIR=$OPTARG;;
@@ -142,6 +143,7 @@ while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:O:L:m:
         x) SS=1;;
         g) GENOME=$OPTARG;;
         X) PROCESSORS=$OPTARG;;
+        U) OVERWRITE=1;;
 		h) HELP=1;;
 	esac
 done
@@ -314,7 +316,7 @@ if [ ! -z "$NO_BASES_UNSCALED_DOWN" ]; then
 fi
 
 ## execute computeMatrix
-if [ ! -s "$OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz" ]; then
+if [ ! -s "$OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz" -o ! -z "$OVERWRITE" ]; then
     computeMatrix $PLOTREGION -S $BWFILE -R $INPUTFILE \
         -out $OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz \
         --beforeRegionStartLength $FLANKREGION --afterRegionStartLength $FLANKREGION \
@@ -347,7 +349,7 @@ if [ ! -z "$SAMPLE_LABEL" ]; then
     fi
 
     ARG="$ARG --samplesLabel $(echo $SAMPLE_LABEL | sed 's/\,/\n/g' | sort | uniq | tr '\r\n' ' ')";
-elif [ ! -s "$OUTDIR/$PLOTTITLE.deepToolsMatrix.gz" ]; then
+elif [ ! -s "$OUTDIR/$PLOTTITLE.deepToolsMatrix.gz" -o ! -z "$OVERWRITE" ]; then
     scp $OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz
 fi
 
