@@ -110,7 +110,7 @@ fi
 
 ## create temporary BED file if input is from stdin
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-TMP="qSatMFYRKyc98k5C2yNm9I3D6jZA8pwS"
+#TMP="qSatMFYRKyc98k5C2yNm9I3D6jZA8pwS"
 if [ "$PROMOTER_FILE" == "stdin" ]; then
     while read LINE; do
         echo -e "${LINE}"

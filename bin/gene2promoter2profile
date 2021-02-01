@@ -14,8 +14,8 @@ usage() {
 	echo "Usage: gene2promoter2profile -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input file containing genomic coordinates of TSS in BED format (can be stdin)]"
-    echo "             [FORMAT: chr start end name score strand down_bp class]"
-    echo "             [down_bp is the distance by which core promoter is extended downstream to TSS, computed using gene2promoter)]"
+    echo "             [FORMAT: chr start end name score strand promoter_defined promoter_coordinate up_bp down_bp]"
+    echo "             [computed using gene2promoter)]"
     echo " -j <file>   [input mapped reads in BAM format]"
     echo "             [if multiple separate by a comma]"
     echo "             **OR**"
@@ -24,6 +24,7 @@ usage() {
     echo "[OPTIONS]"
     echo " -c          [analyze for enhancer (default: promoter)]"
     echo " -r <file>   [input BAM file (eg. chd4 ChIP-seq data) to refine DISTANCE (eg. 3' boundary of promoter)]"
+    echo " -N          [use new dual NFR feature to define the profile]"
     echo "[OPTIONS: bed2expr]"
     echo " -s <float>  [normalize expression by input size factor]"
     echo "             [if multiple, separate them by a comma]"
@@ -46,12 +47,13 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:c:r:s:mkde:v:tng:h ARG; do
+while getopts i:j:c:r:Ns:mkde:v:tng:h ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         j) INPUTBAMFILES=$OPTARG;;
         c) REGION=$OPTARG;;
         r) REFINE=$OPTARG;;
+        N) DUALNFR=1;;
         s) INPUTSIZEFACTORS=$OPTARG;; 
         m) CPM=1;;
         k) FPKM=1;;
@@ -81,19 +83,6 @@ else
     echo "Presently the program only support analysis for mm9, hg19 or rn5"
     echo
     usage
-fi
-
-## create temporary BED file if input is from stdin
-if [ "$INPUTBEDFILE" == "stdin" ]; then
-    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    while read LINE; do
-        echo ${LINE}
-    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
-    INPUTBEDFILE=$TMP
-else
-    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    zless $INPUTBEDFILE > $TMP 
-    INPUTBEDFILE=$TMP
 fi
 
 ## parse binary input parameters
@@ -128,112 +117,163 @@ if [ -z "$INPUTBAMFILES" ]; then
 fi
 #echo "bed2expr -i stdin -j $INPUTBAMFILES -g $GENOME -v $AVG $PARAM_BIN"; exit
 
-## populate up and down window length of HFR
-if [ "$REGION" == "promoter" ]; then
-    WIN_DOWN=50
-    WIN_UP=100
-    WIN_FLANKING=200
+if [ ! -z "DUALNFR" ]; then
+    ## create temporary BED file if input is from stdin
+    if [ "$INPUTBEDFILE" == "stdin" ]; then
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        while read LINE; do
+            echo -e "${LINE}"
+        done > $TMP
+        INPUTBEDFILE=$TMP
+    else
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        zless $INPUTBEDFILE > $TMP 
+        INPUTBEDFILE=$TMP
+    fi
+
+    grep -v start $INPUTBEDFILE | perl -ane '@coor=split(/[:-]+/, $F[7]); print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\n";' | perl -ane '
+        if($F[5]=~/\-/) {
+            $nfr_up_end = $F[2];
+            $nfr_up_start = $F[2]-150;
+            $flagileNucleosome_middle_end = $F[2]-150;
+            $flagileNucleosome_middle_start = $F[2]-300;
+            $nfr_down_end = $F[2]-300;
+            $nfr_down_start = $F[2]-450;
+            $flagileNucleosome_down_end = $F[2]-450;
+            $flagileNucleosome_down_start = $F[1];
+        }
+        else if($F[5]=~/\+/) {
+            $nfr_up_start = $F[1];
+            $nfr_up_end = $F[1]+150;
+            $flagileNucleosome_middle_start = $F[1]+150;
+            $flagileNucleosome_middle_end = $F[1]+300;
+            $nfr_down_start = $F[1]+300;
+            $nfr_down_end = $F[1]+450;
+            $flagileNucleosome_down_start = $F[1]+450;
+            $flagileNucleosome_down_end = $F[2];
+        }
+    ';
 else
-    WIN_DOWN=100
-    WIN_UP=100
-    WIN_FLANKING=200
+    ## create temporary BED file if input is from stdin
+    if [ "$INPUTBEDFILE" == "stdin" ]; then
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        while read LINE; do
+            echo ${LINE}
+        done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' | cut -f 1-6,10 > $TMP
+        INPUTBEDFILE=$TMP
+    else
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        zless $INPUTBEDFILE | cut -f 1-6,10 > $TMP 
+        INPUTBEDFILE=$TMP
+    fi
+
+    ## populate up and down window length of HFR
+    if [ "$REGION" == "promoter" ]; then
+        WIN_DOWN=50
+        WIN_UP=100
+        WIN_FLANKING=200
+    else
+        WIN_DOWN=100
+        WIN_UP=100
+        WIN_FLANKING=200
+    fi
+
+    NCOL=$(zless $INPUTBEDFILE | head -n 1 | perl -ane 'print scalar(@F);')
+
+    #echo -e "WIN_UP: $WIN_UP; WIN_DOWN: $WIN_DOWN"; exit
+    ## refine 3' boundary of promoter
+    if [ ! -z "$REFINE" ]; then
+        >&2 echo -n "Refine 3' boundary of promoter (`date`).. "
+        REFINED_3p=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        zless $INPUTBEDFILE | perl -ane 'if($F[6]>450) { print $_; }' | perl -ane 'if($F[5]=~/\-/) { $end=$F[1]-250; $start=$F[1]-$F[6]; } else { $start=$F[1]+250; $end=$F[1]+$F[6]; } print "$F[0]\t$start\t$end\t$F[3]\t$F[4]\t$F[5]\n";' | bed2HighestExprBin -i stdin -j $REFINE -w 200 -s 200 -d -g $GENOME > $REFINED_3p
+
+        zless <(zless $INPUTBEDFILE | perl -ane 'if($F[6]<=450) { print $_; }') <(join -j 4  <(sort -k 4,4 $INPUTBEDFILE) $REFINED_3p | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t"; $ncol='$NCOL'; foreach(@F[6..($ncol+2)]) { print "$_\t"; } print "\n";' | perl -ane '$ncol='$NCOL'; if($F[5]=~/\-/) { $distance_3p=$F[1]-$F[$ncol+1]; } else { $distance_3p=$F[$ncol+2]-$F[1]; } $F[6]=$distance_3p; print "$F[0]"; foreach(@F[1..($ncol-1)]) { print "\t$_"; } print "\n";') | sort -k 4,4 > $REFINED_3p.bed
+
+        rm $REFINED_3p
+        mv $REFINED_3p.bed $INPUTBEDFILE
+        >&2 echo "done"
+    fi
+
+    ## parse input BED file and compute signal
+    cat $INPUTBEDFILE | perl -ane '
+        if($F[6]!~/^[0-9]+$/) { $F[6]=50; }
+        if($F[5]=~/\-/) { 
+            $hfr_start=$F[1]-'$WIN_DOWN';
+            $hfr_end=$F[1]+'$WIN_UP';
+
+            $up_start=$hfr_end+1;
+            $up_end=$up_start+'$WIN_FLANKING';
+
+            $extr_up_start=$up_end+1;
+            $extr_up_end=$extr_up_start+'$WIN_FLANKING';
+
+            $extr_extr_up_start=$extr_up_end+1;
+            $extr_extr_up_end=$extr_extr_up_start+'$WIN_FLANKING';
+
+            $START=$F[1]-$F[6];
+
+            ## this means if START < 50 (WIN_DOWN) + 200 (WIN_FLANKING) + 50 (NFR)
+            if($START < $hfr_start-250) {
+                $nfr_start=$START+'$WIN_FLANKING';
+                $nfr_end=$hfr_start-1;
+            } else {
+                $nfr_start=$hfr_start;
+                $nfr_end=$hfr_end;
+            }
+
+            $down_end=$nfr_start-1;
+            $down_start=$down_end-'$WIN_FLANKING';
+
+            $extr_down_end=$down_start-1;
+            $extr_down_start=$extr_down_end-'$WIN_FLANKING';
+
+            $extr_extr_down_end=$extr_down_start-1;
+            $extr_extr_down_start=$extr_extr_down_end-'$WIN_FLANKING';
+        } else {
+            $hfr_start=$F[1]-'$WIN_UP';
+            $hfr_end=$F[1]+'$WIN_DOWN';
+
+            $up_end=$hfr_start-1;
+            $up_start=$up_end-'$WIN_FLANKING';
+
+            $extr_up_end=$up_start-1;
+            $extr_up_start=$extr_up_end-'$WIN_FLANKING';
+
+            $extr_extr_up_end=$extr_up_start-1;
+            $extr_extr_up_start=$extr_extr_up_end-'$WIN_FLANKING';
+
+            $END=$F[1]+$F[6];
+
+            ## this means if END > 50 (WIN_DOWN) + 200 (WIN_FLANKING) + 50 (NFR)
+            if($END >= $hfr_end+250) {
+                $nfr_start=$hfr_end+1;
+                $nfr_end=$END-'$WIN_FLANKING';
+            } else {
+                $nfr_start=$hfr_start;
+                $nfr_end=$hfr_end;
+            }
+            $down_start=$nfr_end+1;
+            $down_end=$down_start+'$WIN_FLANKING';
+
+            $extr_down_start=$down_end+1;
+            $extr_down_end=$extr_down_start+'$WIN_FLANKING';
+
+            $extr_extr_down_start=$extr_down_end+1;
+            $extr_extr_down_end=$extr_extr_down_start+'$WIN_FLANKING';
+        }
+        $line=$F[0]; foreach(@F[1..scalar(@F)-1]) { $line.="#$_"; }
+        print "$F[0]\t$extr_extr_up_start\t$extr_extr_up_end\tEXTR_EXTR_UP#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region up-stream to EXTR_UP
+        print "$F[0]\t$extr_up_start\t$extr_up_end\tEXTR_UP#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region up-stream to UP
+        print "$F[0]\t$up_start\t$up_end\tUP#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region up-stream to HFR
+        print "$F[0]\t$hfr_start\t$hfr_end\tHFR#$F[3]\t0\t$F[5]\t$line\n"; ## Promoters: 150 bp nucleosome free region + also devoid of histone modified nucleosomes (HFR)
+        print "$F[0]\t$nfr_start\t$nfr_end\tNFR#$F[3]\t0\t$F[5]\t$line\n"; ## region of varying width containing histone modified nucleosomes (NFR)
+        print "$F[0]\t$down_start\t$down_end\tDOWN#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region down-stream to NFR
+        print "$F[0]\t$extr_down_start\t$extr_down_end\tEXTR_DOWN#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region down-stream to DOWN
+        print "$F[0]\t$extr_extr_down_start\t$extr_extr_down_end\tEXTR_EXTR_DOWN#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region down-stream to EXTR_DOWN
+        #chomp($_);
+        #print "$_\t$F[0]:$up_start-$up_end\t$F[0]:$hfr_start-$hfr_end\t$F[0]:$nfr_start-$nfr_end\t$F[0]:$down_start-$down_end\n";' | bed2expr -i stdin -j $INPUTBAMFILES -g $GENOME -v $AVG $PARAM_BIN
 fi
 
-NCOL=$(zless $INPUTBEDFILE | head -n 1 | perl -ane 'print scalar(@F);')
-
-#echo -e "WIN_UP: $WIN_UP; WIN_DOWN: $WIN_DOWN"; exit
-## refine 3' boundary of promoter
-if [ ! -z "$REFINE" ]; then
-    >&2 echo -n "Refine 3' boundary of promoter (`date`).. "
-    REFINED_3p=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    zless $INPUTBEDFILE | perl -ane 'if($F[6]>450) { print $_; }' | perl -ane 'if($F[5]=~/\-/) { $end=$F[1]-250; $start=$F[1]-$F[6]; } else { $start=$F[1]+250; $end=$F[1]+$F[6]; } print "$F[0]\t$start\t$end\t$F[3]\t$F[4]\t$F[5]\n";' | bed2HighestExprBin -i stdin -j $REFINE -w 200 -s 200 -d -g $GENOME > $REFINED_3p
-
-    zless <(zless $INPUTBEDFILE | perl -ane 'if($F[6]<=450) { print $_; }') <(join -j 4  <(sort -k 4,4 $INPUTBEDFILE) $REFINED_3p | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t"; $ncol='$NCOL'; foreach(@F[6..($ncol+2)]) { print "$_\t"; } print "\n";' | perl -ane '$ncol='$NCOL'; if($F[5]=~/\-/) { $distance_3p=$F[1]-$F[$ncol+1]; } else { $distance_3p=$F[$ncol+2]-$F[1]; } $F[6]=$distance_3p; print "$F[0]"; foreach(@F[1..($ncol-1)]) { print "\t$_"; } print "\n";') | sort -k 4,4 > $REFINED_3p.bed
-
-    rm $REFINED_3p
-    mv $REFINED_3p.bed $INPUTBEDFILE
-    >&2 echo "done"
-fi
-
-## parse input BED file and compute signal
-cat $INPUTBEDFILE | perl -ane '
-    if($F[6]!~/^[0-9]+$/) { $F[6]=50; }
-    if($F[5]=~/\-/) { 
-        $hfr_start=$F[1]-'$WIN_DOWN';
-        $hfr_end=$F[1]+'$WIN_UP';
-
-        $up_start=$hfr_end+1;
-        $up_end=$up_start+'$WIN_FLANKING';
-
-        $extr_up_start=$up_end+1;
-        $extr_up_end=$extr_up_start+'$WIN_FLANKING';
-
-        $extr_extr_up_start=$extr_up_end+1;
-        $extr_extr_up_end=$extr_extr_up_start+'$WIN_FLANKING';
-
-        $START=$F[1]-$F[6];
-
-        ## this means if START < 50 (WIN_DOWN) + 200 (WIN_FLANKING) + 50 (NFR)
-        if($START < $hfr_start-250) {
-            $nfr_start=$START+'$WIN_FLANKING';
-            $nfr_end=$hfr_start-1;
-        } else {
-            $nfr_start=$hfr_start;
-            $nfr_end=$hfr_end;
-        }
-
-        $down_end=$nfr_start-1;
-        $down_start=$down_end-'$WIN_FLANKING';
-
-        $extr_down_end=$down_start-1;
-        $extr_down_start=$extr_down_end-'$WIN_FLANKING';
-
-        $extr_extr_down_end=$extr_down_start-1;
-        $extr_extr_down_start=$extr_extr_down_end-'$WIN_FLANKING';
-    } else {
-        $hfr_start=$F[1]-'$WIN_UP';
-        $hfr_end=$F[1]+'$WIN_DOWN';
-
-        $up_end=$hfr_start-1;
-        $up_start=$up_end-'$WIN_FLANKING';
-
-        $extr_up_end=$up_start-1;
-        $extr_up_start=$extr_up_end-'$WIN_FLANKING';
-
-        $extr_extr_up_end=$extr_up_start-1;
-        $extr_extr_up_start=$extr_extr_up_end-'$WIN_FLANKING';
-
-        $END=$F[1]+$F[6];
-
-        ## this means if END > 50 (WIN_DOWN) + 200 (WIN_FLANKING) + 50 (NFR)
-        if($END >= $hfr_end+250) {
-            $nfr_start=$hfr_end+1;
-            $nfr_end=$END-'$WIN_FLANKING';
-        } else {
-            $nfr_start=$hfr_start;
-            $nfr_end=$hfr_end;
-        }
-        $down_start=$nfr_end+1;
-        $down_end=$down_start+'$WIN_FLANKING';
-
-        $extr_down_start=$down_end+1;
-        $extr_down_end=$extr_down_start+'$WIN_FLANKING';
-
-        $extr_extr_down_start=$extr_down_end+1;
-        $extr_extr_down_end=$extr_extr_down_start+'$WIN_FLANKING';
-    }
-    $line=$F[0]; foreach(@F[1..scalar(@F)-1]) { $line.="#$_"; }
-    print "$F[0]\t$extr_extr_up_start\t$extr_extr_up_end\tEXTR_EXTR_UP#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region up-stream to EXTR_UP
-    print "$F[0]\t$extr_up_start\t$extr_up_end\tEXTR_UP#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region up-stream to UP
-    print "$F[0]\t$up_start\t$up_end\tUP#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region up-stream to HFR
-    print "$F[0]\t$hfr_start\t$hfr_end\tHFR#$F[3]\t0\t$F[5]\t$line\n"; ## Promoters: 150 bp nucleosome free region + also devoid of histone modified nucleosomes (HFR)
-    print "$F[0]\t$nfr_start\t$nfr_end\tNFR#$F[3]\t0\t$F[5]\t$line\n"; ## region of varying width containing histone modified nucleosomes (NFR)
-    print "$F[0]\t$down_start\t$down_end\tDOWN#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region down-stream to NFR
-    print "$F[0]\t$extr_down_start\t$extr_down_end\tEXTR_DOWN#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region down-stream to DOWN
-    print "$F[0]\t$extr_extr_down_start\t$extr_extr_down_end\tEXTR_EXTR_DOWN#$F[3]\t0\t$F[5]\t$line\n"; ## 200 bp region down-stream to EXTR_DOWN
-    #chomp($_);
-    #print "$_\t$F[0]:$up_start-$up_end\t$F[0]:$hfr_start-$hfr_end\t$F[0]:$nfr_start-$nfr_end\t$F[0]:$down_start-$down_end\n";' | bed2expr -i stdin -j $INPUTBAMFILES -g $GENOME -v $AVG $PARAM_BIN
-    
 ## remove temporary file, if exists
 if [ ! -z "$TMP" ]; then
     rm $TMP
