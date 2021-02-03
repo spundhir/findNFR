@@ -33,7 +33,7 @@ usage() {
 	echo "Usage: gene2promoter2annotation -i <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input file containing genomic coordinates of TSS in BED format (can be stdin)]"
-    echo "             [format: chr start end name score strand promoter_defined promoter_coordinate up_bp down_bp]"
+    echo "             [format: chr start end name score strand promoter_defined promoter_coordinate antisense_bp sense_bp]"
     echo "             [down_bp is the distance by which core promoter is extended downstream to TSS, computed using gene2promoter)]"
     echo "             [note: 'name' should be unique]"
     echo "[OPTIONS]"
@@ -48,7 +48,7 @@ usage() {
     echo " -m <file>   [input file containing sequence motif information]"
 	echo " -h          [help]"
     echo "[OUTPUT]"
-    echo "             [chr start end name score strand promoter_defined promoter_coordinate up_bp down_bp]"
+    echo "             [chr start end name score strand promoter_defined promoter_coordinate antisense_bp sense_bp]"
 	echo
 	exit 0
 }

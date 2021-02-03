@@ -68,7 +68,7 @@ usage() {
     echo " -N          [normalize by sequencing depth (#mapped reads)]"
 	echo " -h          [help]"
     echo "[OUTPUT]"
-    echo "             [chr start end name score strand promoter_defined promoter_coordinate up_bp down_bp]"
+    echo "             [chr start end name score strand promoter_defined promoter_coordinate antisense_bp sense_bp]"
 	echo
 	exit 0
 }
@@ -216,7 +216,7 @@ else
         gene2mostActiveTSS -i $GENEFILE -j $BAMFILE -g $GENOME -w 300 | sortBed -i stdin
     fi | bed2window -i stdin -w 0 -t | bed2window -i stdin -w 1 -r | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/define_promoter/GENES_TSS.BED
 
-    echo -e "#chr\tstart\tend\tname\tscore\tstrand\tpromoter_defined\tpromoter_coordinate\tup_bp\tdown_bp"
+    echo -e "#chr\tstart\tend\tname\tscore\tstrand\tpromoter_defined\tpromoter_coordinate\tantisense_bp\tsense_bp"
     closestBed -a <(sortBed -i $OUTDIR/define_promoter/GENES_TSS.BED) -b $OUTDIR/define_promoter/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$F[0]:$start-$end";
     if($F[5]=~/\-/) { 
         $up=$F[1]-$end;
