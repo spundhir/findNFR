@@ -165,12 +165,14 @@ cat $INPUTBEDFILE | perl -ane '
         $nfr_end = $F[1]+'$WIN_ANTISENSE';
 
         ## antisense NDR (should be > one Nucleosome - 200 bp)
-        if(abs(F[8]) > '$WIN_NUCLEOSOME') {
+        if(abs($F[8]) > '$WIN_NUCLEOSOME') {
             $ndr_antisense_start = $nfr_end+1;
-            $ndr_antisense_end = $nfr_end+abs(F[8]);
+            $ndr_antisense_end = $nfr_end+abs($F[8]);
         } else {
-            $ndr_antisense_start = $nfr_start;
-            $ndr_antisense_end = $nfr_end;
+            $ndr_antisense_start = $nfr_end+1;
+            $ndr_antisense_end = $nfr_end+'$WIN_NUCLEOSOME';
+            #$ndr_antisense_start = $nfr_start;
+            #$ndr_antisense_end = $nfr_end;
         }
 
         ## -1, -2 and -3 nucleosomes
@@ -188,8 +190,10 @@ cat $INPUTBEDFILE | perl -ane '
             $ndr_sense_end = $nfr_start-1;
             $ndr_sense_start = $nfr_start-abs($F[9]);
         } else {
-            $ndr_sense_end = $nfr_end;
-            $ndr_sense_start = $nfr_start;
+            $ndr_sense_end = $nfr_start-1;
+            $ndr_sense_start = $nfr_start-'$WIN_NUCLEOSOME';
+            #$ndr_sense_end = $nfr_end;
+            #$ndr_sense_start = $nfr_start;
         }
 
         ## +1, +2 and +3 nucleosomes
@@ -207,12 +211,14 @@ cat $INPUTBEDFILE | perl -ane '
         $nfr_end = $F[1]+'$WIN_SENSE';
 
         ## antisense NDR (should be > one Nucleosome - 200 bp)
-        if(abs(F[8]) > '$WIN_NUCLEOSOME') {
+        if(abs($F[8]) > '$WIN_NUCLEOSOME') {
             $ndr_antisense_end = $nfr_end-1;
             $ndr_antisense_start = $nfr_end-abs($F[8]);
         } else {
-            $ndr_antisense_end = $nfr_end;
-            $ndr_antisense_start = $nfr_start;
+            $ndr_antisense_end = $nfr_end-1;
+            $ndr_antisense_start = $nfr_end-'$WIN_NUCLEOSOME';
+            #$ndr_antisense_end = $nfr_end;
+            #$ndr_antisense_start = $nfr_start;
         }
 
         ## -1, -2 and -3 nucleosomes
@@ -230,8 +236,10 @@ cat $INPUTBEDFILE | perl -ane '
             $ndr_sense_start = $nfr_end+1;
             $ndr_sense_end = $nfr_end+abs($F[9]);
         } else {
-            $ndr_sense_start = $nfr_start;
-            $ndr_sense_end = $nfr_end;
+            $ndr_sense_start = $nfr_end+1;
+            $ndr_sense_end = $nfr_end+'$WIN_NUCLEOSOME';
+            #$ndr_sense_start = $nfr_start;
+            #$ndr_sense_end = $nfr_end;
         }
 
         ## +1, +2 and +3 nucleosomes
