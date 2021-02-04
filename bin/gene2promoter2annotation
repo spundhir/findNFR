@@ -110,7 +110,7 @@ fi
 
 ## create temporary BED file if input is from stdin
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-#TMP="qSatMFYRKyc98k5C2yNm9I3D6jZA8pwS"
+TMP="B7F8L90t3w4mzXeiKmwc9Rk2hJUIZdiR"
 if [ "$PROMOTER_FILE" == "stdin" ]; then
     while read LINE; do
         echo -e "${LINE}"
@@ -120,19 +120,20 @@ fi
 NCOL=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F)."\n";')
 echo -ne "$(grep '^#' $PROMOTER_FILE)\tpromoter_width\tpromoter_class\tdist_to_tss"
 
-## refine TSS based on CAGE peaks
-TSS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -T)
-if [ -f "$TSS_FILE" ]; then
-    closestBed -a <(grep -v start $PROMOTER_FILE | perl -ane '@coor=split(/[:-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]"; foreach(@F[3..scalar(@F)-1]) { print "\t$_"; } print "\t$F[0]:$F[1]-$F[2]\n";' | sortBed -i stdin) -b <(zless $TSS_FILE | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F-1)]==0) { print "$F['$((NCOL+1))']\t$F['$((NCOL+2))']\t$F['$((NCOL+3))']"; } else { @coor=split(/[:-]/,$F['$((NCOL))']); print "$coor[0]\t$coor[1]\t$coor[2]"; } foreach(@F[3..'$((NCOL-1))']) { print "\t$_"; } print "\n";' > ${TMP}.cage
-    PROMOTER_FILE="${TMP}.cage"
-else
-    touch ${TMP}.cage
-fi
-
 ## distance to closest TSS
 >&2 echo -n "Determine distance to closest TSS (`date`).. "
 closestBed -a <(sortBed -i $PROMOTER_FILE) -b <(sortBed -i $PROMOTER_FILE) -d -t first -io | perl -ane '$class="narrow"; @coor=split(/[:-]+/,$F[7]); $promoter_width=($coor[2]-$coor[1]); if($promoter_width > 500 && $promoter_width <=1000) { $class="medium"; } elsif($promoter_width > 1000) { $class="broad"; } foreach(@F[0..9]) { print "$_\t"; } print "$promoter_width\t$class\t".$F[scalar(@F)-1]."\n";' > ${TMP}.distance
 >&2 echo "done"
+
+## refine TSS based on CAGE peaks
+TSS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -T)
+if [ -f "$TSS_FILE" ]; then
+    #closestBed -a <(grep -v start $PROMOTER_FILE | perl -ane '@coor=split(/[:-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]"; foreach(@F[3..scalar(@F)-1]) { print "\t$_"; } print "\t$F[0]:$F[1]-$F[2]\n";' | sortBed -i stdin) -b <(zless $TSS_FILE | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F-1)]==0) { print "$F['$((NCOL+1))']\t$F['$((NCOL+2))']\t$F['$((NCOL+3))']"; } else { @coor=split(/[:-]/,$F['$((NCOL))']); print "$coor[0]\t$coor[1]\t$coor[2]"; } foreach(@F[3..'$((NCOL-1))']) { print "\t$_"; } print "\n";' > ${TMP}.cage
+    echo -ne "\tcage_tss"
+    closestBed -a <(grep -v start $PROMOTER_FILE | perl -ane '@coor=split(/[:-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]"; foreach(@F[3..scalar(@F)-1]) { print "\t$_"; } print "\t$F[0]:$F[1]-$F[2]\n";' | sortBed -i stdin) -b <(zless $TSS_FILE | sortBed -i stdin) -d -t first | perl -ane '@coor=split(/[:-]+/,$F['$((NCOL))']); $cage_tss="$coor[0]:$coor[1]-$coor[2]"; if($F[scalar(@F-1)]==0) { $cage_tss="$F['$((NCOL+1))']:$F['$((NCOL+2))']-$F['$((NCOL+3))']"; } print "$coor[0]\t$coor[1]\t$coor[2]"; foreach(@F[3..'$((NCOL-1))']) { print "\t$_"; } print "\t$cage_tss\n";' > ${TMP}.cage
+else
+    touch ${TMP}.cage
+fi
 
 ## gene length
 GENE_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -e)
@@ -198,7 +199,7 @@ fi
 >&2 echo "done"
 COMMENT
 
-join -j 1 <(join -j 1 <(join -j 1 <(join -1 4 -2 1 <(less ${TMP}.distance | sort -k 4,4) <(less ${TMP}.length | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1)) <(less ${TMP}.cpg | cut -f 4,$((NCOL+1)) | sort -k 1,1)) <(less ${TMP}.conservation | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1)) <(less ${TMP}.bivalent | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1) | tabEdit -i stdin -t | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";'
+join -j 1 <(join -j 1 <(join -j 1 <(join -j 1 <(join -1 4 -2 1 <(less ${TMP}.distance | sort -k 4,4) <(less ${TMP}.cage | cut -f 4,$((NCOL+1)) | sort -k 1,1)) <(less ${TMP}.length | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1)) <(less ${TMP}.cpg | cut -f 4,$((NCOL+1)) | sort -k 1,1)) <(less ${TMP}.conservation | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1)) <(less ${TMP}.bivalent | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1) | tabEdit -i stdin -t | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";'
 
 rm ${TMP}.cage
 rm ${TMP}.distance
