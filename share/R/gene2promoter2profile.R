@@ -4,9 +4,9 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file containing output from gene2promoter2profile script (can be stdin)"),
-    make_option(c("-l", "--classVariable"), default="class", help="plot profiles for promoters categorized based on: a) class or b) directionality (default: %default)"),
+    make_option(c("-l", "--classVariable"), default="promoter_class", help="plot profiles for promoters categorized based on: a) directionality (default: %default)"),
     make_option(c("-m", "--customClass"), help="file containing custom class information to categorize promoters (format: gene_name class)"),
-    make_option(c("-c", "--directionalityCol"), default=8, help="column using which to define the promoter directionality classes (default: %default)"),
+    make_option(c("-c", "--directionalityCol"), default=1, help="column using which to define the promoter directionality classes (default: %default)"),
     make_option(c("-p", "--plotCol"), help="column for which profile needs to be plotted (default: all columns)"),
     make_option(c("-o", "--outFile"), help="output pdf file, if null matrix will be STDOUT")
 )
@@ -32,62 +32,77 @@ suppressPackageStartupMessages(library(session))
 
 ## function to plot profile
 plot_profile <- function(x, title, plot) {
-    test.sub <- x
+    test.sub <- as.data.frame(x)
 
-    if(missing(plot)) { plot="class"; }
+    if(missing(plot)) { plot="promoter_class"; }
 
     if(plot=="directionality") {
-        test.melt <- melt(test.sub[,c(1:8,9,13)])
+        test.melt <- reshape2::melt(test.sub[,c("nucleosome1_antisense", "nucleosome2_antisense", "nucleosome3_antisense",
+                                                "ndr_antisense", "nfr", "ndr_sense",
+                                                "nucleosome1_sense", "nucleosome2_sense", "nucleosome3_sense", 
+                                                "class", "profile_directionality_class")])
 
-        col <- c(rep("#e31a1c", 3), rep("#1f78b4",2), rep("#33a02c",3))
-        shp <- c(rep(17,3), rep(16,2), rep(18,3))
+        col <- c(rep("#e31a1c", 3), rep("#1f78b4",3), rep("#33a02c",3))
+        shp <- c(rep(17,3), rep(16,3), rep(18,3))
 
         ggplot(test.melt, aes(variable, group=1)) +
-            stat_smooth(data = test.melt[which(test.melt$profile_directionality_class=="-1"),], aes(y = log(value), group=1, colour="-1"), method=lm, formula = y ~ poly(x,5), level=0.95) +
-            stat_smooth(data = test.melt[which(test.melt$profile_directionality_class=="0"),], aes(y = log(value), group=1, colour="0"), method=lm, formula = y ~ poly(x,5), level=0.95) +
-            stat_smooth(data = test.melt[which(test.melt$profile_directionality_class=="1"),], aes(y = log(value), group=1, colour="1"), method=lm, formula = y ~ poly(x,5), level=0.95) +
+            stat_smooth(data = test.melt[which(test.melt$profile_directionality_class=="-1"),], aes(y = log(value), group=1, colour="-1"), method=lm, formula = y ~ poly(x,8), level=0.95) +
+            stat_smooth(data = test.melt[which(test.melt$profile_directionality_class=="0"),], aes(y = log(value), group=1, colour="0"), method=lm, formula = y ~ poly(x,8), level=0.95) +
+            stat_smooth(data = test.melt[which(test.melt$profile_directionality_class=="1"),], aes(y = log(value), group=1, colour="1"), method=lm, formula = y ~ poly(x,8), level=0.95) +
             ## colors are arranged alphabetically, meaning -1, 0 and 1
             scale_colour_manual("profile_directionality_class", breaks = c("-1", "0", "1"), values = c("#4faf4a","#ef7e1b", "#e31e1e")) +
             theme_bw() +
-            facet_grid(.~class) +
+            facet_wrap(.~class, scales="free") +
             ggtitle(title) +
-            scale_x_discrete(labels=c("-3", "-2", "-1", "HFR", "NFR", "1", "+2", "+3" )) +
+            scale_x_discrete(labels=c("nucleosome1_antisense", "nucleosome2_antisense", "nucleosome3_antisense",
+                                      "ndr_antisense", "nfr", "ndr_sense",
+                                      "nucleosome1_sense", "nucleosome2_sense", "nucleosome3_sense")) +
             theme(axis.text.x = element_text(size=10, angle=45)) + xlab("") + ylab("Signal (TPKM, log)") +
             theme(legend.position="none")
     } else if(plot=="custom") {
-        test.melt <- melt(test.sub[,c(1:8,15)])
+        test.melt <- reshape2::melt(test.sub[,c("nucleosome1_antisense", "nucleosome2_antisense", "nucleosome3_antisense",
+                                                "ndr_antisense", "nfr", "ndr_sense",
+                                                "nucleosome1_sense", "nucleosome2_sense", "nucleosome3_sense", 
+                                                "class", "promoter_class")])
 
-        col <- c(rep("#e31a1c", 3), rep("#1f78b4",2), rep("#33a02c",3))   
-        shp <- c(rep(17,3), rep(16,2), rep(18,3))        
+        col <- c(rep("#e31a1c", 3), rep("#1f78b4",3), rep("#33a02c",3))   
+        shp <- c(rep(17,3), rep(16,3), rep(18,3))        
 
         custom_class <- as.character(unique(test.melt$custom_class))
 
         ggplot(test.melt, aes(variable, group=1)) +              
-            stat_smooth(data = test.melt[which(test.melt$custom_class==custom_class[1]),], aes(y = log(value), group=1, colour=custom_class[1]), method=lm, formula = y ~ poly(x,5), level=0.95) +              
-            stat_smooth(data = test.melt[which(test.melt$custom_class==custom_class[2]),], aes(y = log(value), group=1, colour=custom_class[2]), method=lm, formula = y ~ poly(x,5), level=0.95) +
-            stat_smooth(data = test.melt[which(test.melt$custom_class==custom_class[3]),], aes(y = log(value), group=1, colour=custom_class[3]), method=lm, formula = y ~ poly(x,5), level=0.95) +
+            stat_smooth(data = test.melt[which(test.melt$custom_class==custom_class[1]),], aes(y = log(value), group=1, colour=custom_class[1]), method=lm, formula = y ~ poly(x,8), level=0.95) +
+            stat_smooth(data = test.melt[which(test.melt$custom_class==custom_class[2]),], aes(y = log(value), group=1, colour=custom_class[2]), method=lm, formula = y ~ poly(x,8), level=0.95) +
+            stat_smooth(data = test.melt[which(test.melt$custom_class==custom_class[3]),], aes(y = log(value), group=1, colour=custom_class[3]), method=lm, formula = y ~ poly(x,8), level=0.95) +
             scale_colour_manual("custom_class", breaks = custom_class, values = c("#4faf4a","#ef7e1b", "#e31e1e")) +
             theme_bw() +
             ggtitle(title) +
-            scale_x_discrete(labels=c("-3", "-2", "-1", "HFR", "NFR", "1", "2", "3" )) +
+            scale_x_discrete(labels=c("nucleosome1_antisense", "nucleosome2_antisense", "nucleosome3_antisense",
+                                      "ndr_antisense", "nfr", "ndr_sense",
+                                      "nucleosome1_sense", "nucleosome2_sense", "nucleosome3_sense")) +
             theme(axis.text.x = element_text(size=10, angle=45)) + xlab("") + ylab("Signal (TPKM, log)") +
             theme(legend.position="top")
     } else {
-        test.melt <- melt(test.sub[,c(1:8,9,11)])
+        test.melt <- reshape2::melt(test.sub[,c("nucleosome1_antisense", "nucleosome2_antisense", "nucleosome3_antisense",
+                                                "ndr_antisense", "nfr", "ndr_sense",
+                                                "nucleosome1_sense", "nucleosome2_sense", "nucleosome3_sense", 
+                                                "class", "promoter_class")])
 
-        col <- c(rep("#e31a1c", 3), rep("#1f78b4",2), rep("#33a02c",3))
-        shp <- c(rep(17,3), rep(16,2), rep(18,3))
+        col <- c(rep("#e31a1c", 3), rep("#1f78b4",3), rep("#33a02c",3))
+        shp <- c(rep(17,3), rep(16,3), rep(18,3))
 
         ggplot(test.melt, aes(variable, group=1)) +
-            stat_smooth(data = test.melt[which(test.melt$promoter_class=="narrow"),], aes(y = log(value), group=1, colour="narrow"), method=lm, formula = y ~ poly(x,5), level=0.95) +
-            stat_smooth(data = test.melt[which(test.melt$promoter_class=="medium"),], aes(y = log(value), group=1, colour="medium"), method=lm, formula = y ~ poly(x,5), level=0.95) +
-            stat_smooth(data = test.melt[which(test.melt$promoter_class=="broad"),], aes(y = log(value), group=1, colour="broad"), method=lm, formula = y ~ poly(x,5), level=0.95) +
+            stat_smooth(data = test.melt[which(test.melt$promoter_class=="narrow"),], aes(y = log(value), group=1, colour="narrow"), method=lm, formula = y ~ poly(x,8), level=0.95) +
+            stat_smooth(data = test.melt[which(test.melt$promoter_class=="medium"),], aes(y = log(value), group=1, colour="medium"), method=lm, formula = y ~ poly(x,8), level=0.95) +
+            stat_smooth(data = test.melt[which(test.melt$promoter_class=="broad"),], aes(y = log(value), group=1, colour="broad"), method=lm, formula = y ~ poly(x,8), level=0.95) +
             ## colors are arranged alphabetically, meaning broad, medium and narrow
             scale_colour_manual("promoter_class", breaks = c("narrow", "medium", "broad"), values = c("#4faf4a","#ef7e1b", "#e31e1e")) +
             theme_bw() +
-            facet_grid(.~class) +
+            facet_wrap(.~class, scales="free") +
             ggtitle(title) +
-            scale_x_discrete(labels=c("-3", "-2", "-1", "HFR", "NFR", "1", "2", "3" )) +
+            scale_x_discrete(labels=c("nucleosome1_antisense", "nucleosome2_antisense", "nucleosome3_antisense",
+                                      "ndr_antisense", "nfr", "ndr_sense",
+                                      "nucleosome1_sense", "nucleosome2_sense", "nucleosome3_sense")) +
             theme(axis.text.x = element_text(size=10, angle=45)) + xlab("") + ylab("Signal (TPKM, log)") +
             theme(legend.position="none")
     }
@@ -107,34 +122,43 @@ colnames(data) <- c("chr", "start", "end", "name", "score", "strand", "descripti
 colnames(data)[8:NCOL] <- seq(1,NCOL-7,1)
 
 ## format list containing profile values
-class <- as.character(gsub("^.*#", "", data[grep("HFR", data$name),]$description))
-distance <- as.numeric(apply(data[grep("HFR", data$name),], 1, function(x) unlist(strsplit(x[7], "#"))[7]))
-gene <- apply(data[grep("HFR", data$name),], 1, function(x) unlist(strsplit(x[7], "#"))[4])
-test <- lapply(data[,c(1:NCOL)], function(x) as.data.frame(matrix(x, nrow=length(x)/8, byrow = T)))
-test <- lapply(test, setNames, nm <- c("2up", "1up", "up", "hfr", "nfr", "down", "1down", "2down"))
+class <- apply(data[grep("NFR", data$name),], 1, function(x) unlist(strsplit(x[7], "#"))[7])
+width <- apply(data[grep("NFR", data$name),], 1, function(x) 
+                as.numeric(unlist(strsplit(unlist(strsplit(x[7], "#"))[8], "[:-]+"))[3])-as.numeric(unlist(strsplit(unlist(strsplit(x[7], "#"))[8], "[:-]+"))[2]))
+gene <- apply(data[grep("NFR", data$name),], 1, function(x) unlist(strsplit(x[7], "#"))[4])
+antisense_bp <- apply(data[grep("NFR", data$name),], 1, function(x) abs(as.numeric(unlist(strsplit(x[7], "#"))[9])))
+sense_bp <- apply(data[grep("NFR", data$name),], 1, function(x) abs(as.numeric(unlist(strsplit(x[7], "#"))[10])))
+test <- lapply(data[,c(8:NCOL)], function(x) as.data.frame(matrix(x, nrow=length(x)/9, byrow = T)))
+test <- lapply(test, setNames, nm <- c("nucleosome1_antisense", "nucleosome2_antisense", "nucleosome3_antisense",
+                                       "ndr_antisense", "nfr", "ndr_sense",
+                                       "nucleosome1_sense", "nucleosome2_sense", "nucleosome3_sense"))
 test <- lapply(test, cbind, class)
-test <- lapply(test, cbind, distance)
+test <- lapply(test, cbind, width)
 test <- lapply(test, cbind, gene)
+test <- lapply(test, cbind, antisense_bp)
+test <- lapply(test, cbind, sense_bp)
 
 ## promoter class
-promoter_class <- test[[opt$directionalityCol]]$distance
-promoter_class[which(test[[opt$directionalityCol]]$distance <= 500)] <- "narrow"
-promoter_class[which(test[[opt$directionalityCol]]$distance > 500 & test[[opt$directionalityCol]]$distance <= 1000)] <- "medium"
-promoter_class[which(test[[opt$directionalityCol]]$distance > 1000)] <- "broad"
+promoter_class <- test[[1]]$width
+promoter_class[which(test[[1]]$width <= 500)] <- "narrow"
+promoter_class[which(test[[1]]$width > 500 & test[[1]]$width <= 1000)] <- "medium"
+promoter_class[which(test[[1]]$width > 1000)] <- "broad"
 test <- lapply(test, cbind, promoter_class)
-data <- cbind(data[grep("HFR", data$name),], promoter_class)
+
+data <- cbind(data[grep("NFR", data$name),], promoter_class)
 
 ## profile directionality
 profile_directionality <- rep(0, nrow(test[[opt$directionalityCol]]))
-profile_directionality <- (rowSums(test[[opt$directionalityCol]][c(5:8)])-rowSums(test[[opt$directionalityCol]][c(1:4)]))/(rowSums(test[[opt$directionalityCol]][c(5:8)])+rowSums(test[[opt$directionalityCol]][c(1:4)]))
+profile_directionality <- (rowSums(test[[opt$directionalityCol]][c(6:9)])-rowSums(test[[opt$directionalityCol]][c(1:4)]))/(rowSums(test[[opt$directionalityCol]][c(6:9)])+rowSums(test[[opt$directionalityCol]][c(1:4)]))
 test <- lapply(test, cbind, profile_directionality)
 profile_directionality_class <- rep("0", nrow(test[[opt$directionalityCol]]))
 profile_directionality_class[which(profile_directionality > 0.3)] <- "1"
 profile_directionality_class[which(profile_directionality < -0.3)] <- "-1"
 test <- lapply(test, cbind, profile_directionality_class)
-data <- cbind(data[grep("HFR", data$name),], profile_directionality)
-data <- cbind(data[grep("HFR", data$name),], profile_directionality_class)
-data$name <- gsub("HFR#", "", data$name)
+
+data <- cbind(data[grep("NFR", data$name),], profile_directionality)
+data <- cbind(data[grep("NFR", data$name),], profile_directionality_class)
+data$name <- gsub("NFR#", "", data$name)
 
 ## filter based on input genes and define custom classes if provided
 if(!is.null(opt$customClass)) {
@@ -154,13 +178,33 @@ if(!is.null(opt$outFile)) {
     if(!is.null(opt$plotCol)) {
         factors_order <- names(test)[as.numeric(opt$plotCol)]
     } else {
-        factors_order <- names(test)[c(8:NCOL)]
+        factors_order <- names(test)
     }
 
     if(!is.null(opt$customClass)) {
         p <- lapply(factors_order, function(x) { plot_profile(test[[x]], x, "custom") })
     } else {
         p <- lapply(factors_order, function(x) { plot_profile(test[[x]], x, opt$classVariable) })
+        #test.sub <- as.data.frame(test[[1]])
+        #test.melt <- reshape2::melt(test.sub[,c("nucleosome1_antisense", "nucleosome2_antisense", "nucleosome3_antisense",
+        #                                        "ndr_antisense", "nfr", "ndr_sense",
+        #                                        "nucleosome1_sense", "nucleosome2_sense", "nucleosome3_sense", 
+        #                                        "class", "promoter_class")])
+
+        #p <- ggplot(test.melt, aes(variable, group=1)) +
+                    #stat_smooth(data = test.melt[which(test.melt$promoter_class=="narrow"),], aes(y = log(value), group=1, colour="narrow"), method=lm, formula = y ~ poly(x,8), level=0.95) +
+                    #stat_smooth(data = test.melt[which(test.melt$promoter_class=="medium"),], aes(y = log(value), group=1, colour="medium"), method=lm, formula = y ~ poly(x,8), level=0.95) +
+                    #stat_smooth(data = test.melt[which(test.melt$promoter_class=="broad"),], aes(y = log(value), group=1, colour="broad"), method=lm, formula = y ~ poly(x,8), level=0.95) +
+                    ## colors are arranged alphabetically, meaning broad, medium and narrow
+                    #scale_colour_manual("promoter_class", breaks = c("narrow", "medium", "broad"), values = c("#4faf4a","#ef7e1b", "#e31e1e")) +
+                    #theme_bw() +
+                    #facet_wrap(.~class, scales="free") +
+                    #ggtitle("title") +
+                    #scale_x_discrete(labels=c("nucleosome1_antisense", "nucleosome2_antisense", "nucleosome3_antisense",
+                    #                          "ndr_antisense", "nfr", "ndr_sense",
+                    #                          "nucleosome1_sense", "nucleosome2_sense", "nucleosome3_sense")) +
+                    #theme(axis.text.x = element_text(size=10, angle=45)) + xlab("") + ylab("Signal (TPKM, log)") +
+                    #theme(legend.position="none")
     }
 
     g <- do.call(grid.arrange, p)
