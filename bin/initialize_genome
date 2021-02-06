@@ -19,7 +19,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 copyright_info
 
-GENOME="mm9"
+FILE="$FINDNFRPATH/data/annotations/GENOME_FILE"
 
 #### usage ####
 usage() {
@@ -27,11 +27,12 @@ usage() {
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: initialize_genome -i <file> -g <genome>"
+	echo "Usage: initialize_genome -g <genome>"
 	echo "Options:"
-	echo " -i <file>   [input file containing genome information]"
-    echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
+    echo "[OPTIONS]"
+	echo " -i <file>   [input file containing genome information]"
+    echo "             [default: $FILE]"
     echo " -m          [macs2 genome parameter, -g]"
     echo " -s          [effective genome size]"
     echo " -e          [file having genomic coordinates of genes in BED format]"
@@ -39,16 +40,18 @@ usage() {
     echo " -n          [file having genomic coordinates of genes in GTF format]"
     echo " -c          [file having genomic coordinates of CpG islands]"
     echo " -T          [file having genomic coordinates of all TSS (cage) in BED format]"
+    echo " -R          [file having genomic coordinates of sequence repeats in BED format]"
+    echo " -B          [file having genomic coordinates of blacklisted regions in BED format]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:g:msetncTh ARG; do
+while getopts g:i:msetncTRBh ARG; do
 	case "$ARG" in
-		i) FILE=$OPTARG;;
         g) GENOME=$OPTARG;;
+		i) FILE=$OPTARG;;
         m) MACS2=1;;
         s) GSIZE=1;;
         e) GENE_COOR_BED=1;;
@@ -56,32 +59,38 @@ while getopts i:g:msetncTh ARG; do
         n) GENE_COOR_GTF=1;;
         c) CPG_COOR_BED=1;;
         T) TSS_COOR_BED_CAGE=1;;
+        R) REPEATS=1;;
+        B) BLACKLIST=1;;
 		h) HELP=1;;
 	esac
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ ! -f "$FILE" -o "$HELP" ]; then
+if [ -z "$GENOME" -o "$HELP" ]; then
 	usage
 fi
 
 ## determine genome file location
 if [ ! -z "$MACS2" ]; then
-    grep -w $GENOME $FILE | perl -ane 'print "$F[2]";'
+    grep -w $GENOME $FILE | head -n 2 | tail -n 1 | perl -ane 'print "$F[1]";'
 elif [ ! -z "$GSIZE" ] ; then
-    grep -w $GENOME $FILE | perl -ane 'print "$F[3]";'
+    grep -w $GENOME $FILE | head -n 3 | tail -n 1 | perl -ane 'print "$F[1]";'
 elif [ ! -z "$GENE_COOR_BED" ] ; then
-    grep -w $GENOME $FILE | perl -ane 'print "$F[4]";'
+    grep -w $GENOME $FILE | head -n 4 | tail -n 1 | perl -ane 'print "$F[1]";'
 elif [ ! -z "$TSS_COOR_BED" ] ; then
-    grep -w $GENOME $FILE | perl -ane 'print "$F[5]";'
+    grep -w $GENOME $FILE | head -n 5 | tail -n 1 | perl -ane 'print "$F[1]";'
 elif [ ! -z "$GENE_COOR_GTF" ] ; then
-    grep -w $GENOME $FILE | perl -ane 'print "$F[6]";'
+    grep -w $GENOME $FILE | head -n 6 | tail -n 1 | perl -ane 'print "$F[1]";'
 elif [ ! -z "$CPG_COOR_BED" ] ; then
-    grep -w $GENOME $FILE | perl -ane 'print "$F[7]";'
+    grep -w $GENOME $FILE | head -n 7 | tail -n 1 | perl -ane 'print "$F[1]";'
 elif [ ! -z "$TSS_COOR_BED_CAGE" ] ; then
-    grep -w $GENOME $FILE | perl -ane 'print "$F[8]";'
+    grep -w $GENOME $FILE | head -n 8 | tail -n 1 | perl -ane 'print "$F[1]";'
+elif [ ! -z "$REPEATS" ] ; then
+    grep -w $GENOME $FILE | head -n 9 | tail -n 1 | perl -ane 'print "$F[1]";'
+elif [ ! -z "$BLACKLIST" ] ; then
+    grep -w $GENOME $FILE | head -n 10 | tail -n 1 | perl -ane 'print "$F[1]";'
 else
-    grep -w $GENOME $FILE | perl -ane 'print "$F[1]";'
+    grep -w $GENOME $FILE | head -n 1 | tail -n 1 | perl -ane 'print "$F[1]";'
 fi
 
 exit

@@ -147,16 +147,11 @@ fi
 echo "done"
 
 echo -n "Populating files based on input genome, $GENOME (`date`).. "
-if [ "$GENOME" == "mm9" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
-    REPEAT_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.simpleRepeat.gz"
-elif [ "$GENOME" == "hg19" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
-    REPEAT_FILE="/home/pundhir/project/genome_annotations/human.hg19.simpleRepeat.gz"
-elif [ "$GENOME" == "rn5" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/rat.rn5.genome"
-else
-    echo "Presently the program only support analysis for mm9, hg19 or rn5"
+GENOME_FILE=$(initialize_genome -g $GENOME)
+REPEAT_FILE=$(initialize_genome -g $GENOME -R)
+
+if [ -z "$GENOME_FILE" -o -z "$REPEAT_FILE" ]; then
+    echo "Presently the program only support analysis for mm0, mm10, hg19 or hg38"
     echo
     usage
 fi
@@ -216,7 +211,7 @@ HEATMAP_FILES=""
 if [ "$GENOMIC_REGIONS" == "bed" ]; then
     #CLASS_COL=5;
     ## On Sep 4, updated input file format to correct BED format
-    CLASS_COL=$(less $OUTDIR_TMP/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq | perl -ane 'BEGIN { $class=7; } if($_!~/^[0-9]+$/) { $class=5; last; } END { print "$class\n"; }')
+    CLASS_COL=$(less $OUTDIR_TMP/NFR_DYNAMICS.TXT | cut -f 5 | sort | uniq | perl -ane 'BEGIN { $class=7; } if($_!~/^[0-9.]+$/) { $class=5; last; } END { print "$class\n"; }')
 else
     CLASS_COL=2
 fi

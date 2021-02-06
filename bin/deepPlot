@@ -157,11 +157,8 @@ echo -n "Create directory structure... "
 mkdir -p $OUTDIR
 echo "done"
 
-echo
-echo -n "Organize input genomic region files (`date`).. " >&2
-if [ "$(echo $REGIONFILE | grep "," | wc -l)" -gt 0 ]; then
-    INPUTFILE=$(echo $REGIONFILE | sed 's/\,/ /g')
-else
+## strand-specific analysis (ngsPlot)
+if [ ! -z "$SS" ]; then
     if [ "$REGIONFILE" == "stdin" ]; then
         while read LINE; do echo -e "${LINE}"; done > $OUTDIR/REGIONS_INTEREST.bed
         REGIONFILE="$OUTDIR/REGIONS_INTEREST.bed"
@@ -170,48 +167,128 @@ else
         REGIONFILE="$OUTDIR/REGIONS_INTEREST.bed"
     fi
 
-    if [ ! -z "$RANDOM_SPLIT" ]; then
-        LINES=$(cat $REGIONFILE | wc -l | perl -ane 'use POSIX; printf("%0.0f", ceil($_/'$RANDOM_SPLIT'));')
-        SPLIT_TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-        cat $REGIONFILE | split -l $LINES --additional-suffix $SPLIT_TMP
-        i=0
-        for file in $(ls *$SPLIT_TMP); do
-            cat $file | perl -ane '$class="CLASS_'$i'"; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$class\n";';
-            i=$((i+1))
-        done > $REGIONFILE.$SPLIT_TMP
-        mv $REGIONFILE.$SPLIT_TMP $OUTDIR/REGIONS_INTEREST.bed
-        REGIONFILE="$OUTDIR/REGIONS_INTEREST.bed"
-        rm *$SPLIT_TMP
-        CLASS_SPLIT=1
+    ## format ngsPlot arguments
+    ARG=""
+    if [ ! -z "$FILTER_MATCH" ]; then
+        ARG="$ARG -f $FILTER_MATCH"
+    fi
+    if [ ! -z "$FILTER_NOMATCH" ]; then
+        ARG="$ARG -d $FILTER_NOMATCH"
+    fi
+    if [ -z "$PLOTTITLE" ]; then
+        PLOTTITLE=NGSPLOT
+    fi
+    NGSPLOT_TITLE_SENSE=$PLOTTITLE"_sense"
+    NGSPLOT_TITLE_ANTISENSE=$PLOTTITLE"_antisense"
+    nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_SENSE -r same $ARG
+    nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_ANTISENSE -r opposite $ARG
+else
+    echo
+    echo -n "Organize input genomic region files (`date`).. " >&2
+    if [ "$(echo $REGIONFILE | grep "," | wc -l)" -gt 0 ]; then
+        INPUTFILE=$(echo $REGIONFILE | sed 's/\,/ /g')
+    else
+        if [ "$REGIONFILE" == "stdin" ]; then
+            while read LINE; do echo -e "${LINE}"; done > $OUTDIR/REGIONS_INTEREST.bed
+            REGIONFILE="$OUTDIR/REGIONS_INTEREST.bed"
+        else
+            scp $REGIONFILE $OUTDIR/REGIONS_INTEREST.bed
+            REGIONFILE="$OUTDIR/REGIONS_INTEREST.bed"
+        fi
+
+        if [ ! -z "$RANDOM_SPLIT" ]; then
+            LINES=$(cat $REGIONFILE | wc -l | perl -ane 'use POSIX; printf("%0.0f", ceil($_/'$RANDOM_SPLIT'));')
+            SPLIT_TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+            cat $REGIONFILE | split -l $LINES --additional-suffix $SPLIT_TMP
+            i=0
+            for file in $(ls *$SPLIT_TMP); do
+                cat $file | perl -ane '$class="CLASS_'$i'"; print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$class\n";';
+                i=$((i+1))
+            done > $REGIONFILE.$SPLIT_TMP
+            mv $REGIONFILE.$SPLIT_TMP $OUTDIR/REGIONS_INTEREST.bed
+            REGIONFILE="$OUTDIR/REGIONS_INTEREST.bed"
+            rm *$SPLIT_TMP
+            CLASS_SPLIT=1
+        fi
+
+        INPUTFILE=$REGIONFILE
+        if [ ! -z "$CLASS_SPLIT" ]; then
+            INPUTFILE=""
+            i=0
+            for CLASS in $(cat $REGIONFILE | cut -f 7 | sort | uniq); do
+                perl -ane 'if($F[6]=~/^'$CLASS'$/) { $F[6]=~s/\,/\_/g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n"; }' $REGIONFILE > $REGIONFILE.$i
+                INPUTFILE="$INPUTFILE $REGIONFILE.$i"
+                i=$((i+1))
+            done
+        fi
     fi
 
-    INPUTFILE=$REGIONFILE
-    if [ ! -z "$CLASS_SPLIT" ]; then
-        INPUTFILE=""
-        i=0
-        for CLASS in $(cat $REGIONFILE | cut -f 7 | sort | uniq); do
-            perl -ane 'if($F[6]=~/^'$CLASS'$/) { $F[6]=~s/\,/\_/g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n"; }' $REGIONFILE > $REGIONFILE.$i
-            INPUTFILE="$INPUTFILE $REGIONFILE.$i"
-            i=$((i+1))
-        done
-    fi
-fi
+    INPUTFILES=($INPUTFILE)
+    echo "done ($INPUTFILE)" >&2
 
-INPUTFILES=($INPUTFILE)
-echo "done ($INPUTFILE)" >&2
-
-## strand-specific analysis
-if [ ! -z "$SS" ]; then
+    ## strand-specific analysis (deepPlot)
+    #if [ ! -z "$SS" ]; then
+    #    oIFS=$IFS
+    #    IFS=","
+    #    FILTERS_MATCH=($FILTER_MATCH)
+    #    FILTERS_NOMATCH=($FILTER_NOMATCH)
+    #    BAMDIRS=($BWDIR)
+    #    IFS=$oIFS
+    #    BAMFILE=""
+    #    BWDIR=""
+    #    for DIR in "${BAMDIRS[@]}"; do
+    #        for file in $DIR/*.bam; do
+    #            MATCH_COUNT=0
+    #            for (( i=0; i<${#FILTERS_MATCH[@]}; i++ )); do
+    #                FOUND=`echo $file | perl -ane '$_=~s/^.*\///g; if($_=~/'${FILTERS_MATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
+    #                #echo "${FILTERS_MATCH[$i]} $file $FOUND $i"
+    #                MATCH_COUNT=$(($MATCH_COUNT + $FOUND))
+    #            done
+    #            
+    #            NOMATCH_COUNT=0
+    #            for (( i=0; i<${#FILTERS_NOMATCH[@]}; i++ )); do
+    #                FOUND=`echo $file | perl -ane '$_=~s/^.*\///g; if($_=~/'${FILTERS_NOMATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
+    #                #echo "${FILTERS_NOMATCH[$i]} $file $FOUND $i"
+    #                NOMATCH_COUNT=$(($NOMATCH_COUNT + $FOUND))
+    #            done
+    #            
+    #            TITLE=`echo $file | sed 's/^.*\///g;' | sed 's/\..*//g' | perl -ane 'chomp($_); print "$_";'`;
+    #            if [ "$MATCH_COUNT" == ${#FILTERS_MATCH[@]} -a "$NOMATCH_COUNT" -eq 0 ]; then
+    #                #echo -e "$TITLE\t$file"
+    #                BAMFILE="$BAMFILE $file"
+    #            fi
+    #        done
+    #
+    #        BAMFILES=($BAMFILE)
+    #        for FILE in "${BAMFILES[@]}"; do
+    #            echo -n "Make strand-specific bigWig files for $FILE.." >&2
+    #            ID=$(echo $FILE | perl -ane '$_=~s/^.+\///g; $_=~s/\..+$//g; print $_;');
+    #            mkdir -p "$DIR/strand_specific"
+    #            if [ ! -s "$DIR/strand_specific/${ID}_forward.bw" ]; then
+    #                bamCoverage -b $FILE -o $DIR/strand_specific/${ID}_forward.bw -of bigwig --normalizeUsing RPKM --numberOfProcessors $PROCESSORS --filterRNAstrand forward
+    #            fi
+    #
+    #            if [ ! -s "$DIR/strand_specific/${ID}_reverse.bw" ]; then
+    #                bamCoverage -b $FILE -o $DIR/strand_specific/${ID}_reverse.bw -of bigwig --normalizeUsing RPKM --numberOfProcessors $PROCESSORS --filterRNAstrand reverse
+    #            fi
+    #            echo "done" >&2
+    #        done
+    #        BWDIR="$BWDIR,$DIR/strand_specific/"
+    #    done
+    #    BWDIR=$(echo $BWDIR | sed 's/^\,//')
+    #fi
+    echo
+    echo -n "Organize input bigWig files (`date`).. " >&2
     oIFS=$IFS
     IFS=","
     FILTERS_MATCH=($FILTER_MATCH)
     FILTERS_NOMATCH=($FILTER_NOMATCH)
-    BAMDIRS=($BWDIR)
+    BWDIRS=($BWDIR)
     IFS=$oIFS
-    BAMFILE=""
-    BWDIR=""
-    for DIR in "${BAMDIRS[@]}"; do
-        for file in $DIR/*.bam; do
+
+    BWFILE=""
+    for DIR in "${BWDIRS[@]}"; do
+        for file in $DIR/*.bw; do
             MATCH_COUNT=0
             for (( i=0; i<${#FILTERS_MATCH[@]}; i++ )); do
                 FOUND=`echo $file | perl -ane '$_=~s/^.*\///g; if($_=~/'${FILTERS_MATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
@@ -229,235 +306,184 @@ if [ ! -z "$SS" ]; then
             TITLE=`echo $file | sed 's/^.*\///g;' | sed 's/\..*//g' | perl -ane 'chomp($_); print "$_";'`;
             if [ "$MATCH_COUNT" == ${#FILTERS_MATCH[@]} -a "$NOMATCH_COUNT" -eq 0 ]; then
                 #echo -e "$TITLE\t$file"
-                BAMFILE="$BAMFILE $file"
+                BWFILE="$BWFILE $file"
             fi
         done
-
-        BAMFILES=($BAMFILE)
-        for FILE in "${BAMFILES[@]}"; do
-            echo -n "Make strand-specific bigWig files for $FILE.." >&2
-            ID=$(echo $FILE | perl -ane '$_=~s/^.+\///g; $_=~s/\..+$//g; print $_;');
-            mkdir -p "$DIR/strand_specific"
-            if [ ! -s "$DIR/strand_specific/${ID}_forward.bw" ]; then
-                bamCoverage -b $FILE -o $DIR/strand_specific/${ID}_forward.bw -of bigwig --normalizeUsing RPKM --numberOfProcessors $PROCESSORS --filterRNAstrand forward
-            fi
-
-            if [ ! -s "$DIR/strand_specific/${ID}_reverse.bw" ]; then
-                bamCoverage -b $FILE -o $DIR/strand_specific/${ID}_reverse.bw -of bigwig --normalizeUsing RPKM --numberOfProcessors $PROCESSORS --filterRNAstrand reverse
-            fi
-            echo "done" >&2
-        done
-        BWDIR="$BWDIR,$DIR/strand_specific/"
     done
-    BWDIR=$(echo $BWDIR | sed 's/^\,//')
-fi
+    BWFILES=($BWFILE)
+    echo "done ($BWFILE)" >&2
 
-echo
-echo -n "Organize input bigWig files (`date`).. " >&2
-oIFS=$IFS
-IFS=","
-FILTERS_MATCH=($FILTER_MATCH)
-FILTERS_NOMATCH=($FILTER_NOMATCH)
-BWDIRS=($BWDIR)
-IFS=$oIFS
-
-BWFILE=""
-for DIR in "${BWDIRS[@]}"; do
-    for file in $DIR/*.bw; do
-        MATCH_COUNT=0
-        for (( i=0; i<${#FILTERS_MATCH[@]}; i++ )); do
-            FOUND=`echo $file | perl -ane '$_=~s/^.*\///g; if($_=~/'${FILTERS_MATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
-            #echo "${FILTERS_MATCH[$i]} $file $FOUND $i"
-            MATCH_COUNT=$(($MATCH_COUNT + $FOUND))
-        done
-        
-        NOMATCH_COUNT=0
-        for (( i=0; i<${#FILTERS_NOMATCH[@]}; i++ )); do
-            FOUND=`echo $file | perl -ane '$_=~s/^.*\///g; if($_=~/'${FILTERS_NOMATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
-            #echo "${FILTERS_NOMATCH[$i]} $file $FOUND $i"
-            NOMATCH_COUNT=$(($NOMATCH_COUNT + $FOUND))
-        done
-        
-        TITLE=`echo $file | sed 's/^.*\///g;' | sed 's/\..*//g' | perl -ane 'chomp($_); print "$_";'`;
-        if [ "$MATCH_COUNT" == ${#FILTERS_MATCH[@]} -a "$NOMATCH_COUNT" -eq 0 ]; then
-            #echo -e "$TITLE\t$file"
-            BWFILE="$BWFILE $file"
-        fi
-    done
-done
-BWFILES=($BWFILE)
-echo "done ($BWFILE)" >&2
-
-echo
-echo -n "Compute signal matrix using #region file(s): ${#INPUTFILES[@]}; #bigWig file(s): ${#BWFILES[@]} (`date`).. " >&2
-
-## format computeMatrix arguments
-ARG=""
-if [ ! -z "$SKIPZEROS" ]; then
-    ARG="$ARG --skipZeros";
-fi
-if [ ! -z "$SKIP_MIN_COUNT" ]; then
-    ARG="$ARG --minThreshold $SKIP_MIN_COUNT";
-fi
-if [ ! -z "$SKIP_MAX_COUNT" ]; then
-    ARG="$ARG --maxThreshold $SKIP_MAX_COUNT";
-fi
-if [ ! -z "$SCALE" ]; then
-    ARG="$ARG --scale $SCALE";
-fi
-if [ ! -z "$REFERENCE_POINT" ]; then
-    ARG="$ARG --referencePoint $REFERENCE_POINT";
-fi
-if [ ! -z "$NO_BASES_UNSCALED_UP" ]; then
-    ARG="$ARG --unscaled5prime $NO_BASES_UNSCALED_UP";
-fi
-if [ ! -z "$NO_BASES_UNSCALED_DOWN" ]; then
-    ARG="$ARG --unscaled3prime $NO_BASES_UNSCALED_DOWN";
-fi
-
-## execute computeMatrix
-if [ ! -s "$OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz" -o ! -z "$OVERWRITE" ]; then
-    computeMatrix $PLOTREGION -S $BWFILE -R $INPUTFILE \
-        -out $OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz \
-        --beforeRegionStartLength $FLANKREGION --afterRegionStartLength $FLANKREGION \
-        --sortRegions $SORT_REGIONS --sortUsing $SORT_USING \
-        --smartLabels -bs $BINSIZE -p "max/2" $ARG
-fi
-echo "done" >&2
-
-echo
-echo -n "Make the plots (profile and heatmap) (`date`).. " >&2
-## format plotProfile OR plotHeatmap arguments
-ARG=""
-if [ ! -z "$KMEANS" ]; then
-    ARG="$ARG --kmeans $KMEANS";
-fi
-if [ ! -z "$REGION_LABEL" ]; then
-    ARG="$ARG --regionsLabel $(echo $REGION_LABEL | sed 's/\,/ /g')";
-fi
-if [ ! -z "$SAMPLE_LABEL" ]; then
-    ## execute deepPlot.R, if sample names are given, and
-    ## compute mean if they are not unique
-    SAMPLE_LABELS=($(echo $SAMPLE_LABEL | sed 's/\,/ /g'))
-
-    if [ "${#BWFILES[@]}" -eq "${#SAMPLE_LABELS[@]}" ]; then 
-        deepPlot.R -i $OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz -j $SAMPLE_LABEL -o $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz
-    else
-        echo
-        echo "Please provide sample labels for all input bigWig file(s)"
-        usage
-    fi
-
-    ARG="$ARG --samplesLabel $(echo $SAMPLE_LABEL | sed 's/\,/\n/g' | sort | uniq | tr '\r\n' ' ')";
-elif [ ! -s "$OUTDIR/$PLOTTITLE.deepToolsMatrix.gz" -o ! -z "$OVERWRITE" ]; then
-    scp $OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz
-fi
-
-if [ ! -z "$YAXIS_LABEL" ]; then
-    ARG="$ARG --yAxisLabel $YAXIS_LABEL";
-fi
-if [ ! -z "$YAXIS_MIN" ]; then
-    ARG="$ARG --yMin $YAXIS_MIN";
-fi
-if [ ! -z "$YAXIS_MAX" ]; then
-    ARG="$ARG --yMax $YAXIS_MAX";
-fi
-
-## format plotProfile arguments
-ARG_PROFILE=""
-if [ ! -z "$PLOT_COLOR" ]; then
-    ARG_PROFILE="$ARG_PROFILE --colors $(echo $PLOT_COLOR | sed 's/\,/ /g')";
-#else
-#    ARG_PROFILE="$ARG_PROFILE --colors $(getRColor.R -i ${#BWFILES[@]} -p)"
-fi
-if [ ! -z "$PLOT_HEIGHT" ]; then
-    ARG_PROFILE="$ARG_PROFILE --plotHeight $PLOT_HEIGHT";
-fi
-if [ ! -z "$PLOT_WIDTH" ]; then
-    ARG_PROFILE="$ARG_PROFILE --plotWidth $PLOT_WIDTH";
-fi
-#if [ ! -z "$OUT_DATA_FILE" ]; then
-#    ARG_PROFILE="$ARG_PROFILE --outFileNameData $OUT_DATA_FILE";
-#fi
-
-## format plotHeatmap arguments
-ARG_HEATMAP=""
-if [ ! -z "$INTERPOLATION_METHOD" ]; then
-    ARG_HEATMAP="$ARG_HEATMAP --interpolationMethod $INTERPOLATION_METHOD";
-fi
-if [ ! -z "$HEATMAP_COLOR" ]; then
-    ARG_HEATMAP="$ARG_HEATMAP --colorMap $HEATMAP_COLOR";
-fi
-if [ ! -z "$ALPHA" ]; then
-    ARG_HEATMAP="$ARG_HEATMAP --alpha $ALPHA";
-fi
-if [ ! -z "$ZAXIS_MIN" ]; then
-    ARG_HEATMAP="$ARG_HEATMAP --zMin $YAXIS_MIN";
-fi
-if [ ! -z "$ZAXIS_MAX" ]; then
-    ARG_HEATMAP="$ARG_HEATMAP --zMax $YAXIS_MIN";
-fi
-if [ ! -z "$PLOT_HEIGHT" ]; then
-    ARG_HEATMAP="$ARG_HEATMAP --heatmapHeight $PLOT_HEIGHT";
-fi
-if [ ! -z "$PLOT_WIDTH" ]; then
-    ARG_HEATMAP="$ARG_HEATMAP --heatmapWidth $PLOT_WIDTH";
-fi
-#if [ ! -z "$OUT_DATA_FILE" ]; then
-#    ARG_HEATMAP="$ARG_PROFILE --outFileSortedRegions $OUT_DATA_FILE";
-#fi
-
-## make the plot
-if [ ! -z "$PLOTBYREGION" ]; then
-    if [ ! -z "$PLOT_PROFILE" ]; then
-        plotProfile -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
-            -o $OUTDIR/$PLOTTITLE.pdf \
-            --plotTitle $PLOTTITLE --averageType $AVERAGE_TYPE \
-            --plotType $PLOT_TYPE \
-            $ARG $ARG_PROFILE --perGroup
-    else
-        plotHeatmap -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
-            -o $OUTDIR/$PLOTTITLE.pdf \
-            --plotTitle $PLOTTITLE --averageTypeSummaryPlot $AVERAGE_TYPE \
-            --sortRegions $SORT_REGIONS --sortUsing $SORT_USING \
-            --plotType $PLOT_TYPE \
-            $ARG $ARG_HEATMAP --perGroup
-    fi
-elif [ ! -z "$PLOTBYBWFILE" ]; then
-    if [ ! -z "$PLOT_PROFILE" ]; then
-        plotProfile -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
-            -o $OUTDIR/$PLOTTITLE.pdf \
-            --plotTitle $PLOTTITLE --averageType $AVERAGE_TYPE \
-            --plotType $PLOT_TYPE \
-            $ARG $ARG_PROFILE
-    else
-        plotHeatmap -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
-            -o $OUTDIR/$PLOTTITLE.pdf \
-            --plotTitle $PLOTTITLE --averageTypeSummaryPlot $AVERAGE_TYPE \
-            --sortRegions $SORT_REGIONS --sortUsing $SORT_USING \
-            --plotType $PLOT_TYPE \
-            $ARG $ARG_HEATMAP
-    fi
-fi
-echo "done" >&2
-
-if [ ! -z "$OUT_DATA_FILE" ]; then
     echo
-    echo -n "Export read counts for input regions in a file (`date`).. " >&2
-    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    echo -n "Compute signal matrix using #region file(s): ${#INPUTFILES[@]}; #bigWig file(s): ${#BWFILES[@]} (`date`).. " >&2
 
-    ## determine unique gene names in the input file
-    zless $INPUTFILE | bed2longestRegion -i stdin | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | sort -k 1,1 | perl -ane 'if(!$seen{$F[0]}) { print $_; $seen{$F[0]}=1; }' | cut -f 2- > $OUTDIR/input.$TMP
+    ## format computeMatrix arguments
+    ARG=""
+    if [ ! -z "$SKIPZEROS" ]; then
+        ARG="$ARG --skipZeros";
+    fi
+    if [ ! -z "$SKIP_MIN_COUNT" ]; then
+        ARG="$ARG --minThreshold $SKIP_MIN_COUNT";
+    fi
+    if [ ! -z "$SKIP_MAX_COUNT" ]; then
+        ARG="$ARG --maxThreshold $SKIP_MAX_COUNT";
+    fi
+    if [ ! -z "$SCALE" ]; then
+        ARG="$ARG --scale $SCALE";
+    fi
+    if [ ! -z "$REFERENCE_POINT" ]; then
+        ARG="$ARG --referencePoint $REFERENCE_POINT";
+    fi
+    if [ ! -z "$NO_BASES_UNSCALED_UP" ]; then
+        ARG="$ARG --unscaled5prime $NO_BASES_UNSCALED_UP";
+    fi
+    if [ ! -z "$NO_BASES_UNSCALED_DOWN" ]; then
+        ARG="$ARG --unscaled3prime $NO_BASES_UNSCALED_DOWN";
+    fi
 
-    multiBigwigSummary BED-file -b $BWFILE --BED $OUTDIR/input.$TMP --outRawCounts $OUTDIR/counts.$TMP -o $OUTDIR/matrix.$TMP --smartLabels -p "max/2"
-
-    echo -e "$(bed2header -i $OUTDIR/input.$TMP -r)\t$(grep '#' $OUTDIR/counts.$TMP | cut -f 4- | sed s/\'//g)" > $OUTDIR/$OUT_DATA_FILE
-    join -j 1 <(cat $OUTDIR/input.$TMP | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | sort -k 1,1) <(grep -v "#" $OUTDIR/counts.$TMP | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | cut -f 1,5- | sort -k 1,1) | tabEdit -i stdin -t | cut -f 2- >> $OUTDIR/$OUT_DATA_FILE 
-   
-    ## remove temporary files
-    rm $OUTDIR/input.$TMP
-    rm $OUTDIR/counts.$TMP
-    rm $OUTDIR/matrix.$TMP
+    ## execute computeMatrix
+    if [ ! -s "$OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz" -o ! -z "$OVERWRITE" ]; then
+        computeMatrix $PLOTREGION -S $BWFILE -R $INPUTFILE \
+            -out $OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz \
+            --beforeRegionStartLength $FLANKREGION --afterRegionStartLength $FLANKREGION \
+            --sortRegions $SORT_REGIONS --sortUsing $SORT_USING \
+            --smartLabels -bs $BINSIZE -p "max/2" $ARG
+    fi
     echo "done" >&2
+
+    echo
+    echo -n "Make the plots (profile and heatmap) (`date`).. " >&2
+    ## format plotProfile OR plotHeatmap arguments
+    ARG=""
+    if [ ! -z "$KMEANS" ]; then
+        ARG="$ARG --kmeans $KMEANS";
+    fi
+    if [ ! -z "$REGION_LABEL" ]; then
+        ARG="$ARG --regionsLabel $(echo $REGION_LABEL | sed 's/\,/ /g')";
+    fi
+    if [ ! -z "$SAMPLE_LABEL" ]; then
+        ## execute deepPlot.R, if sample names are given, and
+        ## compute mean if they are not unique
+        SAMPLE_LABELS=($(echo $SAMPLE_LABEL | sed 's/\,/ /g'))
+
+        if [ "${#BWFILES[@]}" -eq "${#SAMPLE_LABELS[@]}" ]; then 
+            deepPlot.R -i $OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz -j $SAMPLE_LABEL -o $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz
+        else
+            echo
+            echo "Please provide sample labels for all input bigWig file(s)"
+            usage
+        fi
+
+        ARG="$ARG --samplesLabel $(echo $SAMPLE_LABEL | sed 's/\,/\n/g' | sort | uniq | tr '\r\n' ' ')";
+    elif [ ! -s "$OUTDIR/$PLOTTITLE.deepToolsMatrix.gz" -o ! -z "$OVERWRITE" ]; then
+        scp $OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz
+    fi
+
+    if [ ! -z "$YAXIS_LABEL" ]; then
+        ARG="$ARG --yAxisLabel $YAXIS_LABEL";
+    fi
+    if [ ! -z "$YAXIS_MIN" ]; then
+        ARG="$ARG --yMin $YAXIS_MIN";
+    fi
+    if [ ! -z "$YAXIS_MAX" ]; then
+        ARG="$ARG --yMax $YAXIS_MAX";
+    fi
+
+    ## format plotProfile arguments
+    ARG_PROFILE=""
+    if [ ! -z "$PLOT_COLOR" ]; then
+        ARG_PROFILE="$ARG_PROFILE --colors $(echo $PLOT_COLOR | sed 's/\,/ /g')";
+    #else
+    #    ARG_PROFILE="$ARG_PROFILE --colors $(getRColor.R -i ${#BWFILES[@]} -p)"
+    fi
+    if [ ! -z "$PLOT_HEIGHT" ]; then
+        ARG_PROFILE="$ARG_PROFILE --plotHeight $PLOT_HEIGHT";
+    fi
+    if [ ! -z "$PLOT_WIDTH" ]; then
+        ARG_PROFILE="$ARG_PROFILE --plotWidth $PLOT_WIDTH";
+    fi
+    #if [ ! -z "$OUT_DATA_FILE" ]; then
+    #    ARG_PROFILE="$ARG_PROFILE --outFileNameData $OUT_DATA_FILE";
+    #fi
+
+    ## format plotHeatmap arguments
+    ARG_HEATMAP=""
+    if [ ! -z "$INTERPOLATION_METHOD" ]; then
+        ARG_HEATMAP="$ARG_HEATMAP --interpolationMethod $INTERPOLATION_METHOD";
+    fi
+    if [ ! -z "$HEATMAP_COLOR" ]; then
+        ARG_HEATMAP="$ARG_HEATMAP --colorMap $HEATMAP_COLOR";
+    fi
+    if [ ! -z "$ALPHA" ]; then
+        ARG_HEATMAP="$ARG_HEATMAP --alpha $ALPHA";
+    fi
+    if [ ! -z "$ZAXIS_MIN" ]; then
+        ARG_HEATMAP="$ARG_HEATMAP --zMin $YAXIS_MIN";
+    fi
+    if [ ! -z "$ZAXIS_MAX" ]; then
+        ARG_HEATMAP="$ARG_HEATMAP --zMax $YAXIS_MIN";
+    fi
+    if [ ! -z "$PLOT_HEIGHT" ]; then
+        ARG_HEATMAP="$ARG_HEATMAP --heatmapHeight $PLOT_HEIGHT";
+    fi
+    if [ ! -z "$PLOT_WIDTH" ]; then
+        ARG_HEATMAP="$ARG_HEATMAP --heatmapWidth $PLOT_WIDTH";
+    fi
+    #if [ ! -z "$OUT_DATA_FILE" ]; then
+    #    ARG_HEATMAP="$ARG_PROFILE --outFileSortedRegions $OUT_DATA_FILE";
+    #fi
+
+    ## make the plot
+    if [ ! -z "$PLOTBYREGION" ]; then
+        if [ ! -z "$PLOT_PROFILE" ]; then
+            plotProfile -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
+                -o $OUTDIR/$PLOTTITLE.pdf \
+                --plotTitle $PLOTTITLE --averageType $AVERAGE_TYPE \
+                --plotType $PLOT_TYPE \
+                $ARG $ARG_PROFILE --perGroup
+        else
+            plotHeatmap -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
+                -o $OUTDIR/$PLOTTITLE.pdf \
+                --plotTitle $PLOTTITLE --averageTypeSummaryPlot $AVERAGE_TYPE \
+                --sortRegions $SORT_REGIONS --sortUsing $SORT_USING \
+                --plotType $PLOT_TYPE \
+                $ARG $ARG_HEATMAP --perGroup
+        fi
+    elif [ ! -z "$PLOTBYBWFILE" ]; then
+        if [ ! -z "$PLOT_PROFILE" ]; then
+            plotProfile -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
+                -o $OUTDIR/$PLOTTITLE.pdf \
+                --plotTitle $PLOTTITLE --averageType $AVERAGE_TYPE \
+                --plotType $PLOT_TYPE \
+                $ARG $ARG_PROFILE
+        else
+            plotHeatmap -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
+                -o $OUTDIR/$PLOTTITLE.pdf \
+                --plotTitle $PLOTTITLE --averageTypeSummaryPlot $AVERAGE_TYPE \
+                --sortRegions $SORT_REGIONS --sortUsing $SORT_USING \
+                --plotType $PLOT_TYPE \
+                $ARG $ARG_HEATMAP
+        fi
+    fi
+    echo "done" >&2
+
+    if [ ! -z "$OUT_DATA_FILE" ]; then
+        echo
+        echo -n "Export read counts for input regions in a file (`date`).. " >&2
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+
+        ## determine unique gene names in the input file
+        zless $INPUTFILE | bed2longestRegion -i stdin | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | sort -k 1,1 | perl -ane 'if(!$seen{$F[0]}) { print $_; $seen{$F[0]}=1; }' | cut -f 2- > $OUTDIR/input.$TMP
+
+        multiBigwigSummary BED-file -b $BWFILE --BED $OUTDIR/input.$TMP --outRawCounts $OUTDIR/counts.$TMP -o $OUTDIR/matrix.$TMP --smartLabels -p "max/2"
+
+        echo -e "$(bed2header -i $OUTDIR/input.$TMP -r)\t$(grep '#' $OUTDIR/counts.$TMP | cut -f 4- | sed s/\'//g)" > $OUTDIR/$OUT_DATA_FILE
+        join -j 1 <(cat $OUTDIR/input.$TMP | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | sort -k 1,1) <(grep -v "#" $OUTDIR/counts.$TMP | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | cut -f 1,5- | sort -k 1,1) | tabEdit -i stdin -t | cut -f 2- >> $OUTDIR/$OUT_DATA_FILE 
+       
+        ## remove temporary files
+        rm $OUTDIR/input.$TMP
+        rm $OUTDIR/counts.$TMP
+        rm $OUTDIR/matrix.$TMP
+        echo "done" >&2
+    fi
 fi
 exit

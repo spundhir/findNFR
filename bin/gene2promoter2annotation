@@ -120,10 +120,14 @@ fi
 NCOL=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F)."\n";')
 echo -ne "$(grep '^#' $PROMOTER_FILE)\tpromoter_width\tpromoter_class\tdist_to_tss"
 
-## distance to closest TSS
+## distance to closest gene TSS
 >&2 echo -n "Determine distance to closest TSS (`date`).. "
 closestBed -a <(sortBed -i $PROMOTER_FILE) -b <(sortBed -i $PROMOTER_FILE) -d -t first -io | perl -ane '$class="narrow"; @coor=split(/[:-]+/,$F[7]); $promoter_width=($coor[2]-$coor[1]); if($promoter_width > 500 && $promoter_width <=1000) { $class="medium"; } elsif($promoter_width > 1000) { $class="broad"; } foreach(@F[0..9]) { print "$_\t"; } print "$promoter_width\t$class\t".$F[scalar(@F)-1]."\n";' > ${TMP}.distance
 >&2 echo "done"
+
+#closestBed -a <(sortBed -i $PROMOTER_FILE) -b <(cat /scratch/genomes/annotations/GTF/mm10_ensembl.gtf | grep -v chrMT | grep protein_coding | grep -w transcript | perl -ane 'print "$F[0]\t$F[3]\t$F[4]\t$F[17]\t0\t$F[6]\n";' | bed2window -i stdin -w 1 -t | sortBed -i stdin) -D a -t first -fu -io | sed -E 's/[";]+//g' | perl -ane '$dist="NA"; if($F[3]=~/^$F[13]$/) { $dist=$F[scalar(@F)-1]; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$dist\n";'
+
+#closestBed -a <(sortBed -i $PROMOTER_FILE) -b <(cat /scratch/genomes/annotations/GTF/mm10_ensembl.gtf | grep -v chrMT | grep protein_coding | grep -w transcript | perl -ane 'print "$F[0]\t$F[3]\t$F[4]\t$F[17]\t0\t$F[6]\n";' | bed2window -i stdin -w 1 -t | sortBed -i stdin) -D a -t first -fd -io | sed -E 's/[";]+//g' | perl -ane '$dist="NA"; if($F[3]=~/^$F[13]$/) { $dist=$F[scalar(@F)-1]; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$dist\n";'
 
 ## refine TSS based on CAGE peaks
 TSS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -T)

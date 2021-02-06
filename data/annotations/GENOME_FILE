@@ -1,7 +1,61 @@
 ## genome size source: https://deeptools.readthedocs.io/en/develop/content/feature/effectiveGenomeSize.html & https://www.biostars.org/p/178995/
-mm9 mouse.mm9.genome    mm  2620345972  /scratch/genomes/annotations/BED/mm9_ensembl_gene.bed   /scratch/genomes/annotations/BED/mm9_ensembl_tss.bed    /scratch/genomes/annotations/GTF/mm9_ensembl.gtf   /scratch/genomes/annotations/MISC/CpG_mm9.bed    /scratch/genomes/annotations/BED/mm9_cage_tss.bed 
-mm10    mouse.mm10.genome   mm  2652783500  /scratch/genomes/annotations/BED/mm10_ensembl_gene.bed  /scratch/genomes/annotations/BED/mm9_ensembl_tss.bed    /scratch/genomes/annotations/GTF/mm10_ensembl.gtf    /scratch/genomes/annotations/MISC/CpG_mm10.bed /scratch/genomes/annotations/BED/mm10_cage_tss.bed
-hg19    human.hg19.genome   hs  2864785220  /scratch/genomes/annotations/BED/hg19_ensembl_gene.bed  /scratch/genomes/annotations/BED/mm9_ensembl_tss.bed    /scratch/genomes/annotations/GTF/hg19_ensembl.gtf    /scratch/genomes/annotations/MISC/CpG_hg19.bed /scratch/genomes/annotations/BED/hg19_cage_tss.bed
-hg38    human.hg38.genome   hs  2913022398  /scratch/genomes/annotations/BED/hg38_ensembl_gene.bed  /scratch/genomes/annotations/BED/mm9_ensembl_tss.bed    /scratch/genomes/annotations/GTF/hg38_ensembl.gtf    /scratch/genomes/annotations/MISC/CpG_hg38.bed /scratch/genomes/annotations/BED/hg38_cage_tss.bed
-danRer7 zebrafish.danRer7.genome    1369631918  1369631918  NA  NA  NA  NA NA
-rn5 rat.rn5.genome  2197995070  2197995070  NA  NA  NA  NA  NA
+mm9 mouse.mm9.genome
+mm9 mm
+mm9 2620345972
+mm9 /scratch/genomes/annotations/BED/mm9_ensembl_gene.bed
+mm9 /scratch/genomes/annotations/BED/mm9_ensembl_tss.bed
+mm9 /scratch/genomes/annotations/GTF/mm9_ensembl.gtf
+mm9 /scratch/genomes/annotations/MISC/CpG_mm9.bed
+mm9 /scratch/genomes/annotations/BED/mm9_cage_tss.bed
+mm9 /scratch/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz
+mm9 /scratch/genomes/annotations/BLACKLIST/mm9_blacklist.bed.gz
+mm10    mouse.mm10.genome
+mm10    mm
+mm10 2652783500
+mm10    /scratch/genomes/annotations/BED/mm10_ensembl_gene.bed
+mm10    /scratch/genomes/annotations/BED/mm10_ensembl_tss.bed
+mm10    /scratch/genomes/annotations/GTF/mm10_ensembl.gtf
+mm10    /scratch/genomes/annotations/MISC/CpG_mm10.bed
+mm10    /scratch/genomes/annotations/BED/mm10_cage_tss.bed
+mm10    /scratch/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz
+mm10    /scratch/genomes/annotations/BLACKLIST/mm10_blacklist.bed.gz
+hg19    human.hg19.genome
+hg19    hs
+hg19    2864785220
+hg19    /scratch/genomes/annotations/BED/hg19_ensembl_gene.bed
+hg19    /scratch/genomes/annotations/BED/hg19_ensembl_tss.bed
+hg19    /scratch/genomes/annotations/GTF/hg19_ensembl.gtf
+hg19    /scratch/genomes/annotations/MISC/CpG_hg19.bed
+hg19    /scratch/genomes/annotations/BED/hg19_cage_tss.bed
+hg19    /scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz
+hg19    /scratch/genomes/annotations/BLACKLIST/hg19_blacklist.bed.gz
+hg38    human.hg38.genome
+hg38    hs
+hg38    2913022398
+hg38    /scratch/genomes/annotations/BED/hg38_ensembl_gene.bed
+hg38    /scratch/genomes/annotations/BED/hg38_ensembl_tss.bed
+hg38    /scratch/genomes/annotations/GTF/hg38_ensembl.gtf
+hg38    /scratch/genomes/annotations/MISC/CpG_hg38.bed
+hg38    /scratch/genomes/annotations/BED/hg38_cage_tss.bed
+hg38    /scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz
+hg38    /scratch/genomes/annotations/BLACKLIST/hg38_blacklist.bed.gz
+danRer7 zebrafish.danRer7.genome
+danRer7 dr
+danRer7 1369631918
+danRer7 NA
+danRer7 NA
+danRer7 NA
+danRer7 NA
+danRer7 NA
+danRer7 NA
+danRer7 NA
+rn5 rat.rn5.genome
+rn5 rn
+rn5 2197995070
+rn5 NA
+rn5 NA
+rn5 NA
+rn5 NA
+rn5 NA
+rn5 NA
+rn5 NA
