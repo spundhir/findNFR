@@ -175,11 +175,16 @@ if [ ! -z "$SS" ]; then
     if [ ! -z "$FILTER_NOMATCH" ]; then
         ARG="$ARG -d $FILTER_NOMATCH"
     fi
+    if [ ! -z "$HEATMAP_COLOR" ]; then
+        ARG="$ARG -c $HEATMAP_COLOR"
+    fi
     if [ -z "$PLOTTITLE" ]; then
         PLOTTITLE=NGSPLOT
     fi
+
     NGSPLOT_TITLE_SENSE=$PLOTTITLE"_sense"
     NGSPLOT_TITLE_ANTISENSE=$PLOTTITLE"_antisense"
+
     nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_SENSE -r same $ARG
     nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_ANTISENSE -r opposite $ARG
 else
@@ -212,6 +217,7 @@ else
         fi
 
         INPUTFILE=$REGIONFILE
+        REGION_LABEL_AUTO=""
         if [ ! -z "$CLASS_SPLIT" ]; then
             INPUTFILE=""
             i=0
@@ -219,7 +225,12 @@ else
                 perl -ane 'if($F[6]=~/^'$CLASS'$/) { $F[6]=~s/\,/\_/g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n"; }' $REGIONFILE > $REGIONFILE.$i
                 INPUTFILE="$INPUTFILE $REGIONFILE.$i"
                 i=$((i+1))
+                REGION_LABEL_AUTO="$REGION_LABEL_AUTO,$CLASS"
             done
+            if [ -z "$REGION_LABEL" ]; then
+                REGION_LABEL_AUTO=$(echo $REGION_LABEL_AUTO | sed -E 's/^\,//g')
+                REGION_LABEL=$REGION_LABEL_AUTO
+            fi
         fi
     fi
 
