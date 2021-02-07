@@ -29,7 +29,7 @@ usage() {
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: initialize_genome -g <genome>"
 	echo "Options:"
-    echo " -g <string> [genome (default: mm9)]"
+    echo " -g <string> [genome]"
     echo "[OPTIONS]"
 	echo " -i <file>   [input file containing genome information]"
     echo "             [default: $FILE]"
