@@ -45,8 +45,7 @@ usage() {
 	echo "Options:"
 	echo " -i <file>   [input genomic coordinates of genes in GTF or BED format (can be stdin)]"
     echo "             [format: chr start end name score strand]"
-    echo "             [GTF: will identify the most active TSS per gene]"
-    echo "             [BED: requires unique TSS per gene]"
+    echo "             [GTF/BED: will identify the most active TSS per gene]"
     echo " -j <file>   [h3k4me3 modification data in BAM format]"
     echo "             [if multiple, please separate them by a comma]"
     echo "[OPTIONS]"
@@ -211,12 +210,10 @@ else
     >&2 echo "done"
 
     >&2 echo
-    >&2 echo -n "Check, if input gene coordinate file is in BED or GTF format (`date`).. "
-    if [ "$(isBed -i $GENEFILE -s)" -eq 0 -a ! -s "$OUTDIR/define_promoter/GENES_TSS.BED" ]; then
-        zless $GENEFILE 
-    elif [ ! -s "$OUTDIR/define_promoter/GENES_TSS.BED" ]; then
-        gene2mostActiveTSS -i $GENEFILE -j $BAMFILE -g $GENOME -w 300 | sortBed -i stdin
-    fi | bed2window -i stdin -w 0 -t | bed2window -i stdin -w 1 -r | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/define_promoter/GENES_TSS.BED
+    >&2 echo -n "Identify most active TSS corresponding to each ENSEMBL gene id (`date`).. "
+    if [ ! -s "$OUTDIR/define_promoter/GENES_TSS.BED" ]; then
+        gene2mostActiveTSS -i $GENEFILE -j $BAMFILE -g $GENOME -w 300 | sortBed -i stdin | bed2window -i stdin -w 0 -t | bed2window -i stdin -w 1 -r | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/define_promoter/GENES_TSS.BED
+    fi 
 
     echo -e "#chr\tstart\tend\tname\tscore\tstrand\tpromoter_defined\tpromoter_coordinate\tantisense_bp\tsense_bp"
     #closestBed -a <(sortBed -i $OUTDIR/define_promoter/GENES_TSS.BED) -b $OUTDIR/define_promoter/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$F[0]:$start-$end";
@@ -243,7 +240,7 @@ else
     #    foreach(@F[1..scalar(@F)-1]) { print "\t$_"; }
     #    print "\n";' > $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP
 
-    linkTSS2Peaks -i $OUTDIR/define_promoter/GENES_TSS.BED -j $OUTDIR/define_promoter/PEAKS.BED.MERGED -n $PROMOTERDISTANCE > $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP 
+    linkTSS2Peaks -i $OUTDIR/define_promoter/GENES_TSS.BED -j $OUTDIR/define_promoter/PEAKS.BED.MERGED -k $OUTDIR/define_promoter/PEAKS.BED.MERGED.N -n $PROMOTERDISTANCE > $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP 
 
     if [ ! -z "$REFINE" ]; then
         >&2 echo -n "Refine 3' boundary of promoter (`date`).. "
