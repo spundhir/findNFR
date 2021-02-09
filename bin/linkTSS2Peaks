@@ -1,0 +1,125 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+PROMOTERDISTANCE=500
+
+#### usage ####
+usage() {
+	echo Program: "linkTSS2Peaks (associate TSS to peaks)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: linkTSS2Peaks -i <file> -j <file>"
+	echo "Options:"
+	echo " -i <file>   [input file containing genomic coordinates of TSS in BED format (can be stdin)]"
+    echo "             [format: chr start end names score strand]"
+	echo " -j <file>   [input file containing genomic coordinates of peaks in BED format]"
+    echo "[OPTIONS]"
+    echo " -n <int>    [assign peak to TSS if within input distance to each other (default: 500)]"
+    echo " -k <file>   [input file containing genomic coordinates of peaks (secondary) in BED format]"
+    echo "             [NOTE: this could include peaks that are below significance threshold]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo "[OUTPUT]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:n:k:g:h ARG; do
+	case "$ARG" in
+		i) INPUTTSSFILE=$OPTARG;;
+        j) PEAKFILE=$OPTARG;;
+        n) PROMOTERDISTANCE=$OPTARG;;
+        k) PEAKFILE_SECONDARY=$OPTARG;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INPUTTSSFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+GENOME_FILE=$(initialize_genome -g $GENOME)
+if [ -z "$GENOME_FILE" ]; then
+    echo "Presently the program only support analysis for mm9, mm10, hg19 or hg38"
+    echo
+    usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$INPUTTSSFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo -e "${LINE}"
+    done > $TMP
+    INPUTTSSFILE=$TMP
+fi
+
+## associate TSS to closest peak
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+NCOL=$(head -n 1 $INPUTTSSFILE | perl -ane 'print scalar(@F);')
+closestBed -a <(zless $INPUTTSSFILE | sortBed -i stdin) -b <(zless $PEAKFILE | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F['$((NCOL+1))']-0; $end=$F['$((NCOL+2))']+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$F[0]:$start-$end";
+    if($F[5]=~/\-/) { 
+        $up=$F[1]-$end;
+        $down=$F[1]-$start;
+        if($up>0) { $up=0; }
+        if($down<0) { $down=0; }
+    }
+    else {
+        $up=$start-$F[1];
+        $down=$end-$F[1];
+        if($up>0) { $up=0; }
+        if($down<0) { $down=0; }
+    } print "\t$up\t$down\n";' | perl -ane '
+        if($F[9]<=0) {
+            $start=$F[1]-50;
+            $end=$F[1]+50;
+            $F[7]="$F[0]:$start-$end";
+            $F[9]=50;
+            #$F[6]="N";
+        }
+        print "$F[0]";
+        foreach(@F[1..scalar(@F)-1]) { print "\t$_"; }
+        print "\n";' > $TMP.tss2peaks
+
+## associate TSS to closest peak (secondary), if provided
+if [ ! -z "$PEAKFILE_SECONDARY" ]; then
+    cat <(zless $TMP.tss2peaks | grep -w Y) <(closestBed -a <(zless $TMP.tss2peaks | grep -wv Y | cut -f 1-$NCOL | sortBed -i stdin) -b <(zless $PEAKFILE_SECONDARY | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F['$((NCOL+1))']-0; $end=$F['$((NCOL+2))']+0; $defined="Y_N"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$F[0]:$start-$end";
+            if($F[5]=~/\-/) { 
+                $up=$F[1]-$end;
+                $down=$F[1]-$start;
+                if($up>0) { $up=0; }
+                if($down<0) { $down=0; }
+            }
+            else {
+                $up=$start-$F[1];
+                $down=$end-$F[1];
+                if($up>0) { $up=0; }
+                if($down<0) { $down=0; }
+            } print "\t$up\t$down\n";' | perl -ane '
+                if($F[9]<=0) {
+                    $start=$F[1]-50;
+                    $end=$F[1]+50;
+                    $F[7]="$F[0]:$start-$end";
+                    $F[9]=50;
+                    $F[6]="N";
+                }
+                print "$F[0]";
+                foreach(@F[1..scalar(@F)-1]) { print "\t$_"; }
+                print "\n";')
+else
+    zless $TMP.tss2peaks
+fi | sortBed -i stdin
+
+## remove temporary files
+if [ "$INPUTTSSFILE" == "stdin" ]; then
+    rm $TMP
+fi
+rm $TMP.tss2peaks
+
+exit

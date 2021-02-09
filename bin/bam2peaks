@@ -389,8 +389,8 @@ else
             MINCLUSTERHEIGHT=$(perl -e 'printf("%0.2f", '$TOTAL_MAPPED_READS'/10000000);')
             MINBLOCKHEIGHT=$(perl -e 'printf("%0.2f", '$TOTAL_MAPPED_READS'/10000000);')
         fi
-        echo "${BAMFILEa[$i]}: #minimum reads in block group: $MINCLUSTERHEIGHT" >> $OUTDIR/PARAMETERS
-        echo "${BAMFILEa[$i]}: #minimum reads in block: $MINBLOCKHEIGHT" >> $OUTDIR/PARAMETERS
+        echo "#minimum reads in block group (${BAMFILEa[$i]}): $MINCLUSTERHEIGHT" >> $OUTDIR/PARAMETERS
+        echo "#minimum reads in block (${BAMFILEa[$i]}): $MINBLOCKHEIGHT" >> $OUTDIR/PARAMETERS
 
         if [ ! -s "$OUTDIR/rep$i/fitDistr/INPUT.BG" ]; then
             if [ ! -d "$OUTDIR/rep$i/fitDistr/" ]; then

@@ -13,7 +13,7 @@ usage() {
 	echo "Usage: findIntersectionPoint -i <file>"
 	echo "Options:"
 	echo " -i <file>   [input file containing genomic coordinates of peaks in BED format (can be stdin)]"
-    echo "             [format: chr start end names score strand class]"
+    echo "             [format: chr start end names score strand]"
     echo "[OPTIONS]"
     echo " -o <dir>    [output directory to keep intermediate files (default: .)]"
     echo " -g <string> [genome (default: mm9)]"

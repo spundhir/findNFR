@@ -200,14 +200,13 @@ else
         #rm $OUTDIR/define_promoter/SHUFFLE.BED.DIST.$TMP
 
         DISTANCE=$(findIntersectionPoint -i $OUTDIR/PEAKS.BED -o $OUTDIR/define_promoter -g $GENOME) 
-        >&2 echo $DISTANCE
         if [ "$DISTANCE" -gt 1000 ]; then
             DISTANCE=1000
         fi
 
-        echo "DISTANCE: $DISTANCE" >> $OUTDIR/PARAMETERS 
+        echo "distance: $DISTANCE" >> $OUTDIR/PARAMETERS 
         bedtools merge -i <(sortBed -i $OUTDIR/PEAKS.BED) -d $DISTANCE > $OUTDIR/define_promoter/PEAKS.BED.MERGED
-        bedtools merge -i <(sortBed -i $OUTDIR/PEAKS.BED) -d $DISTANCE > $OUTDIR/define_promoter/PEAKS.BED.MERGED.N
+        bedtools merge -i <(grep -wv Y $OUTDIR/ALLPEAKS.BED | sortBed -i stdin) -d $DISTANCE > $OUTDIR/define_promoter/PEAKS.BED.MERGED.N
     fi
     >&2 echo "done"
 
@@ -220,29 +219,31 @@ else
     fi | bed2window -i stdin -w 0 -t | bed2window -i stdin -w 1 -r | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/define_promoter/GENES_TSS.BED
 
     echo -e "#chr\tstart\tend\tname\tscore\tstrand\tpromoter_defined\tpromoter_coordinate\tantisense_bp\tsense_bp"
-    closestBed -a <(sortBed -i $OUTDIR/define_promoter/GENES_TSS.BED) -b $OUTDIR/define_promoter/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$F[0]:$start-$end";
-    if($F[5]=~/\-/) { 
-        $up=$F[1]-$end;
-        $down=$F[1]-$start;
-        if($up>0) { $up=0; }
-        if($down<0) { $down=0; }
-    }
-    else {
-        $up=$start-$F[1];
-        $down=$end-$F[1];
-        if($up>0) { $up=0; }
-        if($down<0) { $down=0; }
-    } print "\t$up\t$down\n";' | perl -ane '
-        if($F[9]<=0) {
-            $start=$F[1]-50;
-            $end=$F[1]+50;
-            $F[7]="$F[0]:$start-$end";
-            $F[9]=50;
-            $F[6]="N";
-        }
-        print "$F[0]";
-        foreach(@F[1..scalar(@F)-1]) { print "\t$_"; }
-        print "\n";' > $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP
+    #closestBed -a <(sortBed -i $OUTDIR/define_promoter/GENES_TSS.BED) -b $OUTDIR/define_promoter/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$F[0]:$start-$end";
+    #if($F[5]=~/\-/) { 
+    #    $up=$F[1]-$end;
+    #    $down=$F[1]-$start;
+    #    if($up>0) { $up=0; }
+    #    if($down<0) { $down=0; }
+    #}
+    #else {
+    #    $up=$start-$F[1];
+    #    $down=$end-$F[1];
+    #    if($up>0) { $up=0; }
+    #    if($down<0) { $down=0; }
+    #} print "\t$up\t$down\n";' | perl -ane '
+    #    if($F[9]<=0) {
+    #        $start=$F[1]-50;
+    #        $end=$F[1]+50;
+    #        $F[7]="$F[0]:$start-$end";
+    #        $F[9]=50;
+    #        $F[6]="N";
+    #    }
+    #    print "$F[0]";
+    #    foreach(@F[1..scalar(@F)-1]) { print "\t$_"; }
+    #    print "\n";' > $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP
+
+    linkTSS2Peaks -i $OUTDIR/define_promoter/GENES_TSS.BED -j $OUTDIR/define_promoter/PEAKS.BED.MERGED -n $PROMOTERDISTANCE > $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP 
 
     if [ ! -z "$REFINE" ]; then
         >&2 echo -n "Refine 3' boundary of promoter (`date`).. "
