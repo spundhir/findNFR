@@ -1,0 +1,82 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+OUTDIR="."
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "findIntersectionPoint (find intersection point between two numeric distributions)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: findIntersectionPoint -i <file>"
+	echo "Options:"
+	echo " -i <file>   [input file containing genomic coordinates of peaks in BED format (can be stdin)]"
+    echo "             [format: chr start end names score strand class]"
+    echo "[OPTIONS]"
+    echo " -o <dir>    [output directory to keep intermediate files (default: .)]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo "[OUTPUT]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:o:g:h ARG; do
+	case "$ARG" in
+		i) INPUTBEDFILE=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INPUTBEDFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+GENOME_FILE=$(initialize_genome -g $GENOME)
+if [ -z "$GENOME_FILE" ]; then
+    echo "Presently the program only support analysis for mm9, mm10, hg19 or hg38"
+    echo
+    usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$INPUTBEDFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo -e "${LINE}"
+    done > $TMP
+    INPUTBEDFILE=$TMP
+fi
+
+## create output directory
+mkdir -p $OUTDIR
+
+## compute optimal distance to merge peaks
+NCOL=$(head -n 1 $INPUTBEDFILE | perl -ane 'print scalar(@F);')
+closestBed -a <(sortBed -i $INPUTBEDFILE) -b <(sortBed -i $INPUTBEDFILE) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/PEAKS.BED.DIST
+
+bed2shuffle -i $INPUTBEDFILE -g $GENOME > $OUTDIR/SHUFFLE.BED
+
+closestBed -a <(sortBed -i $OUTDIR/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/SHUFFLE.BED.DIST
+
+cut -f 2 $OUTDIR/PEAKS.BED.DIST > $OUTDIR/PEAKS.BED.DIST.$TMP
+cut -f 2 $OUTDIR/SHUFFLE.BED.DIST > $OUTDIR/SHUFFLE.BED.DIST.$TMP
+
+DISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/PEAKS.BED.DIST.$TMP -j $OUTDIR/SHUFFLE.BED.DIST.$TMP -m median)
+echo $DISTANCE
+
+## remove temporary files
+if [ "$INPUTBEDFILE" == "stdin" ]; then
+    rm $TMP
+fi
+rm $OUTDIR/PEAKS.BED.DIST.$TMP
+rm $OUTDIR/SHUFFLE.BED.DIST.$TMP
+
+exit

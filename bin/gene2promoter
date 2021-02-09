@@ -185,26 +185,29 @@ if [ ! -s "$OUTDIR/PEAKS.BED" ]; then
 else
     >&2 echo -n "Determine optimal distance between peaks to merge (`date`).. "
     if [ ! -s "$OUTDIR/define_promoter/PEAKS.BED.MERGED" ]; then
-        NCOL=$(head -n 1 $OUTDIR/PEAKS.BED | perl -ane 'print scalar(@F);')
-        closestBed -a <(sortBed -i $OUTDIR/PEAKS.BED) -b <(sortBed -i $OUTDIR/PEAKS.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/define_promoter/PEAKS.BED.DIST
+        #NCOL=$(head -n 1 $OUTDIR/PEAKS.BED | perl -ane 'print scalar(@F);')
+        #closestBed -a <(sortBed -i $OUTDIR/PEAKS.BED) -b <(sortBed -i $OUTDIR/PEAKS.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/define_promoter/PEAKS.BED.DIST
 
-        bed2shuffle -i $OUTDIR/PEAKS.BED -g $GENOME > $OUTDIR/define_promoter/SHUFFLE.BED
+        #bed2shuffle -i $OUTDIR/PEAKS.BED -g $GENOME > $OUTDIR/define_promoter/SHUFFLE.BED
 
-        closestBed -a <(sortBed -i $OUTDIR/define_promoter/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/define_promoter/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/define_promoter/SHUFFLE.BED.DIST
+        #closestBed -a <(sortBed -i $OUTDIR/define_promoter/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/define_promoter/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/define_promoter/SHUFFLE.BED.DIST
 
-        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-        cut -f 2 $OUTDIR/define_promoter/PEAKS.BED.DIST > $OUTDIR/define_promoter/PEAKS.BED.DIST.$TMP
-        cut -f 2 $OUTDIR/define_promoter/SHUFFLE.BED.DIST > $OUTDIR/define_promoter/SHUFFLE.BED.DIST.$TMP
-        DISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/define_promoter/PEAKS.BED.DIST.$TMP -j $OUTDIR/define_promoter/SHUFFLE.BED.DIST.$TMP -m median)
+        #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        #cut -f 2 $OUTDIR/define_promoter/PEAKS.BED.DIST > $OUTDIR/define_promoter/PEAKS.BED.DIST.$TMP
+        #cut -f 2 $OUTDIR/define_promoter/SHUFFLE.BED.DIST > $OUTDIR/define_promoter/SHUFFLE.BED.DIST.$TMP
+        #DISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/define_promoter/PEAKS.BED.DIST.$TMP -j $OUTDIR/define_promoter/SHUFFLE.BED.DIST.$TMP -m median)
+        #rm $OUTDIR/define_promoter/PEAKS.BED.DIST.$TMP
+        #rm $OUTDIR/define_promoter/SHUFFLE.BED.DIST.$TMP
+
+        DISTANCE=$(findIntersectionPoint -i $OUTDIR/PEAKS.BED -o $OUTDIR/define_promoter -g $GENOME) 
         >&2 echo $DISTANCE
-        rm $OUTDIR/define_promoter/PEAKS.BED.DIST.$TMP
-        rm $OUTDIR/define_promoter/SHUFFLE.BED.DIST.$TMP
-      
         if [ "$DISTANCE" -gt 1000 ]; then
             DISTANCE=1000
         fi
 
+        echo "DISTANCE: $DISTANCE" >> $OUTDIR/PARAMETERS 
         bedtools merge -i <(sortBed -i $OUTDIR/PEAKS.BED) -d $DISTANCE > $OUTDIR/define_promoter/PEAKS.BED.MERGED
+        bedtools merge -i <(sortBed -i $OUTDIR/PEAKS.BED) -d $DISTANCE > $OUTDIR/define_promoter/PEAKS.BED.MERGED.N
     fi
     >&2 echo "done"
 
