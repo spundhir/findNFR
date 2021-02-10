@@ -63,55 +63,105 @@ fi
 ## associate TSS to closest peak
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 NCOL=$(head -n 1 $INPUTTSSFILE | perl -ane 'print scalar(@F);')
-closestBed -a <(zless $INPUTTSSFILE | sortBed -i stdin) -b <(zless $PEAKFILE | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F['$((NCOL+1))']-0; $end=$F['$((NCOL+2))']+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$F[0]:$start-$end";
+closestBed -a <(zless $INPUTTSSFILE | sortBed -i stdin) -b <(zless $PEAKFILE | sortBed -i stdin) -D a -t first | perl -ane '
+    if(abs($F[scalar(@F)-1]) < '$PROMOTERDISTANCE' && $F['$((NCOL))']!~/^\.$/) {
+        if($F[scalar(@F)-1] == 0) {
+            $start=$F['$((NCOL+1))']-0;
+            $end=$F['$((NCOL+2))']+0;
+        }
+        elsif(($F[5]=~/\-/ && $F[scalar(@F)-1] > 0) || ($F[5]=~/\+/ && $F[scalar(@F)-1] < 0)) {
+            $start=$F['$((NCOL+1))']-0;
+            $end=$F[1];
+        }
+        elsif(($F[5]=~/\-/ && $F[scalar(@F)-1] < 0) || ($F[5]=~/\+/ && $F[scalar(@F)-1] > 0)) {
+            $start=$F[1];
+            $end=$F['$((NCOL+2))']+0;
+        }
+        $defined="Y";
+    }
+    else {
+        $start=$F[1]-50;
+        $end=$F[1]+50;
+        $defined="N";
+    }
+    if($start<0) { $start=1; }
+    for($i=0; $i<6; $i++) {
+        print "$F[$i]\t";
+    }
+    print "$defined\t$F[0]:$start-$end";
     if($F[5]=~/\-/) { 
         $up=$F[1]-$end;
         $down=$F[1]-$start;
-        if($up>0) { $up=0; }
-        if($down<0) { $down=0; }
+        #if($up>0) { $up=0; }
+        #if($down<0) { $down=0; }
     }
     else {
         $up=$start-$F[1];
         $down=$end-$F[1];
-        if($up>0) { $up=0; }
-        if($down<0) { $down=0; }
+        #if($up>0) { $up=0; }
+        #if($down<0) { $down=0; }
     } print "\t$up\t$down\n";' | perl -ane '
-        if($F[9]<=0) {
-            $start=$F[1]-50;
-            $end=$F[1]+50;
-            $F[7]="$F[0]:$start-$end";
-            $F[9]=50;
-            #$F[6]="N";
-        }
+        #if($F[9]<=0) {
+        #    $start=$F[1]-50;
+        #    $end=$F[1]+50;
+        #    $F[7]="$F[0]:$start-$end";
+        #    $F[9]=50;
+        #    $F[6]="N";
+        #}
         print "$F[0]";
         foreach(@F[1..scalar(@F)-1]) { print "\t$_"; }
         print "\n";' > $TMP.tss2peaks
 
 ## associate TSS to closest peak (secondary), if provided
 if [ ! -z "$PEAKFILE_SECONDARY" ]; then
-    cat <(zless $TMP.tss2peaks | grep -w Y) <(closestBed -a <(zless $TMP.tss2peaks | grep -wv Y | cut -f 1-$NCOL | sortBed -i stdin) -b <(zless $PEAKFILE_SECONDARY | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F['$((NCOL+1))']-0; $end=$F['$((NCOL+2))']+0; $defined="Y_N"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$F[0]:$start-$end";
-            if($F[5]=~/\-/) { 
-                $up=$F[1]-$end;
-                $down=$F[1]-$start;
-                if($up>0) { $up=0; }
-                if($down<0) { $down=0; }
-            }
-            else {
-                $up=$start-$F[1];
-                $down=$end-$F[1];
-                if($up>0) { $up=0; }
-                if($down<0) { $down=0; }
-            } print "\t$up\t$down\n";' | perl -ane '
-                if($F[9]<=0) {
-                    $start=$F[1]-50;
-                    $end=$F[1]+50;
-                    $F[7]="$F[0]:$start-$end";
-                    $F[9]=50;
-                    $F[6]="N";
-                }
-                print "$F[0]";
-                foreach(@F[1..scalar(@F)-1]) { print "\t$_"; }
-                print "\n";')
+    cat <(zless $TMP.tss2peaks | grep -w Y) <(closestBed -a <(zless $TMP.tss2peaks | grep -wv Y | cut -f 1-$NCOL | sortBed -i stdin) -b <(zless $PEAKFILE_SECONDARY | sortBed -i stdin) -D a -t first | perl -ane '
+    if(abs($F[scalar(@F)-1]) < '$PROMOTERDISTANCE' && $F['$((NCOL))']!~/^\.$/) {
+        if($F[scalar(@F)-1] == 0) {
+            $start=$F['$((NCOL+1))']-0;
+            $end=$F['$((NCOL+2))']+0;
+        }
+        elsif(($F[5]=~/\-/ && $F[scalar(@F)-1] > 0) || ($F[5]=~/\+/ && $F[scalar(@F)-1] < 0)) {
+            $start=$F['$((NCOL+1))']-0;
+            $end=$F[1];
+        }
+        elsif(($F[5]=~/\-/ && $F[scalar(@F)-1] < 0) || ($F[5]=~/\+/ && $F[scalar(@F)-1] > 0)) {
+            $start=$F[1];
+            $end=$F['$((NCOL+2))']+0;
+        }
+        $defined="Y_N";
+    }
+    else {
+        $start=$F[1]-50;
+        $end=$F[1]+50;
+        $defined="N";
+    }
+    if($start<0) { $start=1; }
+    for($i=0; $i<6; $i++) {
+        print "$F[$i]\t";
+    }
+    print "$defined\t$F[0]:$start-$end";
+    if($F[5]=~/\-/) { 
+        $up=$F[1]-$end;
+        $down=$F[1]-$start;
+        #if($up>0) { $up=0; }
+        #if($down<0) { $down=0; }
+    }
+    else {
+        $up=$start-$F[1];
+        $down=$end-$F[1];
+        #if($up>0) { $up=0; }
+        #if($down<0) { $down=0; }
+    } print "\t$up\t$down\n";' | perl -ane '
+        #if($F[9]<=0) {
+        #    $start=$F[1]-50;
+        #    $end=$F[1]+50;
+        #    $F[7]="$F[0]:$start-$end";
+        #    $F[9]=50;
+        #    $F[6]="N";
+        #}
+        print "$F[0]";
+        foreach(@F[1..scalar(@F)-1]) { print "\t$_"; }
+        print "\n";')
 else
     zless $TMP.tss2peaks
 fi | sortBed -i stdin
