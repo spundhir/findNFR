@@ -5,7 +5,7 @@ suppressPackageStartupMessages(library(seqPattern))
 ## parse command line arguments
 option_list <- list(
 	make_option(c("-i", "--bedFile"), help="input BED file, can be stdin\n\t\tformat: chr strand end name score strand promoter_class"),
-    make_option(c("-m", "--motifFile"), help="input PWM file"),
+    #make_option(c("-m", "--motifFile"), help="input PWM file"),
     make_option(c("-g", "--genome"), default="mm10", help="genome (default: %default)"),
     make_option(c("-o", "--outPDF"), help="output pdf file")
 )
@@ -74,12 +74,6 @@ sIdx <- coor$promoter_class=="1_narrow"
 mIdx <- coor$promoter_class=="2_medium"
 bIdx <- coor$promoter_class=="3_broad"
 
-## plot PWM frequency plots
-if(is.null(opt$motifFile)) {
-    data(TBPpwm)
-    PWM = TBPpwm
-}
-
 ## create output pdf file
 pdf(opt$outPDF)
     ## plot WW and SS frequency plots
@@ -94,18 +88,26 @@ pdf(opt$outPDF)
         patterns = c("WW", "SS"), flankUp = 400, flankDown = 800,
         smoothingWindow = 3, color = c("red3", "blue3"), cex.axis = 0.9)
 
-    ## plot motif frequency plots
-    par(mfrow=c(1,1))
-    plotMotifOccurrenceAverage(regionsSeq = coorFlankSeq_pwm[sIdx],
-        motifPWM = PWM, minScore = "90%", flankUp = 200, flankDown = 200,
-        smoothingWindow = 3, color = c("red3"), cex.axis = 0.9)
-    plotMotifOccurrenceAverage(regionsSeq = coorFlankSeq_pwm[mIdx],
-        motifPWM = PWM, minScore = "90%", flankUp = 200, flankDown = 200,
-        smoothingWindow = 3, color = c("green3"), cex.axis = 0.9, add=T)
-    plotMotifOccurrenceAverage(regionsSeq = coorFlankSeq_pwm[bIdx],
-        motifPWM = PWM, minScore = "90%", flankUp = 200, flankDown = 200,
-        smoothingWindow = 3, color = c("blue3"), add = T)
-    legend("topright", legend = c("sharp", "medium", "broad"), col = c("red3", "green3", "blue3"), bty = "n", lwd = 1)
+    ## plot PWM frequency plots
+    NAME="BREd,BREu,CCAAT,DCE_S_I,DCE_S_II,DCE_S_III,DPE,GC,INR,MED,MTE,TATA,XCPE1";
+    lapply(unlist(strsplit(NAME, ",")), function(x) {
+        x <- gsub("-.*", "", x)
+        PWM <- as.matrix(read.table(pipe(sprintf("less /localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/jaspar/JASPAR2020_POLII_pfms_jaspar.txt | sed -E 's/^.*\\[\\s+//g' | sed -E 's/\\]//g' | grep -w %s -A 4 | grep -v '>'", as.character(x)))))
+        row.names(PWM) <- c("A", "C", "G", "T")
+
+        ## plot motif frequency plots
+        par(mfrow=c(1,1))
+        plotMotifOccurrenceAverage(regionsSeq = coorFlankSeq_pwm[sIdx],
+            motifPWM = PWM, minScore = "90%", flankUp = 200, flankDown = 200,
+            smoothingWindow = 3, color = c("red3"), cex.axis = 0.9, yLabel = sprintf("Relative frequency (%s)", x))
+        plotMotifOccurrenceAverage(regionsSeq = coorFlankSeq_pwm[mIdx],
+            motifPWM = PWM, minScore = "90%", flankUp = 200, flankDown = 200,
+            smoothingWindow = 3, color = c("green3"), cex.axis = 0.9, add=T)
+        plotMotifOccurrenceAverage(regionsSeq = coorFlankSeq_pwm[bIdx],
+            motifPWM = PWM, minScore = "90%", flankUp = 200, flankDown = 200,
+            smoothingWindow = 3, color = c("blue3"), add = T)
+        legend("topright", legend = c("sharp", "medium", "broad"), col = c("red3", "green3", "blue3"), bty = "n", lwd = 1)
+    })
 dev.off()
 
 q()
