@@ -122,7 +122,7 @@ echo -ne "$(grep '^#' $PROMOTER_FILE)\tpromoter_width\tpromoter_class\tdist_to_g
 
 ## distance to closest gene TSS + alternative TSS
 >&2 echo -n "Determine distance to closest TSS (`date`).. "
-closestBed -a <(sortBed -i $PROMOTER_FILE) -b <(sortBed -i $PROMOTER_FILE) -d -t first -io | perl -ane '$class="narrow"; @coor=split(/[:-]+/,$F[7]); $promoter_width=($coor[2]-$coor[1]); if($promoter_width > 500 && $promoter_width <=1000) { $class="medium"; } elsif($promoter_width > 1000) { $class="broad"; } foreach(@F[0..9]) { print "$_\t"; } print "$promoter_width\t$class\t".$F[scalar(@F)-1]."\n";' > ${TMP}.distance
+closestBed -a <(sortBed -i $PROMOTER_FILE) -b <(sortBed -i $PROMOTER_FILE) -d -t first -io | perl -ane '$class="1_narrow"; @coor=split(/[:-]+/,$F[7]); $promoter_width=($coor[2]-$coor[1]); if($promoter_width > 500 && $promoter_width <=1000) { $class="2_medium"; } elsif($promoter_width > 1000) { $class="3_broad"; } foreach(@F[0..9]) { print "$_\t"; } print "$promoter_width\t$class\t".$F[scalar(@F)-1]."\n";' > ${TMP}.distance
 
 #TSS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -t)
 #if [ -f "$TSS_FILE" ]; then
@@ -192,7 +192,7 @@ if [ ! -z "$BIVALENT_FILE" ]; then
     if [ ! -s "$OUTDIR/h3k27me3_peaks/PEAKS.BED" ]; then
         epic2 -t $BIVALENT_FILE -gn $GENOME -fdr 0.05 -o $OUTDIR/h3k27me3_peaks/PEAKS.BED
     fi
-    intersectBed -a $PROMOTER_FILE -b $OUTDIR/h3k27me3_peaks/PEAKS.BED -wao | intersectBed2uniq -i stdin -o sum -c $((NCOL+4)),$((NCOL+5)) -n ${NCOL} | perl -ane '$activity="inactive"; if($F['$((NCOL))'] > 0) { if($F[6]=~/^Y$/ | $F[6]=~/^Y_N$/) { $activity="bivalent"; } else {  $activity="repressed"; } } elsif($F[6]=~/^Y$/) { $activity="active"; } foreach(@F[0..'$((NCOL-1))']) { print "$_\t"; } print "$activity\n";' > ${TMP}.bivalent
+    intersectBed -a $PROMOTER_FILE -b $OUTDIR/h3k27me3_peaks/PEAKS.BED -wao | intersectBed2uniq -i stdin -o sum -c $((NCOL+4)),$((NCOL+5)) -n ${NCOL} | perl -ane '$activity="1_inactive"; if($F['$((NCOL))'] > 0) { if($F[6]=~/^Y$/ | $F[6]=~/^Y_N$/) { $activity="3_bivalent"; } else {  $activity="2_repressed"; } } elsif($F[6]=~/^Y$/ | $F[6]=~/^Y_N$/) { $activity="4_active"; } foreach(@F[0..'$((NCOL-1))']) { print "$_\t"; } print "$activity\n";' > ${TMP}.bivalent
     >&2 echo "done"
 else
     touch ${TMP}.bivalent

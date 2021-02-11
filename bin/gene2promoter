@@ -242,6 +242,7 @@ else
 
     linkTSS2Peaks -i $OUTDIR/define_promoter/GENES_TSS.BED -j $OUTDIR/define_promoter/PEAKS.BED.MERGED -k $OUTDIR/define_promoter/PEAKS.BED.MERGED.N -n $PROMOTERDISTANCE > $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP 
 
+    ## OBSOLETE
     if [ ! -z "$REFINE" ]; then
         >&2 echo -n "Refine 3' boundary of promoter (`date`).. "
         zless $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP | perl -ane 'if($F[9]>450) { print $_; }' | perl -ane 'if($F[5]=~/\-/) { $end=$F[1]-250; $start=$F[1]-$F[9]; } else { $start=$F[1]+250; $end=$F[1]+$F[9]; } print "$F[0]\t$start\t$end\t$F[3]\t$F[4]\t$F[5]\n";' | bed2HighestExprBin -i stdin -j $REFINE -w 200 -s 200 -d -g $GENOME > $OUTDIR/define_promoter/GENES_PROMOTER.BED.HighestExprBin$TMP
