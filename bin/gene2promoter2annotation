@@ -199,13 +199,14 @@ else
 fi
 
 <<"COMMENT"
->&2 echo -n "Determine Pol II pausing (`date`).. "
-if [ ! -z "$POL2FILE" ]; then
+>&2 echo -n "Determine sequence motif compositon (`date`).. "
+if [ ! -z "$MOTIFFILE" ]; then
+    grep -v start ${TMP}.distance | cut -f 1-6,12 | bed2seqPattern.R -i stdin -g mm10 -o test.pdf 
 fi
 >&2 echo "done"
 
->&2 echo -n "Determine sequence motif compositon (`date`).. "
-if [ ! -z "$MOTIFFILE" ]; then
+>&2 echo -n "Determine Pol II pausing (`date`).. "
+if [ ! -z "$POL2FILE" ]; then
 fi
 >&2 echo "done"
 COMMENT
