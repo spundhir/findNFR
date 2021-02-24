@@ -253,7 +253,7 @@ else
         >&2 echo "done"
     else
         zless $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP
-    fi | sort -k 4,4 -k 10rn,10 | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }'
+    fi | sort -k 4,4 -k 10rn,10 | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }' | perl -ane '@coor=split(/[:-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' | bed2expr -i stdin -j $BAMFILE -k -d -n -g $GENOME | perl -ane '$count=0; $sum=0; foreach(@F[10..scalar(@F)-1]) { $sum+=$_; $count++; } $mean_expr=sprintf("%0.5f", $sum/$count); @coor=split(/[:-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$mean_expr\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";'
     #| perl -ane '@tss=split(/[\:\-]/,$F[7]); print "$tss[0]\t$tss[1]\t".($tss[2]+1)."\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";'
 
     ## remove temporary file

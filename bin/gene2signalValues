@@ -62,7 +62,7 @@ usage() {
     echo "             [signal (divergent mode): NDR_UP/NDR_DOWN/genebody]"
     echo "             [TSSR: TSS-50 to TSS+w]"
     echo "             [TESR: TES-w to TES+50]"
-    echo "             [NDR: TSS-100 to TSS+10]"
+    echo "             [NDR: TSS-100 to TSS+10; NDR_UP: NDR-w; NDR_DOWN: NDR+w]"
     echo "[OUTPUT]"
     echo "             [chr start end name score strand gene coordinate (TSSR) signal (TSSR) distance (closest_tss) signal (per bam file)]"
 	echo
