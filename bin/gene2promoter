@@ -204,8 +204,8 @@ else
         fi
 
         echo "distance: $DISTANCE" >> $OUTDIR/PARAMETERS 
-        bedtools merge -i <(sortBed -i $OUTDIR/PEAKS.BED) -d $DISTANCE > $OUTDIR/define_promoter/PEAKS.BED.MERGED
-        bedtools merge -i <(grep -wv Y $OUTDIR/ALLPEAKS.BED | sortBed -i stdin) -d $DISTANCE > $OUTDIR/define_promoter/PEAKS.BED.MERGED.N
+        bedtools merge -i <(sortBed -i $OUTDIR/PEAKS.BED) -d $DISTANCE -c 5,7 -o sum,mean | perl -ane '$i++; print "$F[0]\t$F[1]\t$F[2]\tPEAK_$i\t$F[3]\t.\t$F[4]\n";'  > $OUTDIR/define_promoter/PEAKS.BED.MERGED
+        bedtools merge -i <(grep -wv Y $OUTDIR/ALLPEAKS.BED | sortBed -i stdin) -d $DISTANCE -c 5,7 -o sum,mean | perl -ane '$i++; print "$F[0]\t$F[1]\t$F[2]\tPEAK_$i\t$F[3]\t.\t$F[4]\n";'  > $OUTDIR/define_promoter/PEAKS.BED.MERGED.N
     fi
     >&2 echo "done"
 

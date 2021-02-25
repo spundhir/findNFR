@@ -65,6 +65,7 @@ TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 NCOL=$(head -n 1 $INPUTTSSFILE | perl -ane 'print scalar(@F);')
 closestBed -a <(zless $INPUTTSSFILE | sortBed -i stdin) -b <(zless $PEAKFILE | sortBed -i stdin) -D a -t first | perl -ane '
     if(abs($F[scalar(@F)-1]) < '$PROMOTERDISTANCE' && $F['$((NCOL))']!~/^\.$/) {
+        $F[4]=$F['$((NCOL+4))'];
         if($F[scalar(@F)-1] == 0) {
             $start=$F['$((NCOL+1))']-0;
             $end=$F['$((NCOL+2))']+0;
@@ -80,6 +81,7 @@ closestBed -a <(zless $INPUTTSSFILE | sortBed -i stdin) -b <(zless $PEAKFILE | s
         $defined="Y";
     }
     else {
+        $F[4]=0;
         $start=$F[1]-50;
         $end=$F[1]+50;
         $defined="N";
@@ -116,6 +118,7 @@ closestBed -a <(zless $INPUTTSSFILE | sortBed -i stdin) -b <(zless $PEAKFILE | s
 if [ ! -z "$PEAKFILE_SECONDARY" ]; then
     cat <(zless $TMP.tss2peaks | grep -w Y) <(closestBed -a <(zless $TMP.tss2peaks | grep -wv Y | cut -f 1-$NCOL | sortBed -i stdin) -b <(zless $PEAKFILE_SECONDARY | sortBed -i stdin) -D a -t first | perl -ane '
     if(abs($F[scalar(@F)-1]) < '$PROMOTERDISTANCE' && $F['$((NCOL))']!~/^\.$/) {
+        $F[4]=$F['$((NCOL+4))'];
         if($F[scalar(@F)-1] == 0) {
             $start=$F['$((NCOL+1))']-0;
             $end=$F['$((NCOL+2))']+0;
@@ -131,6 +134,7 @@ if [ ! -z "$PEAKFILE_SECONDARY" ]; then
         $defined="Y_N";
     }
     else {
+        $F[4]=0;
         $start=$F[1]-50;
         $end=$F[1]+50;
         $defined="N";
