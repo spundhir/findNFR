@@ -38,7 +38,7 @@ fi
 
 ## populate files based on input genome
 GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
-GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+#GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
 if [ ! -f "$GENOME_FILE" ]; then
     echo
     echo "computation for $GENOME is not available yet"

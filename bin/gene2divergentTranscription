@@ -104,7 +104,7 @@ function wait_for_jobs_to_finish {
 
 >&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
-GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+#GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
 if [ ! -f "$GENOME_FILE" ]; then
     >&2 echo
     >&2 echo "computation for $GENOME is not available yet"

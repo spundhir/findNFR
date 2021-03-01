@@ -97,7 +97,7 @@ function wait_for_jobs_to_finish {
 
 >&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
-GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+#GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
 if [ ! -f "$GENOME_FILE" ]; then
     >&2 echo
     >&2 echo "computation for $GENOME is not available yet"
@@ -203,7 +203,7 @@ if [ ! -z "$BIVALENT_FILE" ]; then
     if [ ! -s "$OUTDIR/h3k27me3_peaks/PEAKS.BED" ]; then
         epic2 -t $BIVALENT_FILE -gn $GENOME -fdr 0.05 -o $OUTDIR/h3k27me3_peaks/PEAKS.BED
     fi
-    intersectBed -a $PROMOTER_FILE -b $OUTDIR/h3k27me3_peaks/PEAKS.BED -wao | intersectBed2uniq -i stdin -o sum -c $((NCOL+4)),$((NCOL+5)) -n ${NCOL} | perl -ane '$activity="1_inactive"; if($F['$((NCOL))'] > 0) { if($F[6]=~/^Y$/ | $F[6]=~/^Y_N$/) { $activity="3_bivalent"; } else {  $activity="2_repressed"; } } elsif($F[6]=~/^Y$/ | $F[6]=~/^Y_N$/) { $activity="4_active"; } foreach(@F[0..'$((NCOL-1))']) { print "$_\t"; } print "$activity\n";' > ${TMP}.bivalent
+    intersectBed -a $PROMOTER_FILE -b $OUTDIR/h3k27me3_peaks/PEAKS.BED -wao | intersectBed2uniq -i stdin -o sum -c $((NCOL+4)),$((NCOL+5)) -n ${NCOL} | perl -ane '$activity="1_inactive"; if($F[6]=~/^Y_N$/) { $activity="2_moderate"; } elsif($F['$((NCOL))'] > 0) { if($F[6]=~/^Y$/) { $activity="4_bivalent"; } else {  $activity="3_repressed"; } } elsif($F[6]=~/^Y$/) { $activity="5_active"; } foreach(@F[0..'$((NCOL-1))']) { print "$_\t"; } print "$activity\n";' > ${TMP}.bivalent
     >&2 echo "done"
 else
     touch ${TMP}.bivalent

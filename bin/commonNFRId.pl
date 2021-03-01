@@ -65,7 +65,7 @@ sub usage {
 
 ## populate genome file based on input genome
 my $GENOME_FILE=`initialize_genome -i $ENV{FINDNFRPATH}/data/annotations/GENOME_FILE -g $genome`;
-$GENOME_FILE="$ENV{FINDNFRPATH}/data/annotations/$GENOME_FILE";
+#$GENOME_FILE="$ENV{FINDNFRPATH}/data/annotations/$GENOME_FILE";
 if(! -f $GENOME_FILE) {
     print "\ncomputation for $genome is not feasible yet\n";
     print "please add the chromosome size file for $genome at $ENV{FINDNFRPATH}/data/annotations\n";

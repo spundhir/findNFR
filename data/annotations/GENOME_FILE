@@ -1,5 +1,5 @@
 ## genome size source: https://deeptools.readthedocs.io/en/develop/content/feature/effectiveGenomeSize.html & https://www.biostars.org/p/178995/
-mm9 mouse.mm9.genome
+mm9 /scratch/genomes/annotations/SIZE/mouse.mm9.genome
 mm9 mm
 mm9 2620345972
 mm9 /scratch/genomes/annotations/BED/mm9_ensembl_gene.bed
@@ -9,7 +9,7 @@ mm9 /scratch/genomes/annotations/MISC/CpG_mm9.bed
 mm9 /scratch/genomes/annotations/BED/mm9_cage_tss.bed
 mm9 /scratch/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz
 mm9 /scratch/genomes/annotations/BLACKLIST/mm9_blacklist.bed.gz
-mm10    mouse.mm10.genome
+mm10    /scratch/genomes/annotations/SIZE/mouse.mm10.genome
 mm10    mm
 mm10 2652783500
 mm10    /scratch/genomes/annotations/BED/mm10_ensembl_gene.bed
@@ -19,7 +19,7 @@ mm10    /scratch/genomes/annotations/MISC/CpG_mm10.bed
 mm10    /scratch/genomes/annotations/BED/mm10_cage_tss.bed
 mm10    /scratch/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz
 mm10    /scratch/genomes/annotations/BLACKLIST/mm10_blacklist.bed.gz
-hg19    human.hg19.genome
+hg19    /scratch/genomes/annotations/SIZE/human.hg19.genome
 hg19    hs
 hg19    2864785220
 hg19    /scratch/genomes/annotations/BED/hg19_ensembl_gene.bed
@@ -29,7 +29,7 @@ hg19    /scratch/genomes/annotations/MISC/CpG_hg19.bed
 hg19    /scratch/genomes/annotations/BED/hg19_cage_tss.bed
 hg19    /scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz
 hg19    /scratch/genomes/annotations/BLACKLIST/hg19_blacklist.bed.gz
-hg38    human.hg38.genome
+hg38    /scratch/genomes/annotations/SIZE/human.hg38.genome
 hg38    hs
 hg38    2913022398
 hg38    /scratch/genomes/annotations/BED/hg38_ensembl_gene.bed
@@ -39,7 +39,7 @@ hg38    /scratch/genomes/annotations/MISC/CpG_hg38.bed
 hg38    /scratch/genomes/annotations/BED/hg38_cage_tss.bed
 hg38    /scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz
 hg38    /scratch/genomes/annotations/BLACKLIST/hg38_blacklist.bed.gz
-danRer7 zebrafish.danRer7.genome
+danRer7 /scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome
 danRer7 dr
 danRer7 1369631918
 danRer7 NA
@@ -49,7 +49,7 @@ danRer7 NA
 danRer7 NA
 danRer7 NA
 danRer7 NA
-rn5 rat.rn5.genome
+rn5 /scratch/genomes/annotations/SIZE/rat.rn5.genome
 rn5 rn
 rn5 2197995070
 rn5 NA
