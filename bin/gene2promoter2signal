@@ -1,0 +1,133 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+gene2promoter2signal: compute ChIP-seq signal at gene promoters
+Copyright (C) 2020  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+VERSION="0.01"
+GENOME="mm9"
+PROCESSOR=1
+CONFIG_FILTER="tpm"
+
+#### usage ####
+usage() {
+	echo Program: "gene2promoter2signal (compute ChIP-seq signal at gene promoters)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: $VERSION
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: gene2promoter2signal -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file containing genomic coordinates of TSS in BED format]"
+    echo "             [format: chr start end name score strand promoter_defined promoter_coordinate antisense_bp sense_bp]"
+    echo "             [sense_bp is the distance by which core promoter is extended downstream to TSS, computed using gene2promoter)]"
+    echo "             [note: 'name' should be unique]"
+    echo " -j <file>   [input configuration file containing bam file information (can be stdin)]"
+    echo "             [tpm <bam file>; used to compute ChIP-seq signal at promoters]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
+    echo " -f <string> [filter bam files from configuration file based on input indentifier (default: tpm)]"
+	echo " -h          [help]"
+    echo "[OUTPUT]"
+    echo "             [chr start end name score strand promoter_defined promoter_coordinate antisense_bp sense_bp <signal per bam file>]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:p:h ARG; do
+	case "$ARG" in
+		i) PROMOTER_FILE=$OPTARG;;
+        j) BAMCONFIG=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        f) CONFIG_FILTER=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+>&2 echo
+if [ "$HELP" ]; then
+    usage
+fi
+
+>&2 echo
+>&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
+## usage, if necessary file and directories are given/exist
+if [ -z "$PROMOTER_FILE" ]; then
+    >&2 echo
+    >&2 echo "Error: one or more required paramter values not provided"
+    >&2 echo
+	usage
+fi
+>&2 echo "done"
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+#GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+
+## create temporary BED file if input is from stdin
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+#TMP="B7F8L90t3w4mzXeiKmwc9Rk2hJUIZdiR"
+if [ "$BAMCONFIG" == "stdin" ]; then
+    while read LINE; do
+        echo -e "${LINE}"
+    done > $TMP
+    BAMCONFIG=$TMP
+fi
+NCOL=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F)."\n";')
+
+## compute ChIP-seq signal at gene promoters
+>&2 echo -n "Compute ChIP-seq signal at gene promoters (`date`).. "
+grep -wv start $PROMOTER_FILE | perl -ane '@coor=split(/[:-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\n";' | bed2expr -i stdin -j $BAMCONFIG -k -d -n -g $GENOME -f $CONFIG_FILTER > $TPM.signal
+>&2 echo "done"
+
+## organize final output file
+>&2 echo -n "Organize final output file (`date`).. "
+echo -ne $(grep -w start $PROMOTER_FILE)
+echo -ne "\t";
+echo -e $(less $BAMCONFIG | perl -ane 'if($_=~/^tpm/) { $_=~s/^.*\///g; $_=~s/\.bam//g; chomp($_); print "\t$_"; }')
+paste <(grep -v start $PROMOTER_FILE) <(cut -f 7- $TPM.signal) 
+>&2 echo "done"
+
+## remove temporary files
+if [ -f  "$TMP" ]; then
+    $TMP
+fi
+rm $TMP.signal
