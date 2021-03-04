@@ -1,0 +1,98 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+EXTENSION="bam"
+
+#### usage ####
+usage() {
+	echo Program: "filterFilesByName (filter files from input directory or file by name)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: filterFileByName -i <file | dir> -f <string> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file or directory containing file information]"
+    echo " -f <string> [filter in bigWig files matching identifiers eg. wt or gmp]"
+    echo "             [if multiple seperate them by a comma]"
+    echo "[OPTIONS: filter options]"
+    echo " -d <string> [filter out bigWig files matching identifiers eg. wt or gmp]"
+    echo "             [if multiple seperate them by a comma]"
+    echo " -e <string> [file extension (default: bam)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:f:d:e:h ARG; do
+	case "$ARG" in
+		i) INPUT=$OPTARG;;
+        f) FILTER_MATCH=$OPTARG;;
+        d) FILTER_NOMATCH=$OPTARG;;
+        e) EXTENSION=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INPUT" -o -z "$FILTER_MATCH" -o "$HELP" ]; then
+	usage
+fi
+
+echo
+echo -n "Filter files (`date`).. " >&2
+oIFS=$IFS
+IFS=","
+FILTERS_MATCH=($FILTER_MATCH)
+FILTERS_NOMATCH=($FILTER_NOMATCH)
+IFS=$oIFS
+
+BWFILE=""
+if [ -f "$INPUT" ]; then
+    while read file; do
+        MATCH_COUNT=0
+        for (( i=0; i<${#FILTERS_MATCH[@]}; i++ )); do
+            FOUND=`echo $file | perl -ane '$_=~s/^.*\///g; if($_=~/'${FILTERS_MATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
+            #echo "${FILTERS_MATCH[$i]} $file $FOUND $i"
+            MATCH_COUNT=$(($MATCH_COUNT + $FOUND))
+        done
+        
+        NOMATCH_COUNT=0
+        for (( i=0; i<${#FILTERS_NOMATCH[@]}; i++ )); do
+            FOUND=`echo $file | perl -ane '$_=~s/^.*\///g; if($_=~/'${FILTERS_NOMATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
+            #echo "${FILTERS_NOMATCH[$i]} $file $FOUND $i"
+            NOMATCH_COUNT=$(($NOMATCH_COUNT + $FOUND))
+        done
+        
+        TITLE=`echo $file | sed 's/^.*\///g;' | sed 's/\..*//g' | perl -ane 'chomp($_); print "$_";'`;
+        if [ "$MATCH_COUNT" == ${#FILTERS_MATCH[@]} -a "$NOMATCH_COUNT" -eq 0 ]; then
+            #echo -e "$TITLE\t$file"
+            BWFILE="$BWFILE,$file"
+        fi
+    done < $INPUT
+elif [ -d "$INPUT" ]; then
+    for file in $INPUT/*.$EXTENSION; do
+        MATCH_COUNT=0
+        for (( i=0; i<${#FILTERS_MATCH[@]}; i++ )); do
+            FOUND=`echo $file | perl -ane '$_=~s/^.*\///g; if($_=~/'${FILTERS_MATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
+            #echo "${FILTERS_MATCH[$i]} $file $FOUND $i"
+            MATCH_COUNT=$(($MATCH_COUNT + $FOUND))
+        done
+        
+        NOMATCH_COUNT=0
+        for (( i=0; i<${#FILTERS_NOMATCH[@]}; i++ )); do
+            FOUND=`echo $file | perl -ane '$_=~s/^.*\///g; if($_=~/'${FILTERS_NOMATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
+            #echo "${FILTERS_NOMATCH[$i]} $file $FOUND $i"
+            NOMATCH_COUNT=$(($NOMATCH_COUNT + $FOUND))
+        done
+        
+        TITLE=`echo $file | sed 's/^.*\///g;' | sed 's/\..*//g' | perl -ane 'chomp($_); print "$_";'`;
+        if [ "$MATCH_COUNT" == ${#FILTERS_MATCH[@]} -a "$NOMATCH_COUNT" -eq 0 ]; then
+            #echo -e "$TITLE\t$file"
+            BWFILE="$BWFILE,$file"
+        fi
+    done
+fi
+BWFILE=$(echo $BWFILE | sed -E 's/^,//g')
+echo $BWFILE
+echo "Done (`date`) " >&2
