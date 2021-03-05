@@ -185,8 +185,16 @@ if [ ! -z "$SS" ]; then
     NGSPLOT_TITLE_SENSE=$PLOTTITLE"_sense"
     NGSPLOT_TITLE_ANTISENSE=$PLOTTITLE"_antisense"
 
-    nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_SENSE -r same $ARG
-    nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_ANTISENSE -r opposite $ARG
+    if [ ! -z "$CLASS_SPLIT" ]; then
+        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_SENSE -r same $ARG
+        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_ANTISENSE -r opposite $ARG
+    elif [ ! -z "$RANDOM_SPLIT" ]; then
+        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_SENSE -r same $ARG -u $RANDOM_SPLIT
+        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_ANTISENSE -r opposite $ARG -u $RANDOM_SPLIT
+    else
+        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_SENSE -r same $ARG -x
+        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_ANTISENSE -r opposite $ARG -x
+    fi
 else
     echo
     echo -n "Organize input genomic region files (`date`).. " >&2

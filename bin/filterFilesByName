@@ -2,6 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 EXTENSION="bam"
+FILTER_FIELD=1
 
 #### usage ####
 usage() {
@@ -12,34 +13,42 @@ usage() {
 	echo "Usage: filterFileByName -i <file | dir> -f <string> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input file or directory containing file information]"
+    echo "             [if file: <id> <bam file> <bam file (spikeIn: optional)]"
+    echo "[OPTIONS: filter options]"
     echo " -f <string> [filter in bigWig files matching identifiers eg. wt or gmp]"
     echo "             [if multiple seperate them by a comma]"
-    echo "[OPTIONS: filter options]"
     echo " -d <string> [filter out bigWig files matching identifiers eg. wt or gmp]"
     echo "             [if multiple seperate them by a comma]"
     echo " -e <string> [file extension (default: bam)]"
+    echo " -S          [search field (default: 1)]"
+    echo "             [1: id column]"
+    echo "             [2: bam file column]"
+    echo "             [3: bam file column (spikeIn)]"
+    echo " -M          [matching any one of the filter criteria (default: all)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:f:d:e:h ARG; do
+while getopts i:f:d:e:F:Mh ARG; do
 	case "$ARG" in
 		i) INPUT=$OPTARG;;
         f) FILTER_MATCH=$OPTARG;;
         d) FILTER_NOMATCH=$OPTARG;;
         e) EXTENSION=$OPTARG;;
+        F) FILTER_FIELD=$OPTARG;;
+        M) MATCH=1;;
 		h) HELP=1;;
 	esac
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ -z "$INPUT" -o -z "$FILTER_MATCH" -o "$HELP" ]; then
+if [ -z "$INPUT" -o "$HELP" ]; then
 	usage
 fi
 
-echo
+echo >&2
 echo -n "Filter files (`date`).. " >&2
 oIFS=$IFS
 IFS=","
@@ -47,9 +56,15 @@ FILTERS_MATCH=($FILTER_MATCH)
 FILTERS_NOMATCH=($FILTER_NOMATCH)
 IFS=$oIFS
 
+MIN_MATCH=${#FILTERS_MATCH[@]}
+if [ ! -z "$MATCH" ]; then
+    MIN_MATCH=1
+fi
+
 BWFILE=""
 if [ -f "$INPUT" ]; then
     while read file; do
+        file=$(echo ${file} | cut -f $FILTER_FIELD -d " ")
         MATCH_COUNT=0
         for (( i=0; i<${#FILTERS_MATCH[@]}; i++ )); do
             FOUND=`echo $file | perl -ane '$_=~s/^.*\///g; if($_=~/'${FILTERS_MATCH[$i]}'/) {print "1\n";}else{print "0\n";}'`;
@@ -65,11 +80,11 @@ if [ -f "$INPUT" ]; then
         done
         
         TITLE=`echo $file | sed 's/^.*\///g;' | sed 's/\..*//g' | perl -ane 'chomp($_); print "$_";'`;
-        if [ "$MATCH_COUNT" == ${#FILTERS_MATCH[@]} -a "$NOMATCH_COUNT" -eq 0 ]; then
+        if [ "$MATCH_COUNT" -ge $MIN_MATCH -a "$NOMATCH_COUNT" -eq 0 ]; then
             #echo -e "$TITLE\t$file"
             BWFILE="$BWFILE,$file"
         fi
-    done < $INPUT
+    done < <(grep -v "^$" $INPUT)
 elif [ -d "$INPUT" ]; then
     for file in $INPUT/*.$EXTENSION; do
         MATCH_COUNT=0
@@ -87,7 +102,7 @@ elif [ -d "$INPUT" ]; then
         done
         
         TITLE=`echo $file | sed 's/^.*\///g;' | sed 's/\..*//g' | perl -ane 'chomp($_); print "$_";'`;
-        if [ "$MATCH_COUNT" == ${#FILTERS_MATCH[@]} -a "$NOMATCH_COUNT" -eq 0 ]; then
+        if [ "$MATCH_COUNT" -ge $MIN_MATCH -a "$NOMATCH_COUNT" -eq 0 ]; then
             #echo -e "$TITLE\t$file"
             BWFILE="$BWFILE,$file"
         fi
