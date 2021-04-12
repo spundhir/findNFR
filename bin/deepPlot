@@ -12,6 +12,7 @@ PLOTTITLE="deepPlot"
 AVERAGE_TYPE="mean"
 PLOT_TYPE="se"
 PROCESSORS=1
+PLOTBYREGION=1
 
 #### usage ####
 usage() {
@@ -55,8 +56,8 @@ usage() {
     echo " -5 <int>    [number of unscaled bases at 5' end]" 
     echo " -3 <int>    [number of unscaled bases at 3' end]"
     echo "[OPTIONS: plotProfile OR plotHeatmap]"
-    echo " -p          [one plot for each input region (default: all combined)]"
-    echo " -P          [one plot for each bigWig file (default: all combined)]"
+    echo " -p          [one plot for each input region (default)]"
+    echo " -P          [one plot for each bigWig file]"
     echo " -t <string> [name of the output histone profile plot (default: deepPlot)]"
     echo " -q <int>    [K-means or HC number of clusters]"
     echo " -Y <string> [average type (default: mean)]"
