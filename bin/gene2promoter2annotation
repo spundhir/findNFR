@@ -44,10 +44,7 @@ usage() {
     echo " -k <file>   [h3k27me3 modification data in BAM format]"
     echo "             [if multiple, please separate them by a comma]"
     echo "             [used to define bivalent promoters]"
-    echo " -c <file>   [chromatin interaction file (HiC etc)]"
-    echo "             [format: chr start end target_gene score strand (class)]"
-    echo "             [        OR           ]"
-    echo "             [format: <file>,1-6,12]"
+    echo " -c <file>   [chromatin interaction file (output of linkDHS2Genes)]"
     echo " -l <file>   [input file containing Pol II pausing information]"
     echo " -m <file>   [input file containing sequence motif information]"
 	echo " -h          [help]"
@@ -65,7 +62,7 @@ while getopts i:o:g:p:k:c:l:m:h ARG; do
         g) GENOME=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
         k) BIVALENT_FILE=$OPTARG;;
-        c) HIC_FILE=$OPTARG;;
+        c) INTERACTION_FILE=$OPTARG;;
         l) POL2FILE=$OPTARG;;
         m) MOTIFFILE=$OPTARG;;
 		h) HELP=1;;
@@ -215,18 +212,8 @@ else
 fi
 
 ## Determine enhancer-promoter interactions
-DHS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -D)
-if [ ! -z "$HIC_FILE" ]; then
-    if [ "$(echo $HIC_FILE | perl -ane 'if($_=~/\,/) { print 1; }')" -eq 1 ]; then
-        FILTER_COL=$(echo $HIC_FILE | perl -ane '$_=~s/^.*\,//g;')
-        HIC_FILE=$(echo $HIC_FILE | perl -ane '$_=~s/\,.*$//g;')
-    else
-        FILTER_COL="all"
-    fi
-    if [ ! -s "${TMP}.enhancers" ]; then
-        echo -e "chr\tstart\tend\tdhs_name\tscore\tstrand\ttissue_information\tclosest_gene\tdist_to_closest_gene\tHiC_gene\tHiC_score\tHiC_class\tinteraction_class" > ${TMP}.enhancers
-        intersectBed -a <(closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $PROMOTER_FILE | sortBed -i stdin) -D a -t first | cut -f 1-7,11,$((NCOL+8))) -b <(tabEdit -i $HIC_FILE -f $FILTER_COL) -wao | perl -ane '$F[12]=~s/\-.*//g; chomp($_); if(!$dhs{$F[3]}) { $dhs{$F[3]}{'des'}="$_\t$F[12]"; $seen{$F[3]}{'seen'}=1; } elsif($F[7]=~/^$F[12]$/) { $dhs{$F[3]}{'des'}="$_\t$F[12]"; } END { foreach(keys(%dhs)) { print "$dhs{$_}{'des'}\n"; } }' | perl -ane 'chomp($_); $class="noHiCinteraction_noSupportClosestGene"; if($F[10]!~/^-1$/ && $F[7]=~/^$F[17]$/) { $class="HiCinteraction_SupportClosestGene"; } elsif($F[10]!~/^-1$/ && $F[7]!~/^$F[17]$/) { $class="HiCinteraction_noSupportClosestGene"; } print "$_\t$class\n";' | cut -f 1-9,13,14,16,19 >> ${TMP}.enhancers
-    fi
+if [ ! -z "$INTERACTION_FILE" ]; then
+    linkDHS2Genes -i analysis/promoters_esc/GENES_PROMOTER.BED -g mm10 -c ~/genomes/annotations/HiC/E-MTAB-2414/mm10_capture_hic_interactions_esc.bed,1-6,12
 fi
 
 <<"COMMENT"

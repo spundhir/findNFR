@@ -146,7 +146,34 @@ if [ ! -z "$HIC_FILE" ]; then
     tabEdit -i $HIC_FILE -f $FILTER_COL | tabEdit -i stdin -n 7 > ${TMP}.hic
     HIC_FILE=${TMP}.hic
 
-    intersectBed -a <(closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D a -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8))) -b $HIC_FILE -wao | perl -ane '$F[12]=~s/\-.*//g; chomp($_); if(!$dhs{$F[3]}) { $dhs{$F[3]}{'des'}="$_\t$F[12]"; $seen{$F[3]}{'seen'}=1; } elsif($F[7]=~/^$F[12]$/) { $dhs{$F[3]}{'des'}="$_\t$F[12]"; } END { foreach(keys(%dhs)) { print "$dhs{$_}{'des'}\n"; } }' | perl -ane 'chomp($_); $class="noHiCinteraction_noSupportClosestGene"; if($F[10]!~/^-1$/ && $F[7]=~/^$F[17]$/) { $class="HiCinteraction_SupportClosestGene"; } elsif($F[10]!~/^-1$/ && $F[7]!~/^$F[17]$/) { $class="HiCinteraction_noSupportClosestGene"; } print "$_\t$class\n";' | cut -f 1-9,13,14,16,19
+    intersectBed -a <(closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D a -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8))) -b $HIC_FILE -wao | perl -ane '
+        $F[12]=~s/\-.*//g; chomp($_);
+        $des="$F[0]"; foreach(@F[1..scalar(@F)-1]) { $des.="\t$_"; }
+        if($F[7]=~/^$F[12]$/) {
+            $dhs{$F[3]}{'des'}="$des\t$F[12]";
+            $dhs{$F[3]}{'idMatch'}=1;
+            $dhs{$F[3]}{'seen'}=1;
+            $dhs{$F[3]}{'score'}=$F[13];
+        }
+        elsif(!$dhs{$F[3]}) {
+            $dhs{$F[3]}{'des'}="$des\t$F[12]";
+            $dhs{$F[3]}{'seen'}=1;
+            $dhs{$F[3]}{'score'}=$F[13];
+        }
+        elsif($F[13] > $dhs{$F[3]}{'score'} && $dhs{$F[3]}{'idMatch'}==0) {
+            $dhs{$F[3]}{'des'}="$des\t$F[12]";
+            $dhs{$F[3]}{'score'}=$F[13];
+        }
+        END {
+            foreach(keys(%dhs)) {
+                print "$dhs{$_}{'des'}\n";
+            }
+        }' | perl -ane '
+            chomp($_);
+            $class="noHiCinteraction_noSupportClosestGene";
+            if($F[10]!~/^-1$/ && $F[7]=~/^$F[17]$/) { $class="HiCinteraction_SupportClosestGene"; }
+            elsif($F[10]!~/^-1$/ && $F[7]!~/^$F[17]$/) { $class="HiCinteraction_noSupportClosestGene"; }
+            print "$_\t$class\n";' | cut -f 1-9,13,14,16,19
 else
     closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D a -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8)) | tabEdit -i stdin -n 13
 fi
