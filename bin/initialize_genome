@@ -42,13 +42,14 @@ usage() {
     echo " -T          [file having genomic coordinates of all TSS (cage) in BED format]"
     echo " -R          [file having genomic coordinates of sequence repeats in BED format]"
     echo " -B          [file having genomic coordinates of blacklisted regions in BED format]"
+    echo " -D          [file having genomic coordinates of DNase regions in BED format]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts g:i:msetncTRBh ARG; do
+while getopts g:i:msetncTRBDh ARG; do
 	case "$ARG" in
         g) GENOME=$OPTARG;;
 		i) FILE=$OPTARG;;
@@ -61,6 +62,7 @@ while getopts g:i:msetncTRBh ARG; do
         T) TSS_COOR_BED_CAGE=1;;
         R) REPEATS=1;;
         B) BLACKLIST=1;;
+        D) DHS=1;;
 		h) HELP=1;;
 	esac
 done
@@ -89,6 +91,8 @@ elif [ ! -z "$REPEATS" ] ; then
     grep -w $GENOME $FILE | head -n 9 | tail -n 1 | perl -ane 'print "$F[1]";'
 elif [ ! -z "$BLACKLIST" ] ; then
     grep -w $GENOME $FILE | head -n 10 | tail -n 1 | perl -ane 'print "$F[1]";'
+elif [ ! -z "$DHS" ] ; then
+    grep -w $GENOME $FILE | head -n 11 | tail -n 1 | perl -ane 'print "$F[1]";'
 else
     grep -w $GENOME $FILE | head -n 1 | tail -n 1 | perl -ane 'print "$F[1]";'
 fi

@@ -1,0 +1,157 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+<<"copyright_info"
+linkDHS2Genes: link DHS to potential target gene
+Copyright (C) 2020  Sachin Pundhir (pundhir@binf.ku.dk)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+copyright_info
+
+VERSION="0.01"
+GENOME="mm10"
+PROCESSOR=1
+OUTDIR="."
+
+#### usage ####
+usage() {
+	echo Program: "linkDHS2Genes (link DHS to potential target gene)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: $VERSION
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: linkDHS2Genes -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file containing genomic coordinates of gene TSS in BED format (can be stdin)]"
+    echo "             [format: chr start end name score strand]"
+    echo "[OPTIONS]"
+	echo " -j <file>   [input file containing genomic coordinates of gene DHS in BED format]"
+    echo "             [format: chr start name score strand tissue_information]"
+    echo "             [default (mm10): /scratch/genomes/annotations/BED/mm10_dhs.bed.gz]"
+    echo "             [default (hg38): /scratch/genomes/annotations/BED/hg38_dhs.bed.gz]"
+    echo " -g <string> [genome (default: mm10)]"
+    echo " -c <file>   [chromatin interaction file (HiC etc)]"
+    echo "             [format: chr start end target_gene score strand class]"
+    echo "             [        OR           ]"
+    echo "             [format: <file>,1-6,12]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
+	echo " -h          [help]"
+    echo "[OUTPUT]"
+    echo "             [chr start end dhs_name score strand tissue_information closest_gene dist_to_closest_gene HiC_gene dist_to_HiC_gene HiC_score HiC_class interaction_class]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:c:p:h ARG; do
+	case "$ARG" in
+		i) TSS_FILE=$OPTARG;;
+        j) DHS_FILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        c) HIC_FILE=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+>&2 echo
+if [ "$HELP" ]; then
+    usage
+fi
+
+>&2 echo
+>&2 echo -n "Check, if all required parameters and files are provided (`date`).. "
+## usage, if necessary file and directories are given/exist
+if [ -z "$TSS_FILE" ]; then
+    >&2 echo
+    >&2 echo "Error: one or more required paramter values not provided"
+    >&2 echo
+	usage
+fi
+>&2 echo "done"
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+#GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+
+## create temporary BED file if input is from stdin
+#TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
+if [ "$TSS_FILE" == "stdin" ]; then
+    while read LINE; do
+        echo -e "${LINE}"
+    done
+else
+    zless $TSS_FILE
+fi | tabEdit -i stdin -n 6 > ${TMP}.tss
+
+TSS_FILE=${TMP}.tss
+NCOL_TSS_FILE=$(head -n 1 $TSS_FILE | perl -ane 'print scalar(@F)."\n";')
+
+## load DHS file
+if [ -z "$DHS_FILE" ]; then
+    DHS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -D)
+fi
+if [ "$(tabEdit -i $DHS_FILE | cut -f 2 -d " ")" -ne 7 ]; then
+    zless $DHS_FILE | tabEdit -i stdin -n 7
+else
+    zless $DHS_FILE
+fi > ${TMP}.dhs
+
+DHS_FILE=${TMP}.dhs
+NCOL_DHS_FILE=$(head -n 1 $DHS_FILE | perl -ane 'print scalar(@F)."\n";')
+
+## determine enhancer-promoter interactions
+echo -e "chr\tstart\tend\tdhs_name\tscore\tstrand\ttissue_information\tclosest_gene\tdist_to_closest_gene\tHiC_gene\tHiC_score\tHiC_class\tinteraction_class"
+if [ ! -z "$HIC_FILE" ]; then
+    if [ "$(echo $HIC_FILE | perl -ane 'if($_=~/\,/) { print 1; }')" -eq 1 ]; then
+        FILTER_COL=$(echo $HIC_FILE | perl -ane '$_=~s/^[^,]+\,//g; print $_;')
+        HIC_FILE=$(echo $HIC_FILE | perl -ane '$_=~s/\,.*$//g; print $_;')
+    else
+        FILTER_COL="all"
+    fi
+
+    #echo -e "$HIC_FILE\t$FILTER_COL"; exit
+    tabEdit -i $HIC_FILE -f $FILTER_COL | tabEdit -i stdin -n 7 > ${TMP}.hic
+    HIC_FILE=${TMP}.hic
+
+    intersectBed -a <(closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D a -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8))) -b $HIC_FILE -wao | perl -ane '$F[12]=~s/\-.*//g; chomp($_); if(!$dhs{$F[3]}) { $dhs{$F[3]}{'des'}="$_\t$F[12]"; $seen{$F[3]}{'seen'}=1; } elsif($F[7]=~/^$F[12]$/) { $dhs{$F[3]}{'des'}="$_\t$F[12]"; } END { foreach(keys(%dhs)) { print "$dhs{$_}{'des'}\n"; } }' | perl -ane 'chomp($_); $class="noHiCinteraction_noSupportClosestGene"; if($F[10]!~/^-1$/ && $F[7]=~/^$F[17]$/) { $class="HiCinteraction_SupportClosestGene"; } elsif($F[10]!~/^-1$/ && $F[7]!~/^$F[17]$/) { $class="HiCinteraction_noSupportClosestGene"; } print "$_\t$class\n";' | cut -f 1-9,13,14,16,19
+else
+    closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D a -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8)) | tabEdit -i stdin -n 13
+fi
+
+## delete temporary file, if exists
+rm ${TMP}.tss
+rm ${TMP}.dhs
+rm ${TMP}.hic

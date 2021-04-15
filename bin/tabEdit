@@ -15,13 +15,15 @@ usage() {
     echo " -t          [convert spaces to tab]"
     echo " -m          [convert comma to tab]"
     echo " -n <int>    [reformat file to ensure input number of columns]"
+    echo " -f <string> [filter given columns from the input file (comma separated, if multiple)]"
+    echo "             [format: 1,5,6 OR 1,5,6,count OR 1-4,count OR all]"
     echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:crtmn:h ARG; do
+while getopts i:crtmn:f:h ARG; do
     case "$ARG" in
     i) INFILE=$OPTARG;;
     c) COUNT=1;;
@@ -29,6 +31,7 @@ while getopts i:crtmn:h ARG; do
     t) TAB=1;;
     m) COMMA=1;;
     n) NCOL=$OPTARG;;
+    f) FILTER=$OPTARG;;
     h) HELP=1;;
     esac
 done
@@ -38,51 +41,46 @@ if [ -z "$INFILE" -o "$HELP" ]; then
 	usage
 fi
 
+## create temporary BED file if input is from stdin
+if [ "$INFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo -e "${LINE}"
+    done > $TMP 
+    #perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";' > $TMP
+    INFILE=$TMP
+fi
+
+## perform operations on the input file
 if [ ! -z "$TAB" ]; then
-    if [ "$INFILE" == "stdin" ]; then
-        while read LINE; do
-            echo ${LINE}
-        done
-    else
-        zless $INFILE 
-    fi | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
+    zless $INFILE | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
 elif [ ! -z "$COMMA" ]; then
-    if [ "$INFILE" == "stdin" ]; then
-        while read LINE; do
-            echo ${LINE}
-        done
-    else
-        zless $INFILE 
-    fi | perl -an -F'/\,/' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
+    zless $INFILE | perl -an -F'/\,/' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
 elif [ ! -z "$NCOL" ]; then
-    if [ "$INFILE" == "stdin" ]; then
-        while read LINE; do
-            echo ${LINE}
-        done
+    zless $INFILE | perl -ane 'print $F[0]; if(scalar(@F)<'$NCOL') { foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } $i='$NCOL'-scalar(@F); while($i>0) { print "\tNA"; $i--; } print "\n"; } else { foreach(@F[1..'$((NCOL-1))']) { print "\t$_"; } print "\n"; }'
+elif [ ! -z "$REMOVE" ]; then
+    #tr -s '\t' < $INFILE
+    zless $INFILE | perl -ane '$_=~s/\s+$//g; print "$_\n";'
+elif [ ! -z "$FILTER" ]; then
+    if [ "$FILTER" == "all" ]; then
+        zless $INFILE
     else
-        zless $INFILE 
-    fi | perl -ane 'print $F[0]; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } if(scalar(@F)<'$NCOL') { $i='$NCOL'-scalar(@F); while($i>0) { print "\tNA"; $i--; } print "\n"; }'
+        COLS=($(echo $FILTER | tr ',' ' '));
+        FILTER=$(for COL in "${COLS[@]}"; do
+            if [ "$(echo $COL | perl -ane 'if($_=~/[a-zA-Z]+/) { print 1; } else { print 0;}')" -eq 1 ]; then
+                zless $INFILE | head -n 1 | perl -ane 'foreach(@F) { $i++; if($_=~/'${COL}'/) { print "$i,"; } }';
+            else
+                echo -ne "$COL,"
+            fi
+        done)
+        FILTER=$(echo $FILTER | perl -ane '$_=~s/\,$//g; print $_;')
+        zless $INFILE | cut -f $FILTER
+    fi
 else
-    ## create temporary BED file if input is from stdin
-    if [ "$INFILE" == "stdin" ]; then
-        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-        while read LINE; do
-            echo -e "${LINE}"
-        done > $TMP 
-        #perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";' > $TMP
-        INFILE=$TMP
-    fi
+    zless $INFILE | perl -an -F'/\t{1}/' -e 'print scalar(@F)."\n";' | sort | uniq -c
+fi
 
-    ## remove empty columns
-    if [ ! -z "$REMOVE" ]; then
-        #tr -s '\t' < $INFILE
-        perl -ane '$_=~s/\s+$//g; print "$_\n";' < $INFILE
-    else
-        zless $INFILE | perl -an -F'/\t{1}/' -e 'print scalar(@F)."\n";' | sort | uniq -c
-    fi
-
-    ## remove temporary file, if exists
-    if [ ! -z "$TMP" ]; then
-        rm $TMP
-    fi
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
 fi
