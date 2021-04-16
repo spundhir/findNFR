@@ -106,8 +106,8 @@ fi
 >&2 echo "done"
 
 ## create temporary BED file if input is from stdin
-#TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+#TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
 if [ "$TSS_FILE" == "stdin" ]; then
     while read LINE; do
         echo -e "${LINE}"
@@ -133,7 +133,7 @@ DHS_FILE=${TMP}.dhs
 NCOL_DHS_FILE=$(head -n 1 $DHS_FILE | perl -ane 'print scalar(@F)."\n";')
 
 ## determine enhancer-promoter interactions
-echo -e "chr\tstart\tend\tdhs_name\tscore\tstrand\ttissue_information\tclosest_gene\tdist_to_closest_gene\tHiC_gene\tHiC_score\tHiC_class\tinteraction_class"
+echo -e "chr\tstart\tend\tdhs_name\tscore\tstrand\ttissue_information\tclosest_gene\tdist_to_closest_gene\tHiC_gene\tdist_to_HiC_gene\tHiC_score\tHiC_class\tinteraction_class"
 if [ ! -z "$HIC_FILE" ]; then
     if [ "$(echo $HIC_FILE | perl -ane 'if($_=~/\,/) { print 1; }')" -eq 1 ]; then
         FILTER_COL=$(echo $HIC_FILE | perl -ane '$_=~s/^[^,]+\,//g; print $_;')
@@ -146,7 +146,7 @@ if [ ! -z "$HIC_FILE" ]; then
     tabEdit -i $HIC_FILE -f $FILTER_COL | tabEdit -i stdin -n 7 > ${TMP}.hic
     HIC_FILE=${TMP}.hic
 
-    intersectBed -a <(closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D a -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8))) -b $HIC_FILE -wao | perl -ane '
+    intersectBed -a <(closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D b -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8))) -b $HIC_FILE -wao | perl -ane '
         $F[12]=~s/\-.*//g; chomp($_);
         $des="$F[0]"; foreach(@F[1..scalar(@F)-1]) { $des.="\t$_"; }
         if($F[7]=~/^$F[12]$/) {
@@ -173,9 +173,40 @@ if [ ! -z "$HIC_FILE" ]; then
             $class="noHiCinteraction_noSupportClosestGene";
             if($F[10]!~/^-1$/ && $F[7]=~/^$F[17]$/) { $class="HiCinteraction_SupportClosestGene"; }
             elsif($F[10]!~/^-1$/ && $F[7]!~/^$F[17]$/) { $class="HiCinteraction_noSupportClosestGene"; }
-            print "$_\t$class\n";' | cut -f 1-9,13,14,16,19
+            print "$_\t$class\n";' | cut -f 1-9,13,14,16,19 > ${TMP}.enhancers
+
+    grep -w "noHiCinteraction_noSupportClosestGene" ${TMP}.enhancers | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\tNA\t$F[10]\t$F[11]\t$F[12]\n";'
+    join -1 10 -2 2 <(grep -v "noHiCinteraction_noSupportClosestGene" ${TMP}.enhancers | sort -k 10,10) <(grep -v start $TSS_FILE | cut -f 2,4,6 | sort -k 2,2) -a 1 | perl -ane '
+        if($F[scalar(@F)-1]=~/\+/) {
+            if($F[3] < $F[scalar(@F)-2]) {
+                $dist=($F[3]-$F[scalar(@F)-2])-1;
+            }
+            elsif($F[2] > $F[scalar(@F)-2]) {
+                $dist=$F[2]-$F[scalar(@F)-2];
+            }
+            else {
+                $dist=0;
+            }
+            
+        } elsif($F[scalar(@F)-1]=~/\-/) {
+            if($F[3] < $F[scalar(@F)-2]) {
+                $dist=($F[scalar(@F)-2]-$F[3])+1;
+            }
+            elsif($F[2] > $F[scalar(@F)-2]) {
+                $dist=$F[scalar(@F)-2]-$F[2];
+            }
+            else {
+                $dist=0;
+            }
+        }
+        else {
+            $dist="NA";
+        }
+        print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$F[0]\t$dist\t$F[10]\t$F[11]\t$F[12]\t$F[scalar(@F)-2]\n";'
+
+    rm ${TMP}.enhancers
 else
-    closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D a -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8)) | tabEdit -i stdin -n 13
+    closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D a -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8)) | tabEdit -i stdin -n 14
 fi
 
 ## delete temporary file, if exists
