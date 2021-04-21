@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 <<"copyright_info"
-linkDHS2Genes: link DHS to potential target gene
+linkDHS2Genes: link DHS to their potential target gene
 Copyright (C) 2020  Sachin Pundhir (pundhir@binf.ku.dk)
 
 This program is free software: you can redistribute it and/or modify
@@ -26,7 +26,7 @@ OUTDIR="."
 
 #### usage ####
 usage() {
-	echo Program: "linkDHS2Genes (link DHS to potential target gene)"
+	echo Program: "linkDHS2Genes (link DHS to their potential target gene)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: $VERSION
 	echo Contact: pundhir@binf.ku.dk
@@ -198,16 +198,16 @@ if [ ! -z "$HIC_FILE" ]; then
             }
         }
         else {
-            $dist="NA";
+            $dist="NA"; ## when we can not find the genomic coordinate for a gene
         }
         print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$F[0]\t$dist\t$F[10]\t$F[11]\t$F[12]\n";'
 
+    rm ${TMP}.hic
     rm ${TMP}.enhancers
 else
-    closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D a -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8)) | tabEdit -i stdin -n 14
+    closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D b -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8)) | tabEdit -i stdin -n 14
 fi
 
 ## delete temporary file, if exists
 rm ${TMP}.tss
 rm ${TMP}.dhs
-rm ${TMP}.hic
