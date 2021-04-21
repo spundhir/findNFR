@@ -202,7 +202,7 @@ if [ ! -z "$HIC_FILE" ]; then
         else {
             $dist="NA";
         }
-        print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$F[0]\t$dist\t$F[10]\t$F[11]\t$F[12]\t$F[scalar(@F)-2]\n";'
+        print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$F[0]\t$dist\t$F[10]\t$F[11]\t$F[12]\n";'
 
     rm ${TMP}.enhancers
 else

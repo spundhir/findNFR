@@ -213,7 +213,7 @@ fi
 
 ## Determine enhancer-promoter interactions
 if [ ! -z "$INTERACTION_FILE" ]; then
-    linkDHS2Genes -i analysis/promoters_esc/GENES_PROMOTER.BED -g mm10 -c ~/genomes/annotations/HiC/E-MTAB-2414/mm10_capture_hic_interactions_esc.bed,1-6,12
+    linkDHS2Genes -i analysis/promoters_esc/GENES_PROMOTER.BED -g mm10 -c ~/genomes/annotations/HiC/E-MTAB-2414/mm10_capture_hic_interactions_esc.bed,1-6,12 > t1
 fi
 
 <<"COMMENT"
