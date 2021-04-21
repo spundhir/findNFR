@@ -44,7 +44,7 @@ usage() {
     echo " -k <file>   [h3k27me3 modification data in BAM format]"
     echo "             [if multiple, please separate them by a comma]"
     echo "             [used to define bivalent promoters]"
-    echo " -c <file>   [chromatin interaction file (output of linkDHS2Genes)]"
+    echo " -c <file>   [enhancer-promoter interaction file to annotate enhancers per gene (output of linkDHS2Genes)]"
     echo " -l <file>   [input file containing Pol II pausing information]"
     echo " -m <file>   [input file containing sequence motif information]"
 	echo " -h          [help]"

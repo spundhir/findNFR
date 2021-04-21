@@ -6,11 +6,11 @@ GENOME="mm9"
 
 #### usage ####
 usage() {
-	echo Program: "findIntersectionPoint (find intersection point between two numeric distributions)"
+	echo Program: "peaks2optimalMergeDistance (find optimal distance to merge closely spaced peaks)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: findIntersectionPoint -i <file>"
+	echo "Usage: peaks2optimalMergeDistance -i <file>"
 	echo "Options:"
 	echo " -i <file>   [input file containing genomic coordinates of peaks in BED format (can be stdin)]"
     echo "             [format: chr start end names score strand]"
@@ -69,7 +69,7 @@ closestBed -a <(sortBed -i $OUTDIR/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/SHUFFLE.
 cut -f 2 $OUTDIR/PEAKS.BED.DIST > $OUTDIR/PEAKS.BED.DIST.$TMP
 cut -f 2 $OUTDIR/SHUFFLE.BED.DIST > $OUTDIR/SHUFFLE.BED.DIST.$TMP
 
-DISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/PEAKS.BED.DIST.$TMP -j $OUTDIR/SHUFFLE.BED.DIST.$TMP -m median)
+DISTANCE=$($FINDNFRPATH/share/R/peaks2optimalMergeDistance.R -i $OUTDIR/PEAKS.BED.DIST.$TMP -j $OUTDIR/SHUFFLE.BED.DIST.$TMP -m median)
 echo $DISTANCE
 
 ## remove temporary files

@@ -216,7 +216,7 @@ else
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     cut -f 2 $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.DIST > $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.DIST.$TMP
     cut -f 2 $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED.DIST > $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED.DIST.$TMP
-    MERGEDISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.DIST.$TMP -j $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED.DIST.$TMP -m median)
+    MERGEDISTANCE=$($FINDNFRPATH/share/R/peaks2optimalMergeDistance.R -i $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.DIST.$TMP -j $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED.DIST.$TMP -m median)
     >&2 echo $MERGEDISTANCE
     rm $OUTDIR/secondary_files/h3k4me1/PEAKS.BED.DIST.$TMP
     rm $OUTDIR/secondary_files/h3k4me1/SHUFFLE.BED.DIST.$TMP
@@ -264,7 +264,7 @@ if [ ! -z "$H3K4ME3FILE" ]; then
         TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
         cut -f 2 $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.DIST > $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.DIST.$TMP
         cut -f 2 $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED.DIST > $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED.DIST.$TMP
-        MERGEDISTANCE=$($FINDNFRPATH/share/R/findIntersectionPoint.R -i $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.DIST.$TMP -j $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED.DIST.$TMP -m median)
+        MERGEDISTANCE=$($FINDNFRPATH/share/R/peaks2optimalMergeDistance.R -i $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.DIST.$TMP -j $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED.DIST.$TMP -m median)
         >&2 echo $MERGEDISTANCE
         rm $OUTDIR/secondary_files/h3k4me3/PEAKS.BED.DIST.$TMP
         rm $OUTDIR/secondary_files/h3k4me3/SHUFFLE.BED.DIST.$TMP

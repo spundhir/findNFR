@@ -13,7 +13,7 @@ opt <- parse_args(parser)
 
 ## check, if all required arguments are given
 if(is.null(opt$firstFile) | is.null(opt$secondFile)) {
-	cat("\nProgram: findIntersectionPoint.R (R script to find intersection point between two numeric distributions)\n")
+	cat("\nProgram: peaks2optimalMergeDistance.R (R script to find optimal distance to merge closely spaced peaks)\n")
 	cat("Author: BRIC, University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
 	cat("Contact: pundhir@binf.ku.dk\n");
