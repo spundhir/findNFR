@@ -40,10 +40,8 @@ usage() {
     echo "             [default (mm10): /scratch/genomes/annotations/BED/mm10_dhs.bed.gz]"
     echo "             [default (hg38): /scratch/genomes/annotations/BED/hg38_dhs.bed.gz]"
     echo " -g <string> [genome (default: mm10)]"
-    echo " -c <file>   [chromatin interaction file (HiC etc)]"
+    echo " -c <file>   [chromatin interaction file (HiC etc) (input format: <file>,1-6,12)]"
     echo "             [format: chr start end target_gene score strand class]"
-    echo "             [        OR           ]"
-    echo "             [format: <file>,1-6,12]"
     echo " -p <int>    [number of processors to use (default: 1)]"
 	echo " -h          [help]"
     echo "[OUTPUT]"
@@ -170,13 +168,13 @@ if [ ! -z "$HIC_FILE" ]; then
             }
         }' | perl -ane '
             chomp($_);
-            $class="noHiCinteraction_noSupportClosestGene";
-            if($F[10]!~/^-1$/ && $F[7]=~/^$F[17]$/) { $class="HiCinteraction_SupportClosestGene"; }
-            elsif($F[10]!~/^-1$/ && $F[7]!~/^$F[17]$/) { $class="HiCinteraction_noSupportClosestGene"; }
+            $class="noHiCinteraction";
+            if($F[10]!~/^-1$/ && $F[7]=~/^$F[17]$/) { $class="HiCinteraction_ToClosestGene"; }
+            elsif($F[10]!~/^-1$/ && $F[7]!~/^$F[17]$/) { $class="HiCinteraction_NotToClosestGene"; }
             print "$_\t$class\n";' | cut -f 1-9,13,14,16,19 > ${TMP}.enhancers
 
-    grep -w "noHiCinteraction_noSupportClosestGene" ${TMP}.enhancers | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\tNA\t$F[10]\t$F[11]\t$F[12]\n";'
-    join -1 10 -2 2 <(grep -v "noHiCinteraction_noSupportClosestGene" ${TMP}.enhancers | sort -k 10,10) <(grep -v start $TSS_FILE | cut -f 2,4,6 | sort -k 2,2) -a 1 | perl -ane '
+    grep -w "noHiCinteraction" ${TMP}.enhancers | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\tNA\t$F[10]\t$F[11]\t$F[12]\n";'
+    join -1 10 -2 2 <(grep -v "noHiCinteraction" ${TMP}.enhancers | sort -k 10,10) <(grep -v start $TSS_FILE | cut -f 2,4,6 | sort -k 2,2) -a 1 | perl -ane '
         if($F[scalar(@F)-1]=~/\+/) {
             if($F[3] < $F[scalar(@F)-2]) {
                 $dist=($F[3]-$F[scalar(@F)-2])-1;
