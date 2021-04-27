@@ -3,7 +3,6 @@
 
 GENOME="mm9"
 AVG=0
-CONFIG_FILTER="tpm"
 MAPQ=10
 
 #### usage ####
@@ -20,6 +19,8 @@ usage() {
     echo "             **OR**"
     echo "             [input configuration file containing bam file information]"
     echo "             [<id> <bam file> <bam file (spikeIn: optional)> (id should start with tpm)]"
+    echo "             **OR**"
+    echo "             [input directory containing bam files]"
     echo "[OPTIONS]"
     echo " -s <float>  [normalize expression by input size factor]"
     echo "             [if multiple, seperate them by a comma]"
@@ -33,10 +34,14 @@ usage() {
     echo " -R          [require opposite strand]"
     echo " -n          [add 1 to all the raw expression counts - useful while taking log]"
     echo " -g <string> [genome (default: mm9)]"
-    echo " -f <string> [filter bam files from configuration file based on input indentifier (default: tpm)]"
+    echo " -f <string> [include bam files matching identifiers]"
+    echo "             [if multiple seperate them by a comma]"
+    echo " -F <string> [exclude bam files matching identifiers]"
+    echo "             [if multiple seperate them by a comma]"
     echo " -c <file>   [input mapped reads in BAM format for control sample]"
     echo " -M <int>    [minimum MAPQ score of reads to consider as mapped (default: 10)]"
     echo "             [for counting multimapping reads, consider setting it to 0]"
+    echo " -A          [append read counts to the input file itself]"
 	echo " -h          [help]"
     echo "[NOTE]"
     echo " In case of error: Could not open input BAM files, refer to:"
@@ -52,7 +57,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:s:mkde:v:rRng:f:c:M:h ARG; do
+while getopts i:j:s:mkde:v:rRng:f:F:c:M:Ah ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         j) INPUTBAMFILES=$OPTARG;;
@@ -66,9 +71,11 @@ while getopts i:j:s:mkde:v:rRng:f:c:M:h ARG; do
         R) OPPOSITE_STRAND=1;;
         n) ADDONE=1;;
         g) GENOME=$OPTARG;;
-        f) CONFIG_FILTER=$OPTARG;;
+        f) INCLUDE_FILTER=$OPTARG;;
+        F) EXCLUDE_FILTER=$OPTARG;;
         c) INPUTBAMCONTROL=$OPTARG;;
         M) MAPQ=$OPTARG;;
+        A) APPEND=1;;
 		h) HELP=1;;
 	esac
 done
@@ -94,22 +101,42 @@ fi
 # echo $GENOME_FILE; exit
 
 ## check if input is BAM files or configuration file containing BAM file information
-INPUT=$(echo $INPUTBAMFILES | perl -ane '$_=~s/\,.*//g; print $_;')
-if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
-    ## check if input configuration file is in correct format
-    if [ "$(cat $INPUTBAMFILES | perl -ane 'if($_=~/^'$CONFIG_FILTER'/) { print scalar(@F)."\n"; }' | sort | uniq | wc -l)" -gt 1 ]; then
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+#TMP="0CcMdodnWGmAG7cPYOVsL59gdHDr7jGK"
+FILTER_FILES=0
+if [ -d "$INPUTBAMFILES" ]; then
+    FILTER_FILES=1
+elif [ "$(samtools view -H $(echo $INPUTBAMFILES | perl -ane '$_=~s/\,.*//g; print $_;') | wc -l)" -le 0 ]; then
+    FILTER_FILES=1
+fi
+
+if [ "$FILTER_FILES" -eq 1 ]; then
+    ## filter bam files based on input filters (include and/or exclude)
+    if [ ! -z "$INCLUDE_FILTER" -a ! -z "$EXCLUDE_FILTER" ]; then
+        filterFilesByName -i $INPUTBAMFILES -f $INCLUDE_FILTER -F $EXCLUDE_FILTER -e bam -M | tr '\,' '\n'
+    elif [ ! -z "$INCLUDE_FILTER" ]; then
+        filterFilesByName -i $INPUTBAMFILES -f $INCLUDE_FILTER -e bam -M | tr '\,' '\n'
+    elif [ ! -z "$EXCLUDE_FILTER" ]; then
+        filterFilesByName -i $INPUTBAMFILES -F $EXCLUDE_FILTER -e bam -M | tr '\,' '\n'
+    else
+        cat $INPUTBAMFILES
+    fi | grep -v "^$" | perl -ane 'chomp($_); if(scalar(@F)==1) { print "tpm\t$_\n"; } else { print "$_\n"; }' > ${TMP}.bamConfig
+    INPUTBAMFILES=${TMP}.bamConfig
+    
+    if [ "$(cat $INPUTBAMFILES | perl -ane 'print scalar(@F)."\n";' | sort | uniq | wc -l)" -gt 1 -o "$(cat $INPUTBAMFILES | wc -l)" -eq 0 ]; then
         echo
-        echo "input bam configuration file is not in correct format"
-        echo "possible reason: spikeIn control not provided for each sample"
+        echo "ERROR: input bam configuration file is not in correct format"
+        echo "possible reason: spikeIn control not provided for each sample, or"
+        echo "possible reason: none of the files fulfill the input filter criteria"
+        echo
         usage
     fi
 
     ## read spikeIn control
     if [ "$(cat $INPUTBAMFILES | perl -ane 'if($_!~/^\s+$/) { print scalar(@F)."\n"; }' | sort | uniq)" -gt 2 ]; then
         INPUT=$(cat $INPUTBAMFILES | perl -ane '
-            if($_=~/^'$CONFIG_FILTER'/) {
-                $file.="$F[2] ";
-            } END {
+            $file.="$F[2] ";
+            END {
                 $file=~s/\s+$//g;
                 print "$file\n";
             }'
@@ -131,9 +158,8 @@ if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
 
     ## read configuration file
     INPUT=$(cat $INPUTBAMFILES | perl -ane '
-        if($_=~/^'$CONFIG_FILTER'/) {
-            $file.="$F[1],";
-        } END {
+        $file.="$F[1],";
+        END {
             $file=~s/\,$//g;
             print "$file\n";
         }'
@@ -183,14 +209,23 @@ if [ -z "$ADDONE" ]; then
     ADDONE=0
 fi
 
-## create temporary BED file if input is from stdin
+## create temporary BED file without header
 if [ "$INPUTBEDFILE" == "stdin" ]; then
-    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     while read LINE; do
-        echo ${LINE}
-    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $TMP
-    INPUTBEDFILE=$TMP
-fi
+        echo -e "${LINE}"
+    done
+    #| perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
+else
+    zless $INPUTBEDFILE
+fi > ${TMP}
+tabEdit -i ${TMP} -D > $TMP.bed
+BEDFILE=${TMP}.bed
+
+## organize file header
+HEADER=$(tabEdit -i ${TMP} -d)
+for(( i=0; i<${#BAMFILES[@]}; i++ )); do
+    HEADER="$HEADER $(echo ${BAMFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bam$//g; print $_;')"
+done
 
 ## compute coverage using control sample
 if [ ! -z "$INPUTBAMCONTROL" ]; then
@@ -206,11 +241,12 @@ if [ ! -z "$INPUTBAMCONTROL" ]; then
     if [ ! -z "$OPPOSITE_STRAND" ]; then ARG=$(echo $ARG "-R "); ARG_CONTROL=$(echo $ARG_CONTROL "-R "); fi
     if [ "$ADDONE" -eq 1 ]; then ARG=$(echo $ARG "-n "); ARG_CONTROL=$(echo $ARG_CONTROL "-n "); fi
     if [ ! -z "$GENOME" ]; then ARG=$(echo $ARG "-g $GENOME "); ARG_CONTROL=$(echo $ARG_CONTROL "-g $GENOME "); fi
-    if [ ! -z "$CONFIG_FILTER" ]; then ARG=$(echo $ARG "-f $CONFIG_FILTER "); ARG_CONTROL=$(echo $ARG_CONTROL "-f $CONFIG_FILTER "); fi
+    if [ ! -z "$INCLUDE_FILTER" ]; then ARG=$(echo $ARG "-f $INCLUDE_FILTER "); ARG_CONTROL=$(echo $ARG_CONTROL "-f $INCLUDE_FILTER "); fi
+    if [ ! -z "$EXCLUDE_FILTER" ]; then ARG=$(echo $ARG "-F $EXCLUDE_FILTER "); ARG_CONTROL=$(echo $ARG_CONTROL "-F $EXCLUDE_FILTER "); fi
 
     INPUTBAMFILES=$(echo $INPUTBAMFILES | sed 's/\ /,/g')
-    #echo "bed2expr -i $INPUTBEDFILE -j $INPUTBAMFILES $ARG"; exit
-    paste <(bed2expr -i $INPUTBEDFILE -j $INPUTBAMFILES $ARG) <(bed2expr -i $INPUTBEDFILE -j $INPUTBAMCONTROL $ARG_CONTROL | perl -ane 'print $F[scalar(@F)-1]."\n";') | perl -ane '
+    #echo "bed2expr -i $BEDFILE -j $INPUTBAMFILES $ARG"; exit
+    paste <(bed2expr -i $BEDFILE -j $INPUTBAMFILES $ARG) <(bed2expr -i $BEDFILE -j $INPUTBAMCONTROL $ARG_CONTROL | perl -ane 'print $F[scalar(@F)-1]."\n";') | perl -ane '
         $field_count=scalar(@F)-'$BAMFILES_COUNT'-1;
         print "$F[0]"; foreach(@F[1..$field_count-1]) { print "\t$_"; }
         foreach(@F[$field_count..scalar(@F)-2]) {
@@ -231,19 +267,19 @@ else
 
         if [ -z "$REMOVE_DUPLICATE" ]; then
             if [ ! -z "$SAME_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D -s
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D -s
             elif [ ! -z "$OPPOSITE_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D -S
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D -S
             else
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D
             fi
         else
             if [ ! -z "$SAME_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -s
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -s
             elif [ ! -z "$OPPOSITE_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -S
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -S
             else
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ
             fi
         fi | perl -ane '@scaleSpikeIn=split(/\,/, "'$SCALE_SPIKEIN'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", ($_+'$ADDONE')*$scaleSpikeIn[$i]); $i++; } print "\n";'
     elif [ ! -z "$INPUTSIZEFACTORS" ]; then
@@ -269,19 +305,19 @@ else
 
         if [ -z "$REMOVE_DUPLICATE" ]; then
             if [ ! -z "$SAME_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D -s
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D -s
             elif [ ! -z "$OPPOSITE_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D -S
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D -S
             else
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D
             fi
         else
             if [ ! -z "$SAME_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -s
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -s
             elif [ ! -z "$OPPOSITE_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -S
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -S
             else
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ
             fi
         fi | perl -ane '@sizeFactors=split(/\,/, "'$INPUTSIZEFACTORS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; foreach(@F[$field_count..scalar(@F)-1]) { printf("%0.5f\t", ($_+'$ADDONE')/$sizeFactors[$i]); $i++; } print "\n";'
     elif [ ! -z "$FPKM" ]; then
@@ -300,20 +336,20 @@ else
         #echo $MAPPEDREADS
         if [ -z "$REMOVE_DUPLICATE" ]; then
             if [ ! -z "$SAME_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D -s
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D -s
             elif [ ! -z "$OPPOSITE_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D -S
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D -S
             else
-                #echo "bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D"; exit;
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D
+                #echo "bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D"; exit;
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D
             fi
         else
             if [ ! -z "$SAME_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -s
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -s
             elif [ ! -z "$OPPOSITE_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -S
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -S
             else
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ
             fi
         fi | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); $length=(($F[2]-$F[1])+1)/1000; foreach(@F[$field_count..scalar(@F)-1]) { $line.=sprintf("%0.5f\t", (($_+'$ADDONE')*1000000)/($mappedReads[$i]*$length)); $i++; } $line=~s/\t$//g; print "$line\n";'
         #| perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); $length=(($F[2]-$F[1])+1)/1000; foreach(@F[$field_count..scalar(@F)-1]) { $line.=sprintf("%0.5f\t", exp(log($_+1) + log(1000000) - log($length) - log($mappedReads[$i]))); $i++; } $line=~s/\t$//g; print "$line\n";'
@@ -333,27 +369,40 @@ else
         #echo $MAPPEDREADS; exit
         if [ -z "$REMOVE_DUPLICATE" ]; then
             if [ ! -z "$SAME_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D -s
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D -s
             elif [ ! -z "$OPPOSITE_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D -S
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D -S
             else
-                #echo "bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D"; exit;
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -D
+                #echo "bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D"; exit;
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -D
             fi
         else
             if [ ! -z "$SAME_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -s
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -s
             elif [ ! -z "$OPPOSITE_STRAND" ]; then
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ -S
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ -S
             else
-                bedtools multicov -bams $INPUTBAMFILES -bed $INPUTBEDFILE -q $MAPQ
+                bedtools multicov -bams $INPUTBAMFILES -bed $BEDFILE -q $MAPQ
             fi
         fi | perl -ane '@mappedReads=split(/\,/, "'$MAPPEDREADS'"); $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); foreach(@F[$field_count..scalar(@F)-1]) { $line.=sprintf("%0.5f\t", (($_+'$ADDONE')*1000000)/$mappedReads[$i]); $i++; } $line=~s/\t$//g; print "$line\n";'
     fi | perl -ane 'if('$AVG') { $field_count=scalar(@F)-'$BAMFILES_COUNT'; foreach(@F[0..$field_count-1]) { print "$_\t"; } $i=0; $line=(); for($i=$field_count; $i<scalar(@F); $i+=2) { if(!defined($F[$i+1])) { $F[$i+1]=$F[$i]; } $line.=sprintf("%0.5f\t", ($F[$i]+$F[$i+1])/2); } $line=~s/\t$//g; $line=~s/\s+$//g;print "$line\n"; } else { $_=~s/\s+$//g; print "$_\n"; }'
+fi > ${TMP}.tpm
+
+## append to the input file, if required
+NCOL=$(zless $BEDFILE | head -n 1 | perl -ane 'print scalar(@F);')
+if [ ! -z "$APPEND" -a "$(cmp -s <(cut -f 1-${NCOL} ${TMP}.tpm) $BEDFILE && echo 0 || echo 1)" -eq 0 ]; then
+    echo "$INPUTBEDFILE is updated"
+    cat <(echo $HEADER | tabEdit -i stdin -t) ${TMP}.tpm > $INPUTBEDFILE
+else
+    cat <(echo $HEADER | tabEdit -i stdin -t) ${TMP}.tpm
 fi
 
-if [ ! -z "$TMP" ]; then
-    rm $TMP
+## remove temporary files
+rm $TMP
+rm $TMP.bed
+rm $TMP.tpm
+if [ "$FILTER_FILES" -eq 1 ]; then
+    rm $TMP.bamConfig
 fi
 
 exit
