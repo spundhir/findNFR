@@ -122,12 +122,13 @@ fi
 NCOL=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F)."\n";')
 echo -ne "$(grep '^#' $PROMOTER_FILE)\tpromoter_width\tpromoter_class\tdist_to_geneTSS_antisense"
 
-## promoter classes based on promoter width
+## promoter classes based on promoter width + distance to closest gene TSS
+GENE_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -e)
 >&2 echo -n "Define promoter classes based on promoter width (`date`).. "
 closestBed -a <(sortBed -i $PROMOTER_FILE) -b <(sortBed -i $PROMOTER_FILE) -D a -t first -fu -io | perl -ane '$class="1_narrow"; @coor=split(/[:-]+/,$F[7]); $promoter_width=($coor[2]-$coor[1]); if($promoter_width > 500 && $promoter_width <=1000) { $class="2_medium"; } elsif($promoter_width > 1000) { $class="3_broad"; } foreach(@F[0..9]) { print "$_\t"; } $dist=$F[scalar(@F)-1]; if($F[scalar(@F)-1] > 0) { $dist="NA"; } print "$promoter_width\t$class\t$dist\n";' > ${TMP}.class
 >&2 echo "done"
 
-## distance to closest gene TSS + frequency of alternate TSS
+## distance to closest alternate TSS + frequency of alternate TSS
 TSS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -t)
 if [ -f "$TSS_FILE" ]; then
     >&2 echo -n "Determine distance to closest TSS (`date`).. "

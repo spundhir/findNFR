@@ -100,7 +100,7 @@ fi
 >&2 echo "done"
 # echo $GENOME_FILE; exit
 
-## check if input is BAM files or configuration file containing BAM file information
+## check if input is BAM files or configuration file or directory containing BAM file information
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 #TMP="0CcMdodnWGmAG7cPYOVsL59gdHDr7jGK"
 FILTER_FILES=0
@@ -110,6 +110,7 @@ elif [ "$(samtools view -H $(echo $INPUTBAMFILES | perl -ane '$_=~s/\,.*//g; pri
     FILTER_FILES=1
 fi
 
+## filter BAM files for analysis
 if [ "$FILTER_FILES" -eq 1 ]; then
     ## filter bam files based on input filters (include and/or exclude)
     if [ ! -z "$INCLUDE_FILTER" -a ! -z "$EXCLUDE_FILTER" ]; then
@@ -390,7 +391,7 @@ fi > ${TMP}.tpm
 
 ## append to the input file, if required
 NCOL=$(zless $BEDFILE | head -n 1 | perl -ane 'print scalar(@F);')
-if [ ! -z "$APPEND" -a "$(cmp -s <(cut -f 1-${NCOL} ${TMP}.tpm) $BEDFILE && echo 0 || echo 1)" -eq 0 ]; then
+if [ ! -z "$APPEND" -a "$(cmp -s <(cut -f 1-${NCOL} ${TMP}.tpm) $BEDFILE && echo 0 || echo 1)" -eq 0 -a "$INPUTBEDFILE" != "stdin" ]; then
     echo "$INPUTBEDFILE is updated"
     cat <(echo $HEADER | tabEdit -i stdin -t) ${TMP}.tpm > $INPUTBEDFILE
 else
