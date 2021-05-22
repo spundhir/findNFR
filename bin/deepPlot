@@ -333,6 +333,14 @@ else
     BWFILES=($BWFILE)
     echo "done ($BWFILE)" >&2
 
+    ## check, if atleast one bigWig file matching the input filter criteria is found
+    if [ "${#BWFILES[@]}" -eq 0 ]; then
+        echo
+        echo "ERROR: no bigWig file matching the input filter criteria found"
+        echo
+        usage
+    fi
+
     echo
     echo -n "Compute signal matrix using #region file(s): ${#INPUTFILES[@]}; #bigWig file(s): ${#BWFILES[@]} (`date`).. " >&2
 

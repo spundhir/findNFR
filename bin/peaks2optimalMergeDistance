@@ -58,13 +58,13 @@ fi
 ## create output directory
 mkdir -p $OUTDIR
 
-## compute optimal distance to merge peaks
+## compute optimal distance to merge peaks (remove -1, if for example there is only one region from ChrY)
 NCOL=$(head -n 1 $INPUTBEDFILE | perl -ane 'print scalar(@F);')
-closestBed -a <(sortBed -i $INPUTBEDFILE) -b <(sortBed -i $INPUTBEDFILE) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/PEAKS.BED.DIST
+closestBed -a <(sortBed -i $INPUTBEDFILE) -b <(sortBed -i $INPUTBEDFILE) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | perl -ane 'if($F[1]>0) { print $_; }' | sort -k 2n,2 > $OUTDIR/PEAKS.BED.DIST
 
 bed2shuffle -i $INPUTBEDFILE -g $GENOME > $OUTDIR/SHUFFLE.BED
 
-closestBed -a <(sortBed -i $OUTDIR/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | sort -k 2n,2 > $OUTDIR/SHUFFLE.BED.DIST
+closestBed -a <(sortBed -i $OUTDIR/SHUFFLE.BED) -b <(sortBed -i $OUTDIR/SHUFFLE.BED) -io -d -t first | perl -ane '$mean=($F[4]+$F['$(($NCOL+4))'])/2; print "$mean\t$F[scalar(@F)-1]\n";' | perl -ane 'if($F[1]>0) { print $_; }' | sort -k 2n,2 > $OUTDIR/SHUFFLE.BED.DIST
 
 cut -f 2 $OUTDIR/PEAKS.BED.DIST > $OUTDIR/PEAKS.BED.DIST.$TMP
 cut -f 2 $OUTDIR/SHUFFLE.BED.DIST > $OUTDIR/SHUFFLE.BED.DIST.$TMP

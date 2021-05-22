@@ -213,9 +213,9 @@ else
 fi
 
 ## Determine enhancer-promoter interactions
-if [ ! -z "$INTERACTION_FILE" ]; then
-    linkDHS2Genes -i analysis/promoters_esc/GENES_PROMOTER.BED -g mm10 -c ~/genomes/annotations/HiC/E-MTAB-2414/mm10_capture_hic_interactions_esc.bed,1-6,12 > t1
-fi
+#if [ ! -z "$INTERACTION_FILE" ]; then
+#    linkDHS2Genes -i analysis/promoters_esc/GENES_PROMOTER.BED -g mm10 -c ~/genomes/annotations/HiC/E-MTAB-2414/mm10_capture_hic_interactions_esc.bed,1-6,12 > t1
+#fi
 
 <<"COMMENT"
 ## Determine sequence motif compositon
@@ -234,7 +234,7 @@ COMMENT
 
 
 >&2 echo -n "Organize final results (`date`).. "
-join -j 1 <(join -j 1 <(join -j 1 <(join -j 1 <(join -j 1 <(join -1 4 -2 1 <(less ${TMP}.class | sort -k 4,4) <(less ${TMP}.cage | cut -f 4,$((NCOL+1)) | sort -k 1,1)) <(less ${TMP}.cageFreq | cut -f 4,$((NCOL+1)) | sort -k 1,1)) <(less ${TMP}.length | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1)) <(less ${TMP}.cpg | cut -f 4,$((NCOL+1)) | sort -k 1,1)) <(less ${TMP}.conservation | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1)) <(less ${TMP}.bivalent | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1) | tabEdit -i stdin -t | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";'
+join -j 1 <(join -j 1 <(join -j 1 <(join -j 1 <(join -j 1 <(join -1 4 -2 1 <(less ${TMP}.class | sort -k 4,4) <(less ${TMP}.cage | cut -f 4,$((NCOL+1)) | sort -k 1,1)) <(less ${TMP}.cageFreq | cut -f 4,$((NCOL+1)) | sort -k 1,1)) <(less ${TMP}.length | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1)) <(less ${TMP}.cpg | cut -f 4,$((NCOL+1)) | sort -k 1,1)) <(less ${TMP}.conservation | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1)) <(less ${TMP}.bivalent | cut -f 4,$((NCOL+1)),$((NCOL+2)) | sort -k 1,1) | tabEdit -i stdin -t | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";' | grep -v "not in the chromosome"
 >&2 echo "done"
 
 rm ${TMP}.class

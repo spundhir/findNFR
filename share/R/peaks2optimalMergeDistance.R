@@ -43,6 +43,7 @@ shuffle <- read.table(opt$secondFile)
 peaks$class <- "peaks"
 shuffle$class <- "shuffle"
 df <- rbind(peaks, shuffle)
+# df[which(df$V1<=0),]$V1 <- 1 ## for example, if there is one region from ChrY
 # lower.limit <- min(log(df$V1))
 # upper.limit <- max(log(df$V1))
 

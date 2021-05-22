@@ -107,6 +107,8 @@ elif [ ! -z "$HEADER" ]; then
 elif [ ! -z "$NOHEADER" ]; then
     if [ "$(zgrep start $INFILE | wc -l)" -eq 1 ]; then
         zgrep -v start $INFILE
+    else
+        zless $INFILE
     fi
 else
     zless $INFILE | perl -an -F'/\t{1}/' -e 'print scalar(@F)."\n";' | sort | uniq -c

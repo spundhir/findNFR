@@ -147,10 +147,15 @@ if [ "$FILTER_FILES" -eq 1 ]; then
         ## determine spikeIn normalization values
         SCALE_SPIKEIN=""
         for(( i=0; i<${#INPUTSPIKEINFILES[@]}; i++ )); do
-            if [ "$(samtools flagstat ${INPUTSPIKEINFILES[$i]} | grep 'properly paired (' | cut -f 1 -d " ")" -gt 0 ]; then
-                SCALE=$(samtools flagstat ${INPUTSPIKEINFILES[$i]} | grep "properly paired (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
-            elif [ "$(samtools flagstat ${INPUTSPIKEINFILES[$i]} | grep 'mapped (' | cut -f 1 -d " ")" -gt 0 ]; then
-                SCALE=$(samtools flagstat ${INPUTSPIKEINFILES[$i]} | grep "mapped (" | cut -f 1 -d " " | perl -ane 'printf("%0.6f", 1000000/$_);');
+            if [ "$(isBam -i ${INPUTSPIKEINFILES[$i]})" -eq 0 ]; then
+                SCALE=$(bam2spikeInScale -i ${INPUTSPIKEINFILES[$i]})
+                #if [ "$(samtools flagstat ${INPUTSPIKEINFILES[$i]} | grep 'properly paired (' | cut -f 1 -d " ")" -gt 0 ]; then
+                #    SCALE=$(samtools flagstat ${INPUTSPIKEINFILES[$i]} | grep "properly paired (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
+                #elif [ "$(samtools flagstat ${INPUTSPIKEINFILES[$i]} | grep 'mapped (' | cut -f 1 -d " ")" -gt 0 ]; then
+                #    SCALE=$(samtools flagstat ${INPUTSPIKEINFILES[$i]} | grep "mapped (" | cut -f 1 -d " " | perl -ane 'printf("%0.6f", 1000000/$_);');
+                #fi
+            else
+                SCALE=${INPUTSPIKEINFILES[$i]}
             fi
             SCALE_SPIKEIN="$SCALE_SPIKEIN,$SCALE"
         done
@@ -167,7 +172,7 @@ if [ "$FILTER_FILES" -eq 1 ]; then
     )
     INPUTBAMFILES=$INPUT
 fi
-#echo -e "$SCALE_SPIKEIN"; exit
+# echo -e "$SCALE_SPIKEIN"; exit
 
 ## parse input bam files in an array
 oIFS=$IFS
@@ -393,9 +398,9 @@ fi > ${TMP}.tpm
 NCOL=$(zless $BEDFILE | head -n 1 | perl -ane 'print scalar(@F);')
 if [ ! -z "$APPEND" -a "$(cmp -s <(cut -f 1-${NCOL} ${TMP}.tpm) $BEDFILE && echo 0 || echo 1)" -eq 0 -a "$INPUTBEDFILE" != "stdin" ]; then
     echo "$INPUTBEDFILE is updated"
-    cat <(echo $HEADER | tabEdit -i stdin -t) ${TMP}.tpm > $INPUTBEDFILE
+    cat <(echo "#$HEADER" | tabEdit -i stdin -t) ${TMP}.tpm > $INPUTBEDFILE
 else
-    cat <(echo $HEADER | tabEdit -i stdin -t) ${TMP}.tpm
+    cat <(echo "#$HEADER" | tabEdit -i stdin -t) ${TMP}.tpm
 fi
 
 ## remove temporary files
