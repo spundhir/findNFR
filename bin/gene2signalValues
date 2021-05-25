@@ -23,7 +23,6 @@ VERSION="0.01"
 GENOME="mm9"
 WINDOW_TSS=300
 WINDOW_TES=3000
-CONFIG_FILTER="signal"
 
 #### usage ####
 usage() {
@@ -42,13 +41,18 @@ usage() {
     echo "             [<id> <bam file> (eg. signal pol2_esc_Rep1.bam)]"
     echo "             [<id> <bam file> (eg. signal_sameStrand groseq_esc_Rep1.bam)]"
     echo "             [<id> <bam file> (eg. signal_oppositeStrand nasseq_esc_Rep1.bam)]"
+    echo "             **OR**"
+    echo "             [input directory containing bam files]" 
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
     echo " -w <int>    [extend TSS/TES downstream/upstream with input number of bases to define TSSR/TESR (default: 300)]"
     echo " -W <int>    [extend TES downstream with input number of bases to define genebody (default: 3000)]"
     echo " -r          [analyze protein coding genes only (default: all genes; only valid if input is in GTF format)]"
     echo " -c <file>   [input mapped reads in BAM format for control sample]"
-    echo " -f <string> [filter bam files from configuration file based on input indentifier (default: signal)]"
+    echo " -f <string> [include bam files matching identifiers]"
+    echo "             [if multiple seperate them by a comma]"
+    echo " -F <string> [exclude bam files matching identifiers]"
+    echo "             [if multiple seperate them by a comma]"
     echo " -s          [require same strand (GRO-seq)]"
     echo " -S          [require opposite strand (Nascent-seq)]"
     echo " -a          [output raw read counts (default: RPKM normalized)]"
@@ -70,7 +74,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:g:w:W:rc:f:sSaedh ARG; do
+while getopts i:j:g:w:W:rc:f:F:sSaedh ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
@@ -79,7 +83,8 @@ while getopts i:j:g:w:W:rc:f:sSaedh ARG; do
         W) WINDOW_TES=$OPTARG;;
         r) ONLYPROTEINCODING=1;;
         c) BAMFILECONTROL=$OPTARG;;
-        f) CONFIG_FILTER=$OPTARG;;
+        f) INCLUDE_FILTER=$OPTARG;;
+        F) EXCLUDE_FILTER=$OPTARG;;
         s) SAME_STRAND=1;;
         S) OPPOSITE_STRAND=1;;
         a) RAW=1;;
@@ -130,12 +135,42 @@ if [ ! -f "$GENOME_FILE" ]; then
 fi
 >&2 echo "done"
 
-## check if input is BAM files or configuration file containing BAM file information
-INPUT=$(echo $BAMFILE | perl -ane '$_=~s/\,.*//g; print $_;')
-if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
+## check if input is BAM files or configuration file or directory containing BAM file information
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+#TMP="VAmpr2lzRjsXS3gZG4fs1i9L4qryUvWH"
+FILTER_FILES=0
+if [ -d "$BAMFILE" ]; then
+    FILTER_FILES=1
+elif [ "$(samtools view -H $(echo $BAMFILE | perl -ane '$_=~s/\,.*//g; print $_;') | wc -l)" -le 0 ]; then
+    FILTER_FILES=1
+fi
+
+## filter BAM files for analysis
+if [ "$FILTER_FILES" -eq 1 ]; then
+    ## filter bam files based on input filters (include and/or exclude)
+    if [ ! -z "$INCLUDE_FILTER" -a ! -z "$EXCLUDE_FILTER" ]; then
+        filterFilesByName -i $BAMFILE -f $INCLUDE_FILTER -F $EXCLUDE_FILTER -e bam -M | tr '\,' '\n'
+    elif [ ! -z "$INCLUDE_FILTER" ]; then
+        filterFilesByName -i $BAMFILE -f $INCLUDE_FILTER -e bam -M | tr '\,' '\n'
+    elif [ ! -z "$EXCLUDE_FILTER" ]; then
+        filterFilesByName -i $BAMFILE -F $EXCLUDE_FILTER -e bam -M | tr '\,' '\n'
+    else
+        cat $BAMFILE
+    fi | grep -v "^$" | perl -ane 'chomp($_); if(scalar(@F)==1) { print "tpm\t$_\n"; } else { print "$_\n"; }' > ${TMP}.bamConfig
+    BAMFILE=${TMP}.bamConfig
+
+    if [ "$(cat $BAMFILE | perl -ane 'print scalar(@F)."\n";' | sort | uniq | wc -l)" -gt 1 -o "$(cat $BAMFILE | wc -l)" -eq 0 ]; then
+        echo
+        echo "ERROR: input bam configuration file is not in correct format"
+        echo "possible reason: spikeIn control not provided for each sample, or"
+        echo "possible reason: none of the files fulfill the input filter criteria"
+        echo
+        usage
+    fi
+
     ## read configuration file for same strand transcription data (gro-seq, cage etc)
     INPUT=$(cat $BAMFILE | perl -ane '
-        if($_=~/^'$CONFIG_FILTER'_sameStrand/) {
+        if($_=~/_sameStrand/) {
             $file.="$F[1],";
         } END {
             $file=~s/\,$//g;
@@ -146,7 +181,7 @@ if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
 
     ## read configuration file for opposite strand transcription data (nas-seq etc)
     INPUT=$(cat $BAMFILE | perl -ane '
-        if($_=~/^'$CONFIG_FILTER'_oppositeStrand/) {
+        if($_=~/_oppositeStrand/) {
             $file.="$F[1],";
         } END {
             $file=~s/\,$//g;
@@ -157,7 +192,7 @@ if [ "$(samtools view -H $INPUT | wc -l)" -le 0 ]; then
 
     ## read configuration file
     INPUT=$(cat $BAMFILE | perl -ane '
-        if($_=~/^'$CONFIG_FILTER'/ && $_!~/sameStrand/ && $_!~/oppositeStrand/) {
+        if($_!~/_sameStrand/ && $_!~/_oppositeStrand/) {
             $file.="$F[1],";
         } END {
             $file=~s/\,$//g;
@@ -171,8 +206,6 @@ fi
 ## create temporary BED file if input is from stdin
 <<"COMMENT"
 COMMENT
-TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-#TMP="VAmpr2lzRjsXS3gZG4fs1i9L4qryUvWH"
 if [ "$GTFFILE" == "stdin" ]; then
     while read LINE; do
         echo "${LINE}"
@@ -227,7 +260,7 @@ if [ ! -z "$BAMFILE_SAMESTRAND" ]; then
     >&2 echo -n "Start measuring signal values for genes using input BAM files (`date`).. "
     LAST_COL=$(perl -e '$col='$NCOL'+'$BAMFILES_SAMESTRAND_COUNT'; print "$col";')
 
-    ARG=""
+    ARG="-N "
     if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
     if [ -z "$RAW" ]; then ARG=$(echo $ARG "-k "); fi
     ARG=$(echo $ARG "-r ");
@@ -267,7 +300,7 @@ if [ ! -z "$BAMFILE_OPPOSITESTRAND" ]; then
     >&2 echo -n "Start measuring signal values for genes using input BAM files (`date`).. "
     LAST_COL=$(perl -e '$col='$NCOL'+'$BAMFILES_OPPOSITESTRAND_COUNT'; print "$col";')
 
-    ARG=""
+    ARG="-N "
     if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
     if [ -z "$RAW" ]; then ARG=$(echo $ARG "-k "); fi
     ARG=$(echo $ARG "-R ");
@@ -306,7 +339,7 @@ if [ ! -z "$BAMFILE" ]; then
     >&2 echo -n "Start measuring signal values for genes using input BAM files (`date`).. "
     LAST_COL=$(perl -e '$col='$NCOL'+'$BAMFILES_COUNT'; print "$col";')
 
-    ARG=""
+    ARG="-N "
     if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
     if [ -z "$RAW" ]; then ARG=$(echo $ARG "-k "); fi
     if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-r "); fi
@@ -340,10 +373,11 @@ fi
 paste $TMP.signalValues $TMP.signalValuesSameStrand $TMP.signalValuesOppositeStrand | sortBed -i stdin | perl -ane '$F[3]=~s/\-[0-9]+$//g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sort -k 4,4 -k 9rg,9 -k 10rn,10 | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }'
 
 ## remove temporary file, if exists
-if [ "$GTFFILE" == "stdin" ]; then
+if [ -f "${TMP}.gtf" ]; then
     rm $TMP.gtf
 fi
 
+rm $TMP.bamConfig
 rm $TMP.mostActiveTSS
 rm $TMP.signalValues
 rm $TMP.signalValuesSameStrand

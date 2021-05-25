@@ -55,6 +55,7 @@ usage() {
     echo " -k <file>   [IgG control file in BAM format]"
     echo " -n <int>    [assign peak to a gene, if within this distance to TSS (default: 500)]"
     echo " -r <file>   [input BAM file to refine 3' boundary of promoter, eg. chd4 ChIP-seq data]"
+    echo " -l          [also link secondary (weak) peaks to TSS (default: only primary (strong) peaks)]"
     echo "[OPTIONS: bam2peaks]"
     echo " -c <int>    [minimum number of read in the block group (default: 2)]"
     echo " -e <int>    [minimum number of read in the block (default: 2)]"
@@ -73,7 +74,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:o:m:p:k:n:r:c:e:x:s:g:t:v:d:Nh ARG; do
+while getopts i:j:o:m:p:k:n:r:lc:e:x:s:g:t:v:d:Nh ARG; do
 	case "$ARG" in
 		i) GENEFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
@@ -83,6 +84,7 @@ while getopts i:j:o:m:p:k:n:r:c:e:x:s:g:t:v:d:Nh ARG; do
         k) CONTROLFILE=$OPTARG;;
         n) PROMOTERDISTANCE=$OPTARG;;
         r) REFINE=$OPTARG;;
+        l) LINK_SECONDARY=1;;
         c) MINCLUSTERHEIGHT=$OPTARG;;
         e) MINBLOCKHEIGHT=$OPTARG;;
         x) DISTANCE=$OPTARG;;
@@ -152,8 +154,8 @@ fi
 >&2 echo "done"
 
 ## create temporary BED file if input is from stdin
-if [ "$GENEFILE" == "stdin" ]; then
-    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+if [ "$GENEFILE" == "stdin" -a ! -s "$OUTDIR/define_promoter/GENES_TSS.BED" ]; then
     while read LINE; do
         echo -e "${LINE}"
     done > $OUTDIR/$TMP
@@ -203,7 +205,7 @@ else
             DISTANCE=1000
         fi
 
-        echo "distance: $DISTANCE" >> $OUTDIR/PARAMETERS 
+        echo "#distance: $DISTANCE" >> $OUTDIR/PARAMETERS 
         bedtools merge -i <(sortBed -i $OUTDIR/PEAKS.BED) -d $DISTANCE -c 5,7 -o sum,mean | perl -ane '$i++; print "$F[0]\t$F[1]\t$F[2]\tPEAK_$i\t$F[3]\t.\t$F[4]\n";'  > $OUTDIR/define_promoter/PEAKS.BED.MERGED
         bedtools merge -i <(grep -wv Y $OUTDIR/ALLPEAKS.BED | sortBed -i stdin) -d $DISTANCE -c 5,7 -o sum,mean | perl -ane '$i++; print "$F[0]\t$F[1]\t$F[2]\tPEAK_$i\t$F[3]\t.\t$F[4]\n";'  > $OUTDIR/define_promoter/PEAKS.BED.MERGED.N
     fi
@@ -214,6 +216,7 @@ else
     if [ ! -s "$OUTDIR/define_promoter/GENES_TSS.BED" ]; then
         gene2mostActiveTSS -i $GENEFILE -j $BAMFILE -g $GENOME -w 300 | sortBed -i stdin | bed2window -i stdin -w 0 -t | bed2window -i stdin -w 1 -r | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/define_promoter/GENES_TSS.BED
     fi 
+    >&2 echo "done"
 
     echo -e "#chr\tstart\tend\tname\tscore\tstrand\tpromoter_defined\tpromoter_coordinate\tantisense_bp\tsense_bp"
     #closestBed -a <(sortBed -i $OUTDIR/define_promoter/GENES_TSS.BED) -b $OUTDIR/define_promoter/PEAKS.BED.MERGED -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\t$F[0]:$start-$end";
@@ -240,8 +243,17 @@ else
     #    foreach(@F[1..scalar(@F)-1]) { print "\t$_"; }
     #    print "\n";' > $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP
 
-    linkTSS2Peaks -i $OUTDIR/define_promoter/GENES_TSS.BED -j $OUTDIR/define_promoter/PEAKS.BED.MERGED -k $OUTDIR/define_promoter/PEAKS.BED.MERGED.N -n $PROMOTERDISTANCE > $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP 
+    >&2 echo
+    >&2 echo -n "Link peaks to TSS (`date`).. "
+    if [ ! -z "$LINK_SECONDARY" ]; then
+        linkTSS2Peaks -i $OUTDIR/define_promoter/GENES_TSS.BED -j $OUTDIR/define_promoter/PEAKS.BED.MERGED -k $OUTDIR/define_promoter/PEAKS.BED.MERGED.N -n $PROMOTERDISTANCE > $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP
+    else
+        linkTSS2Peaks -i $OUTDIR/define_promoter/GENES_TSS.BED -j $OUTDIR/define_promoter/PEAKS.BED.MERGED -n $PROMOTERDISTANCE > $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP
+    fi
+    >&2 echo "done"
 
+    >&2 echo
+    >&2 echo -n "Organize final output file (`date`).. "
     if [ ! -z "$REFINE" ]; then
         >&2 echo -n "Refine 3' boundary of promoter (`date`).. "
         zless $OUTDIR/define_promoter/GENES_PROMOTER.BED.$TMP | perl -ane 'if($F[9]>450) { print $_; }' | perl -ane 'if($F[5]=~/\-/) { $end=$F[1]-250; $start=$F[1]-$F[9]; } else { $start=$F[1]+250; $end=$F[1]+$F[9]; } print "$F[0]\t$start\t$end\t$F[3]\t$F[4]\t$F[5]\n";' | bed2HighestExprBin -i stdin -j $REFINE -w 200 -s 200 -d -g $GENOME > $OUTDIR/define_promoter/GENES_PROMOTER.BED.HighestExprBin$TMP
@@ -261,5 +273,6 @@ else
     #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     #cat <(grep -w Y $OUTDIR/define_promoter/GENES_PROMOTER.BED) <(closestBed -a <(grep -vw Y $OUTDIR/define_promoter/GENES_PROMOTER.BED | bed2window -i stdin -w 0 | cut -f 1-6) -b <(cat $OUTDIR/ALLPEAKS.BED | perl -ane 'if($F[6]<0.2) { print $_; }' | sortBed -i stdin) -d -t first | perl -ane 'if($F[scalar(@F)-1] < '$PROMOTERDISTANCE' && $F[scalar(@F)-1] >= 0) { $start=$F[7]-0; $end=$F[8]+0; $defined="Y1"; } else { $start=$F[1]-50; $end=$F[1]+50; $defined="N"; } if($start<0) { $start=1; } $F[1]=$start; $F[2]=$end; for($i=0; $i<6; $i++) { print "$F[$i]\t"; } print "$defined\n";') > $TMP
     #mv $TMP $OUTDIR/define_promoter/GENES_PROMOTER.BED
+    >&2 echo "done"
 fi
 >&2 echo "done"

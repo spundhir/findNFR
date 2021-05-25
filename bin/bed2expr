@@ -42,6 +42,7 @@ usage() {
     echo " -M <int>    [minimum MAPQ score of reads to consider as mapped (default: 10)]"
     echo "             [for counting multimapping reads, consider setting it to 0]"
     echo " -A          [append read counts to the input file itself]"
+    echo " -N          [do not add header to file]"
 	echo " -h          [help]"
     echo "[NOTE]"
     echo " In case of error: Could not open input BAM files, refer to:"
@@ -57,7 +58,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:s:mkde:v:rRng:f:F:c:M:Ah ARG; do
+while getopts i:j:s:mkde:v:rRng:f:F:c:M:ANh ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         j) INPUTBAMFILES=$OPTARG;;
@@ -76,6 +77,7 @@ while getopts i:j:s:mkde:v:rRng:f:F:c:M:Ah ARG; do
         c) INPUTBAMCONTROL=$OPTARG;;
         M) MAPQ=$OPTARG;;
         A) APPEND=1;;
+        N) NOHEADER=1;;
 		h) HELP=1;;
 	esac
 done
@@ -398,9 +400,17 @@ fi > ${TMP}.tpm
 NCOL=$(zless $BEDFILE | head -n 1 | perl -ane 'print scalar(@F);')
 if [ ! -z "$APPEND" -a "$(cmp -s <(cut -f 1-${NCOL} ${TMP}.tpm) $BEDFILE && echo 0 || echo 1)" -eq 0 -a "$INPUTBEDFILE" != "stdin" ]; then
     echo "$INPUTBEDFILE is updated"
-    cat <(echo "#$HEADER" | tabEdit -i stdin -t) ${TMP}.tpm > $INPUTBEDFILE
+    if [ ! -z "$NOHEADER" ]; then
+        cat ${TMP}.tpm > $INPUTBEDFILE
+    else
+        cat <(echo "#$HEADER" | tabEdit -i stdin -t) ${TMP}.tpm > $INPUTBEDFILE
+    fi
 else
-    cat <(echo "#$HEADER" | tabEdit -i stdin -t) ${TMP}.tpm
+    if [ ! -z "$NOHEADER" ]; then
+        cat ${TMP}.tpm
+    else
+        cat <(echo "#$HEADER" | tabEdit -i stdin -t) ${TMP}.tpm
+    fi
 fi
 
 ## remove temporary files
