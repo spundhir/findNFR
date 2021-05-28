@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 GENOME="mm9";
-TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs"
+#TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs"
 PROCESSOR=1
 NMOTIFS=50
 LENGTH="7,8,9,10,11,12,13,14" ## recommended 7,8,9,10,11,12,13,14 (Andersson et al. 2014)
@@ -30,7 +30,6 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
     echo " -o <dir>    [output directory]"
     echo "[OPTIONS]"
     echo " -s <file>   [input file having PWM of TFBS motifs (genome specific)]"
-    echo "             [default: /localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs]"
     echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
     echo " -r <int>    [number fo processors to use (default: 1)]"
     echo " -c <int>    [number of top motifs to analyze from each sample (default: 50)]"

@@ -111,7 +111,7 @@ elif [ ! -z "$NOHEADER" ]; then
         zless $INFILE
     fi
 else
-    zless $INFILE | perl -an -F'/\t{1}/' -e 'print scalar(@F)."\n";' | sort | uniq -c
+    zless $INFILE | perl -an -F'/\t{1}/' -e 'print scalar(@F)."\n";' | sort | uniq -c | sed -E 's/^\s+//g'
 fi
 
 ## remove temporary file, if exists

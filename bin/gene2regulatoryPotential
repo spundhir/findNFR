@@ -5,7 +5,6 @@ GENOME="mm9"
 CONFIG_FILTER="RP"
 WINDOW=1000
 MIN_N_CLASS=1
-SEGMENT_COL=7
 
 #### usage ####
 usage() {
@@ -28,7 +27,7 @@ usage() {
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: RP)]"
     echo "[OPTIONS: class-based analysis]"
     echo " -n <int>    [minimum number of CRE within each class (default: 1)]"
-    echo " -s <int>    [column containing class information in CRE coordinate file (default: 7)]"
+    echo " -s <int>    [column containing class information in CRE coordinate file]"
     echo " -b          [use class information to compute TF binding or class present information]"
     echo "[OPTIONS: gene2promoter]"
     echo " -m <file>   [h3k4me3 modification data in BAM format. Used to refine promoter region]"
@@ -64,15 +63,17 @@ if [ ! -f "$PROMOTER_FILE" -o -z "$PEAK_FILE" -o "$HELP" ]; then
 fi
 
 ## populating files based on input genome
-if [ "$GENOME" == "mm9" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
-elif [ "$GENOME" == "hg19" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
-else
-    echo "Presently the program only support analysis for mm9 or hg19"
-    echo
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
     usage
 fi
+>&2 echo "done"
 
 ## initiate analysis
 if [ ! -z "$CONFIG_FILE" ]; then
@@ -80,7 +81,7 @@ if [ ! -z "$CONFIG_FILE" ]; then
     ## create temporary output directory
     #####################################
     TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    #TMP="xajcIXJtLKpFbP72GH1SZk4MEzxAjVyN"
+    TMP="xajcIXJtLKpFbP72GH1SZk4MEzxAjVyN"
     if [ ! -d "$TMP" ]; then mkdir $TMP; fi
 
     #####################################
@@ -136,7 +137,7 @@ if [ ! -z "$CONFIG_FILE" ]; then
     ## compute proximal regulatory potential of genes using BAM and BED files
     #####################################
     if [ ! -s "$TMP/PROMOTER.BED.proximalRP" ]; then
-        bed2expr -i $TMP/PROMOTER.BED -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER > $TMP/PROMOTER.BED.proximalRP
+        bed2expr -i $TMP/PROMOTER.BED -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER -N > $TMP/PROMOTER.BED.proximalRP
 
         if [ "${#BEDFILES[@]}" -gt 0 ]; then
             for (( i=0; i<${#BEDFILES[@]}; i++ )); do
@@ -152,7 +153,7 @@ if [ ! -z "$CONFIG_FILE" ]; then
     #####################################
     if [ ! -s "$TMP/PROMOTER.BED.distalRP" ]; then
         if [ ! -s "$TMP/PEAK.BED.tpm" ]; then
-            bed2expr -i $TMP/PEAK.BED -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER > $TMP/PEAK.BED.tpm
+            bed2expr -i $TMP/PEAK.BED -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER -N > $TMP/PEAK.BED.tpm
 
             if [ "${#BEDFILES[@]}" -gt 0 ]; then
                 for (( i=0; i<${#BEDFILES[@]}; i++ )); do
@@ -167,7 +168,11 @@ if [ ! -z "$CONFIG_FILE" ]; then
         NCOL_SCORE_COL=$(zless $TMP/PEAK.BED.tpm | grep -v start | head -n 1 | perl -ane 'for($i='$((NCOL_PEAK_FILE+1))'; $i<=scalar(@F); $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
         #echo -e "$NCOL_PEAK_FILE\t$NCOL_SCORE_COL"; exit
 
-        bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.tpm -g $GENOME -c $NCOL_SCORE_COL > $TMP/PROMOTER.BED.distalRP
+        if [ ! -z "$SEGMENT_COL" ]; then
+            bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.tpm -g $GENOME -c $NCOL_SCORE_COL -s $SEGMENT_COL > $TMP/PROMOTER.BED.distalRP
+        else
+            bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.tpm -g $GENOME -c $NCOL_SCORE_COL > $TMP/PROMOTER.BED.distalRP
+        fi
     fi
 
     #####################################
@@ -178,7 +183,7 @@ if [ ! -z "$CONFIG_FILE" ]; then
     #paste <(bed2longestRegion -i $PROMOTER_FILE) <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
     paste $TMP/PROMOTER.BED <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | grep -v COUNT | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
     
-else
+elif [ ! -z "$SEGMENT_COL" ]; then
     #####################################
     ## create temporary output directory
     #####################################
@@ -251,7 +256,8 @@ else
     ## problem with chrMT
     #paste <(bed2longestRegion -i $PROMOTER_FILE) <(zless $TMP/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $TMP/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
     paste <(cat <(echo -ne "chr\tstart\tend\tname\tscore\tstrand"; for((i=6; i<$NCOL_PROMOTER_FILE; i++)); do echo -ne "\tfield$i"; done; echo) $TMP/PROMOTER.BED) <(zless $TMP/PROMOTER.BED.proximalRPClass | cut -f $((NCOL_PROMOTER_FILE+4))-10000000) <(zless $TMP/PROMOTER.BED.distalRPClass | cut -f $((NCOL_PROMOTER_FILE+4))-10000000)
-    
+else
+    usage
 fi
 
 ## remove temporary file

@@ -53,6 +53,7 @@ my $id=(); my $des=();
 my $start=(); my $score=();
 my @freq=(); my @matrix=();
 my $max=(); my @F=();
+my @values=();
 
 foreach my $l(@data) {
     @F=split(/\s+/,$l);
@@ -75,7 +76,8 @@ foreach my $l(@data) {
         $score=$score-4;
         print ">$id\t$des\t$score\n";
         foreach(@matrix) {
-            print $_;
+            @values=split(/\s+/,$_);
+            print "$values[0]\t$values[1]\t$values[2]\t$values[3]\n";
         }
         $start=0;
     }
@@ -101,7 +103,8 @@ if($start) {
     $score=$score-4;
     print ">$id\t$des\t$score\n";
     foreach(@matrix) {
-        print $_;
+        @values=split(/\s+/,$_);
+        print "$values[0]\t$values[1]\t$values[2]\t$values[3]\n";
     }
     $start=0;
 }

@@ -6,7 +6,7 @@ MODE=1;
 ## v1
 #TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe.motifs"
 ## v2
-TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs"
+#TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs"
 ## v3
 #TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/hocomoco_mouse.motifs"
 LIST="1,2"
@@ -36,7 +36,6 @@ usage() {
     echo " -m <int>    [running mode (default: 1)]"
     echo "             [mode 1: Determine all TFBS motifs enriched in the input regions]"
     echo "              -s <file>   [input file having PWM of TFBS motifs (genome specific)]"
-    echo "                          [default: /localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/jaspar_uniprobe_jolma.motifs]"
     echo "              -t <string> [motif length (default=8,10,12)]"
     echo "              -u <float>  [similarity threshold used to remove similar motifs (default: 0.6; **OBSOLETE**)]"
     echo "              -v <float>  [remove motifs with information content less than # (default: not used; **OBSOLETE**)]"
