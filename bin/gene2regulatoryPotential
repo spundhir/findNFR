@@ -168,11 +168,7 @@ if [ ! -z "$CONFIG_FILE" ]; then
         NCOL_SCORE_COL=$(zless $TMP/PEAK.BED.tpm | grep -v start | head -n 1 | perl -ane 'for($i='$((NCOL_PEAK_FILE+1))'; $i<=scalar(@F); $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
         #echo -e "$NCOL_PEAK_FILE\t$NCOL_SCORE_COL"; exit
 
-        if [ ! -z "$SEGMENT_COL" ]; then
-            bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.tpm -g $GENOME -c $NCOL_SCORE_COL -s $SEGMENT_COL > $TMP/PROMOTER.BED.distalRP
-        else
-            bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.tpm -g $GENOME -c $NCOL_SCORE_COL > $TMP/PROMOTER.BED.distalRP
-        fi
+        bed2weightedSignal -i $TMP/PROMOTER.BED -j $TMP/PEAK.BED.tpm -g $GENOME -c $NCOL_SCORE_COL > $TMP/PROMOTER.BED.distalRP
     fi
 
     #####################################

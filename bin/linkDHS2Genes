@@ -208,6 +208,8 @@ else
     closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D b -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8)) | tabEdit -i stdin -n 14
 fi
 
+#less analysis/DHS.BED.dox.annotation | grep -v start | sort -k 8,8 | groupBy -g 8 -c 5,9,14 -o collapse | head -n 10 | bed2weightedSignal.R -i stdin -s 2 -d 3 -t 4
+
 ## delete temporary file, if exists
 rm ${TMP}.tss
 rm ${TMP}.dhs

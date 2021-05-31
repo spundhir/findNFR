@@ -64,7 +64,7 @@ compute_weighted_signal <- function(signal, distance, mu) {
         weighted_signal <- 0
     } else {
         all_signal <- as.numeric(unlist(strsplit(as.character(signal),",")))
-        all_distance <- as.numeric(unlist(strsplit(as.character(distance),",")))/as.numeric(opt$weight)
+        all_distance <- abs(as.numeric(unlist(strsplit(as.character(distance),","))))/as.numeric(opt$weight)
 
         e <- exp(1)
         weighted_signal=0
@@ -114,7 +114,7 @@ if(length(unlist(strsplit(opt$scoreCol,","))) > 1) {
 #############################################
 ## compute enhancer count
 #############################################
-COUNT <- unlist(lapply(df[,10], function(x) length(unlist(strsplit(as.character(x), ","))[!is.na(unlist(strsplit(as.character(x), ",")))])))
+COUNT <- unlist(lapply(df[,opt$distanceCol], function(x) length(unlist(strsplit(as.character(x), ","))[!is.na(unlist(strsplit(as.character(x), ",")))])))
 df <- cbind(df, COUNT)
 
 #############################################
