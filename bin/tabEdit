@@ -99,14 +99,14 @@ elif [ ! -z "$FILTER_ROW" ]; then
         zless $INFILE | sed -ne ${FILTER_ROW}
     fi
 elif [ ! -z "$HEADER" ]; then
-    if [ "$(zgrep start $INFILE | wc -l)" -eq 1 ]; then
-        zgrep start $INFILE
+    if [ "$(zgrep 'chr.*start.*end' $INFILE | wc -l)" -eq 1 ]; then
+        zgrep 'chr.*start.*end' $INFILE
     else
         zless $INFILE | bed2header -i stdin -r
     fi
 elif [ ! -z "$NOHEADER" ]; then
-    if [ "$(zgrep start $INFILE | wc -l)" -eq 1 ]; then
-        zgrep -v start $INFILE
+    if [ "$(zgrep 'chr.*start.*end' $INFILE | wc -l)" -eq 1 ]; then
+        zgrep -v 'chr.*start.*end' $INFILE
     else
         zless $INFILE
     fi

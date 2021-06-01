@@ -35,7 +35,7 @@ usage() {
 	echo " -i <file>   [input file containing genomic coordinates of gene TSS in BED format (can be stdin)]"
     echo "             [format: chr start end name score strand]"
     echo "[OPTIONS]"
-	echo " -j <file>   [input file containing genomic coordinates of gene DHS in BED format]"
+	echo " -j <file>   [input file containing genomic coordinates of DHS in BED format]"
     echo "             [format: chr start name score strand tissue_information]"
     echo "             [default (mm10): /scratch/genomes/annotations/BED/mm10_dhs.bed.gz]"
     echo "             [default (hg38): /scratch/genomes/annotations/BED/hg38_dhs.bed.gz]"

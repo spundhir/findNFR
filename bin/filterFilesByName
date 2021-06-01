@@ -20,19 +20,21 @@ usage() {
     echo "             [if multiple seperate them by a comma]"
     echo " -e <string> [file extension (default: bam)]"
     echo " -M          [matching any one of the filter criteria (default: all)]"
+    echo " -N          [output format: one file per line (default: comma separated)"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:f:F:e:Mh ARG; do
+while getopts i:f:F:e:MNh ARG; do
 	case "$ARG" in
 		i) INPUT=$OPTARG;;
         f) INCLUDE_FILTER=$OPTARG;;
         F) EXCLUDE_FILTER=$OPTARG;;
         e) EXTENSION=$OPTARG;;
         M) MATCH=1;;
+        N) ONE_PER_LINE=1;;
 		h) HELP=1;;
 	esac
 done
@@ -102,5 +104,10 @@ elif [ -d "$INPUT" ]; then
     done
 fi
 BWFILE=$(echo $BWFILE | sed -E 's/^,//g')
-echo $BWFILE
+
+if [ "$ONE_PER_LINE" ]; then
+    echo $BWFILE | tr '\,' '\n'
+else
+    echo $BWFILE
+fi
 echo "Done (`date`) " >&2

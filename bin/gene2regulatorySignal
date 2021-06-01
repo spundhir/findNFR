@@ -1,0 +1,203 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm10"
+CONFIG_FILTER="RP"
+SEGMENT_COL=14
+MIN_N_CLASS=1
+
+#### usage ####
+usage() {
+	echo Program: "gene2regulatorySignal (compute regulatory signal for input genes in BED format)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: gene2regulatorySignal -i <file> -j <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input gene coordinates in BED format (eg. gene2promoter)]"
+    echo "             [format: chr start end name score strand (..)]"
+	echo " -j <file>   [input CRE coordinates in BED format (can be stdin)]"
+    echo "             [format: output from linkDHS2genes]"
+    echo " -k <file>   [configuration file containing list of BAM/BED files used to compute regulatory signal]"
+    echo "             [<id> <bamfile> (eg. RP h3k27me3_esc_Rep1.bam)]"
+    echo "             [<id> <bedfile> (eg. RP h3k4me3_esc_Rep1.bed)]"
+    echo " -o <dir>    [output directory]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm10)]"
+    echo " -f <string> [filter bam files from configuration file based on input indentifier (default: RP)]"
+    echo " -s <int>    [column containing class information in CRE coordinate file (default: 14)]"
+    echo " -n <int>    [minimum number of CRE within each class (default: 1)]"
+    echo " -b          [use class information to compute TF binding or class present information]"
+	echo " -h          [help]"
+    echo "[OUTPUT]"
+    echo "             [chr start end gene_name score strand (..) signal_promoter (..) total_signal_distal (..) weighted_signal_distal (..) enhancer_count]"
+    echo "             [computed for each input peak: signal_promoter, total_signal_distal, weighted_signal_distal]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:k:o:g:f:s:n:bh ARG; do
+    case "$ARG" in
+    i) PROMOTER_FILE=$OPTARG;;
+    j) CRE_FILE=$OPTARG;;
+    k) CONFIG_FILE=$OPTARG;;
+    o) OUTDIR=$OPTARG;;
+    g) GENOME=$OPTARG;;
+    f) CONFIG_FILTER=$OPTARG;;
+    s) SEGMENT_COL=$OPTARG;;
+    n) MIN_N_CLASS=$OPTARG;;
+    b) SEGMENT_COL_BINARY=1;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ ! -f "$PROMOTER_FILE" -o -z "$CRE_FILE" -o -z "$CONFIG_FILE" -o -z "$OUTDIR" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+
+#####################################
+## create output directory
+#####################################
+mkdir -p $OUTDIR
+
+#####################################
+## check, if BED file(s) exist in input config file
+#####################################
+BEDFILES=()
+while read LINE; do
+    if [ "$(isBed -i $LINE)" -eq "0" ]; then
+        BEDFILES+=($LINE)
+    fi;
+done < <(zless $CONFIG_FILE  | perl -ane 'if($F[0]=~/^'$CONFIG_FILTER'/) { print "$F[1]\n"; }')
+
+#####################################
+## create configuration file containing only BAM files
+#####################################
+if [ ! -s "$OUTDIR/BAM.CONFIG" ]; then
+    while read LINE; do
+        if [ "$(isBam -i $LINE)" -eq "0" ]; then
+            echo -e "$CONFIG_FILTER\t$LINE"
+        fi;
+    done < <(zless $CONFIG_FILE  | perl -ane 'if($F[0]=~/^'$CONFIG_FILTER'/) { print "$F[1]\n"; }') > $OUTDIR/BAM.CONFIG
+fi 
+CONFIG_FILE="$OUTDIR/BAM.CONFIG"
+
+#####################################
+## define gene promoters
+#####################################
+if [ ! -s "$OUTDIR/PROMOTER.BED" ]; then
+    if [ "$(zless $PROMOTER_FILE | cut -f 8 | grep -E '\:[0-9]+\-[0-9]+' | wc -l)" -ge "1" -a "$(zless $PROMOTER_FILE | cut -f 7 | grep 'Y\|N' | wc -l)" -ge "1" ]; then
+        bed2longestRegion -i $PROMOTER_FILE | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $OUTDIR/PROMOTER.BED
+    else
+        bed2longestRegion -i $PROMOTER_FILE | bed2window -i stdin -x -w 250 > $OUTDIR/PROMOTER.BED
+    fi
+fi
+
+#####################################
+## organize peaks file
+#####################################
+if [ ! -s "$OUTDIR/CRE.BED" ]; then
+    if [ "$CRE_FILE" == "stdin" ]; then
+        while read LINE; do
+            echo -e "${LINE}"
+        done
+    else
+        zless $CRE_FILE 
+    fi | grep -v 'chr.*start.*end' > $OUTDIR/CRE.BED
+fi
+
+#####################################
+## compute signal at promoters using BAM and BED files
+#####################################
+if [ ! -s "$OUTDIR/PROMOTER.BED.tpm" ]; then
+    bed2expr -i $OUTDIR/PROMOTER.BED -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER -N > $OUTDIR/PROMOTER.BED.tpm
+
+    if [ "${#BEDFILES[@]}" -gt 0 ]; then
+        for (( i=0; i<${#BEDFILES[@]}; i++ )); do
+            NCOL=$(head -n 1 $OUTDIR/PROMOTER.BED.tpm | perl -ane 'print scalar(@F);')
+            intersectBed -a $OUTDIR/PROMOTER.BED.tpm -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | grep -v 'chr.*start.*end' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $((NCOL+5)) -o sum -n $NCOL > $OUTDIR/PROMOTER.BED.tpm.tmp
+            mv $OUTDIR/PROMOTER.BED.tpm.tmp $OUTDIR/PROMOTER.BED.tpm
+        done
+    fi
+fi
+
+## organize file header
+if [ "$(grep 'chr.*start.*end' test/PROMOTER.BED.tpm | wc -l)" -eq 0 ]; then
+    HEADER_PROXIMAL=$(tabEdit -i $PROMOTER_FILE -d)
+    HEADER_PROXIMAL="$HEADER_PROXIMAL $(zless $OUTDIR/BAM.CONFIG | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; print "$F[1]\t";')"
+    for(( i=0; i<${#BEDFILES[@]}; i++ )); do
+        HEADER_PROXIMAL="$HEADER_PROXIMAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$//g; print $_;')"
+    done
+
+    cat <(echo "$HEADER_PROXIMAL" | tabEdit -i stdin -t) $OUTDIR/PROMOTER.BED.tpm > $OUTDIR/PROMOTER.BED.tpm.tmp
+    mv $OUTDIR/PROMOTER.BED.tpm.tmp $OUTDIR/PROMOTER.BED.tpm
+fi
+
+#####################################
+## compute signal at CRE using BAM and BED files
+#####################################
+if [ ! -s "$OUTDIR/CRE.BED.tpm" ]; then
+    bed2expr -i $OUTDIR/CRE.BED -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER -N > $OUTDIR/CRE.BED.tpm
+
+    if [ "${#BEDFILES[@]}" -gt 0 ]; then
+        for (( i=0; i<${#BEDFILES[@]}; i++ )); do
+            NCOL=$(head -n 1 $OUTDIR/CRE.BED.tpm | perl -ane 'print scalar(@F);')
+            intersectBed -a $OUTDIR/CRE.BED.tpm -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | grep -v 'chr.*start.*end' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $((NCOL+5)) -o sum -n $NCOL > $OUTDIR/CRE.BED.tpm.tmp
+            mv $OUTDIR/CRE.BED.tpm.tmp $OUTDIR/CRE.BED.tpm
+        done
+    fi
+fi
+
+## organize file header
+if [ "$(grep 'chr.*start.*end' test/CRE.BED.tpm | wc -l)" -eq 0 ]; then
+    HEADER_PROXIMAL=$(tabEdit -i $CRE_FILE -d)
+    HEADER_PROXIMAL="$HEADER_PROXIMAL $(zless $OUTDIR/BAM.CONFIG | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; print "$F[1]\t";')"
+    for(( i=0; i<${#BEDFILES[@]}; i++ )); do
+        HEADER_PROXIMAL="$HEADER_PROXIMAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$//g; print $_;')"
+    done
+
+    cat <(echo "$HEADER_PROXIMAL" | tabEdit -i stdin -t) $OUTDIR/CRE.BED.tpm > $OUTDIR/CRE.BED.tpm.tmp
+    mv $OUTDIR/CRE.BED.tpm.tmp $OUTDIR/CRE.BED.tpm
+fi
+
+#####################################
+## compute regulatory signal at promoters and distal elements of genes
+#####################################
+if [ ! -s "$OUTDIR/PROMOTER.BED.distalRP" ]; then
+    NCOL_CRE_FILE=$(head -n 1 $CRE_FILE | perl -ane 'print scalar(@F);')
+    NCOL_SCORE_COL=$(zless $OUTDIR/CRE.BED.tpm | grep -v start | head -n 1 | perl -ane 'for($i='$((NCOL_CRE_FILE+1))'; $i<=scalar(@F); $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
+    #echo -e "$NCOL_CRE_FILE\t$NCOL_SCORE_COL"; exit
+fi
+
+exit
+
+#####################################
+## arrange final output
+#####################################
+NCOL_PROMOTER_FILE=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F);')
+## problem with chrMT
+#paste <(bed2longestRegion -i $PROMOTER_FILE) <(zless $OUTDIR/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $OUTDIR/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
+paste $OUTDIR/PROMOTER.BED <(zless $OUTDIR/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $OUTDIR/PROMOTER.BED.distalRP | grep -v COUNT | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
+
+#####################################
+## remove temporary file
+#####################################
+#if [ ! -z "$OUTDIR" ]; then
+#    rm -r $OUTDIR
+#fi
+
