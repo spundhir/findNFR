@@ -139,9 +139,9 @@ fi
 ## organize file header
 if [ "$(grep 'chr.*start.*end' test/PROMOTER.BED.tpm | wc -l)" -eq 0 ]; then
     HEADER_PROXIMAL=$(tabEdit -i $PROMOTER_FILE -d)
-    HEADER_PROXIMAL="$HEADER_PROXIMAL $(zless $OUTDIR/BAM.CONFIG | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; print "$F[1]\t";')"
+    HEADER_PROXIMAL="$HEADER_PROXIMAL $(zless $OUTDIR/BAM.CONFIG | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; $F[1]=~s/[\-\.]+/\_/g; print "$F[1]\t";')"
     for(( i=0; i<${#BEDFILES[@]}; i++ )); do
-        HEADER_PROXIMAL="$HEADER_PROXIMAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$//g; print $_;')"
+        HEADER_PROXIMAL="$HEADER_PROXIMAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$//g; $_=~s/[\-\.]+/\_/g; print $_;')"
     done
 
     cat <(echo "$HEADER_PROXIMAL" | tabEdit -i stdin -t) $OUTDIR/PROMOTER.BED.tpm > $OUTDIR/PROMOTER.BED.tpm.tmp
@@ -165,38 +165,53 @@ fi
 
 ## organize file header
 if [ "$(grep 'chr.*start.*end' test/CRE.BED.tpm | wc -l)" -eq 0 ]; then
-    HEADER_PROXIMAL=$(tabEdit -i $CRE_FILE -d)
-    HEADER_PROXIMAL="$HEADER_PROXIMAL $(zless $OUTDIR/BAM.CONFIG | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; print "$F[1]\t";')"
+    HEADER_DISTAL=$(tabEdit -i $CRE_FILE -d)
+    HEADER_DISTAL="$HEADER_DISTAL $(zless $OUTDIR/BAM.CONFIG | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; $F[1]=~s/[\-\.]+/\_/g; print "$F[1]\t";')"
     for(( i=0; i<${#BEDFILES[@]}; i++ )); do
-        HEADER_PROXIMAL="$HEADER_PROXIMAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$//g; print $_;')"
+        HEADER_DISTAL="$HEADER_DISTAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$//g; $_=~s/[\-\.]+/\_/g; print $_;')"
     done
 
-    cat <(echo "$HEADER_PROXIMAL" | tabEdit -i stdin -t) $OUTDIR/CRE.BED.tpm > $OUTDIR/CRE.BED.tpm.tmp
+    cat <(echo "$HEADER_DISTAL" | tabEdit -i stdin -t) $OUTDIR/CRE.BED.tpm > $OUTDIR/CRE.BED.tpm.tmp
     mv $OUTDIR/CRE.BED.tpm.tmp $OUTDIR/CRE.BED.tpm
 fi
 
 #####################################
 ## compute regulatory signal at promoters and distal elements of genes
 #####################################
-if [ ! -s "$OUTDIR/PROMOTER.BED.distalRP" ]; then
+if [ ! -s "$OUTDIR/GENES.DistalSignal" ]; then
     NCOL_CRE_FILE=$(head -n 1 $CRE_FILE | perl -ane 'print scalar(@F);')
-    NCOL_SCORE_COL=$(zless $OUTDIR/CRE.BED.tpm | grep -v start | head -n 1 | perl -ane 'for($i='$((NCOL_CRE_FILE+1))'; $i<=scalar(@F); $i++) { $col.="$i,"; } $col=~s/\,$//g; print $col;')
-    #echo -e "$NCOL_CRE_FILE\t$NCOL_SCORE_COL"; exit
-fi
+    DIST_COL=2
+    HIC_SCORE_COL=3
+    SEGMENT_COL=4
+    SIGNAL_SCORE_COL=$(zless $OUTDIR/CRE.BED.tpm | grep -v start | head -n 1 | perl -ane '$j=5; for($i='$((NCOL_CRE_FILE+1))'; $i<=scalar(@F); $i++) { $col.="$j,"; $j++; } $col=~s/\,$//g; print $col;')
+    #echo -e "$NCOL_CRE_FILE\t$SIGNAL_SCORE_COL"; exit
 
-exit
+    HEADER_SIGNAL="HiC_score $(zless $OUTDIR/BAM.CONFIG | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; print "$F[1]\t";')"
+    for(( i=0; i<${#BEDFILES[@]}; i++ )); do
+        HEADER_SIGNAL="$HEADER_DISTAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$//g; print $_;')"
+    done
+    HEADER_SIGNAL=$(echo "$HEADER_SIGNAL" | perl -ane '$ts=""; $ws=""; foreach(@F) { $_=~s/[\-\.]+/\_/g; $ts.="TDS_$_\t"; $ws.="WDS_$_\t"; } END { $ts=~s/\s+$//g; $ws=~s/\s+$//g; print "$ts"; }')
+    HEADER_SIGNAL=$(echo -e "$HEADER_SIGNAL" | sed -E 's/TDS\_//g' | tr '\t+' ',')
+
+    intersectBed -a <(grep -v start test/CRE.BED.tpm) -b <(grep -v start test/PROMOTER.BED) -v | perl -ane '$gene=$F[7]; $dist=$F[8]; if($F[13]!~/noHiCinteraction/) { $gene=$F[9]; $dist=$F[10]; } $hic_score=1; if($F[11]!~/^\.$/ && $F[11]!~/^NA$/) { $hic_score=$F[11]; } print "$gene\t$dist\t$hic_score"; foreach(@F[13..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sort -k 1,1 | perl -ane 'if($F[0]!~/^\.$/) { print $_; }' | groupBy -g 1 -c $DIST_COL,$HIC_SCORE_COL,$SEGMENT_COL,$SIGNAL_SCORE_COL -o collapse | bed2weightedSignal.R -i stdin -s $HIC_SCORE_COL,$SIGNAL_SCORE_COL -d $DIST_COL -t $SEGMENT_COL -r $HEADER_SIGNAL | cut -f 1,3- | sed -E 's/^V1\t/name\t/' > $OUTDIR/GENES.DistalSignal
+fi
 
 #####################################
 ## arrange final output
 #####################################
-NCOL_PROMOTER_FILE=$(head -n 1 $PROMOTER_FILE | perl -ane 'print scalar(@F);')
-## problem with chrMT
-#paste <(bed2longestRegion -i $PROMOTER_FILE) <(zless $OUTDIR/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $OUTDIR/PROMOTER.BED.distalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
-paste $OUTDIR/PROMOTER.BED <(zless $OUTDIR/PROMOTER.BED.proximalRP | cut -f $((NCOL_PROMOTER_FILE+1))-10000000) <(zless $OUTDIR/PROMOTER.BED.distalRP | grep -v COUNT | cut -f $((NCOL_PROMOTER_FILE+1))-10000000)
+
+## join 'proximal' and 'distal' signal information
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+cat <(join -1 4 -2 1 -a 1 <(sort -k 4,4 $OUTDIR/PROMOTER.BED.tpm) <(sort -k 1,1 $OUTDIR/GENES.DistalSignal) | grep "chr.*start.*end" | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";' | tabEdit -i stdin -t) <(join -1 4 -2 1 -a 1 -e NA <(sort -k 4,4 $OUTDIR/PROMOTER.BED.tpm) <(sort -k 1,1 $OUTDIR/GENES.DistalSignal) | grep -v "chr.*start.*end" | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";' | tabEdit -i stdin -t) > $TMP
+
+## replace missing fields with 'NA'
+NCOL=$(tabEdit -i $TMP  | cut -f 2,2 -d " " | sort -k 1r,1 | head -n 1)
+tabEdit -i $TMP -n $NCOL
 
 #####################################
 ## remove temporary file
 #####################################
+rm $TMP
 #if [ ! -z "$OUTDIR" ]; then
 #    rm -r $OUTDIR
 #fi

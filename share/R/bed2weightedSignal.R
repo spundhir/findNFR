@@ -9,7 +9,8 @@ option_list <- list(
     make_option(c("-d", "--distanceCol"), help="column in input file that contains distance information"),
     make_option(c("-t", "--segmentCol"), help="column in input file that contains enhancer class or TF binding information (eg. ChromHMM | active, primed | TF binding)"),
     make_option(c("-b", "--segmentColBinary"), action="store_true", help="use class information to compute TF binding or class present information"),
-    make_option(c("-w", "--weight"), default=1000, help="weight parameter, higher it is less steep would be the reduction in signal with increase in distance to TSS (default: %default)")
+    make_option(c("-w", "--weight"), default=1000, help="weight parameter, higher it is less steep would be the reduction in signal with increase in distance to TSS (default: %default)"),
+    make_option(c("-r", "--header"), help="comma separated list of names for columns of output file containing signal information")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -93,6 +94,13 @@ if(length(unlist(strsplit(opt$scoreCol,","))) > 1) {
     df <- cbind(df, TOTAL)
 }
 
+# add colnames
+if(!is.null(opt$header) & length(unlist(strsplit(opt$header, ",")))==ncol(TOTAL)) {
+    colnames(TOTAL) <- unlist(lapply(unlist(strsplit(opt$header, ",")), function(x) sprintf("tds_%s", x)))
+} else {
+    colnames(TOTAL) <- sprintf("tds_%d", seq(1:ncol(TOTAL)))
+}
+
 #############################################
 ## compute weighted signal
 #############################################
@@ -111,11 +119,19 @@ if(length(unlist(strsplit(opt$scoreCol,","))) > 1) {
     df <- cbind(df, WS)
 }
 
+# add colnames
+if(!is.null(opt$header) & length(unlist(strsplit(opt$header, ",")))==ncol(WS)) {
+    colnames(WS) <- unlist(lapply(unlist(strsplit(opt$header, ",")), function(x) sprintf("wds_%s", x)))
+} else {
+    colnames(WS) <- sprintf("wds_%d", seq(1:ncol(WS)))
+}
+
 #############################################
 ## compute enhancer count
 #############################################
-COUNT <- unlist(lapply(df[,opt$distanceCol], function(x) length(unlist(strsplit(as.character(x), ","))[!is.na(unlist(strsplit(as.character(x), ",")))])))
+COUNT <- as.data.frame(unlist(lapply(df[,opt$distanceCol], function(x) length(unlist(strsplit(as.character(x), ","))[!is.na(unlist(strsplit(as.character(x), ",")))]))))
 df <- cbind(df, COUNT)
+colnames(COUNT) <- "cre_count"
 
 #############################################
 ## compute enhancer class information, if required
