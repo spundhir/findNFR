@@ -3,8 +3,6 @@
 
 GENOME="mm10"
 CONFIG_FILTER="RP"
-SEGMENT_COL=14
-MIN_N_CLASS=1
 
 #### usage ####
 usage() {
@@ -25,19 +23,18 @@ usage() {
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm10)]"
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: RP)]"
-    echo " -s <int>    [column containing class information in CRE coordinate file (default: 14)]"
-    echo " -n <int>    [minimum number of CRE within each class (default: 1)]"
+    echo " -r          [output raw read counts (default: TPKM at promoter and TPM at CRE)]"
     echo " -b          [use class information to compute TF binding or class present information]"
 	echo " -h          [help]"
     echo "[OUTPUT]"
-    echo "             [chr start end gene_name score strand (..) signal_promoter (..) total_signal_distal (..) weighted_signal_distal (..) enhancer_count]"
-    echo "             [computed for each input peak: signal_promoter, total_signal_distal, weighted_signal_distal]"
+    echo "             [chr start end gene_name score strand (..) promoter_signal (..) total_distal_signal (..) weighted_distal_signal (..) enhancer_count class_frequencies]"
+    echo "             [computed for each input peak: promoter_signal, total_distal_signal, weighted_distal_signal]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:k:o:g:f:s:n:bh ARG; do
+while getopts i:j:k:o:g:f:rbh ARG; do
     case "$ARG" in
     i) PROMOTER_FILE=$OPTARG;;
     j) CRE_FILE=$OPTARG;;
@@ -45,8 +42,7 @@ while getopts i:j:k:o:g:f:s:n:bh ARG; do
     o) OUTDIR=$OPTARG;;
     g) GENOME=$OPTARG;;
     f) CONFIG_FILTER=$OPTARG;;
-    s) SEGMENT_COL=$OPTARG;;
-    n) MIN_N_CLASS=$OPTARG;;
+    r) RAW=1;;
     b) SEGMENT_COL_BINARY=1;;
     h) HELP=1;;
     esac
@@ -102,7 +98,11 @@ CONFIG_FILE="$OUTDIR/BAM.CONFIG"
 #####################################
 if [ ! -s "$OUTDIR/PROMOTER.BED" ]; then
     if [ "$(zless $PROMOTER_FILE | cut -f 8 | grep -E '\:[0-9]+\-[0-9]+' | wc -l)" -ge "1" -a "$(zless $PROMOTER_FILE | cut -f 7 | grep 'Y\|N' | wc -l)" -ge "1" ]; then
-        bed2longestRegion -i $PROMOTER_FILE | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $OUTDIR/PROMOTER.BED
+        if [ "$RAW" ]; then
+            bed2longestRegion -i $PROMOTER_FILE | sort -k 4,4 | bed2window -i stdin -x -w 500 > $OUTDIR/PROMOTER.BED
+        else
+            bed2longestRegion -i $PROMOTER_FILE | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $OUTDIR/PROMOTER.BED
+        fi
     else
         bed2longestRegion -i $PROMOTER_FILE | bed2window -i stdin -x -w 250 > $OUTDIR/PROMOTER.BED
     fi
@@ -118,14 +118,20 @@ if [ ! -s "$OUTDIR/CRE.BED" ]; then
         done
     else
         zless $CRE_FILE 
-    fi | grep -v 'chr.*start.*end' > $OUTDIR/CRE.BED
+    fi | grep -v 'chr.*start.*end' | bed2window -i stdin -w 250 > $OUTDIR/CRE.BED
 fi
 
 #####################################
 ## compute signal at promoters using BAM and BED files
 #####################################
 if [ ! -s "$OUTDIR/PROMOTER.BED.tpm" ]; then
-    bed2expr -i $OUTDIR/PROMOTER.BED -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER -N > $OUTDIR/PROMOTER.BED.tpm
+    ARG=""
+    if [ -z "$RAW" ]; then
+        ARG="-k";
+    fi
+
+    ## tags per kilobase per million mapped reads (TPKM) unless 'RAW' is defined
+    bed2expr -i $OUTDIR/PROMOTER.BED -j $CONFIG_FILE -d -n -g $GENOME -f $CONFIG_FILTER -N $ARG > $OUTDIR/PROMOTER.BED.tpm
 
     if [ "${#BEDFILES[@]}" -gt 0 ]; then
         for (( i=0; i<${#BEDFILES[@]}; i++ )); do
@@ -152,7 +158,13 @@ fi
 ## compute signal at CRE using BAM and BED files
 #####################################
 if [ ! -s "$OUTDIR/CRE.BED.tpm" ]; then
-    bed2expr -i $OUTDIR/CRE.BED -j $CONFIG_FILE -k -d -n -g $GENOME -f $CONFIG_FILTER -N > $OUTDIR/CRE.BED.tpm
+    ARG=""
+    if [ -z "$RAW" ]; then
+        ARG="-m";
+    fi
+
+    ## tags per million mapped reads (TPM) unless 'RAW' is defined
+    bed2expr -i $OUTDIR/CRE.BED -j $CONFIG_FILE -d -n -g $GENOME -f $CONFIG_FILTER -N $ARG > $OUTDIR/CRE.BED.tpm
 
     if [ "${#BEDFILES[@]}" -gt 0 ]; then
         for (( i=0; i<${#BEDFILES[@]}; i++ )); do
@@ -191,7 +203,7 @@ if [ ! -s "$OUTDIR/GENES.DistalSignal" ]; then
     for(( i=0; i<${#BEDFILES[@]}; i++ )); do
         HEADER_SIGNAL="$HEADER_DISTAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$//g; print $_;')"
     done
-    HEADER_SIGNAL=$(echo "$HEADER_SIGNAL" | perl -ane '$ts=""; $ws=""; foreach(@F) { $_=~s/[\-\.]+/\_/g; $ts.="TDS_$_\t"; $ws.="WDS_$_\t"; } END { $ts=~s/\s+$//g; $ws=~s/\s+$//g; print "$ts"; }')
+    HEADER_SIGNAL=$(echo "$HEADER_SIGNAL" | perl -ane '$tds=""; $wds=""; foreach(@F) { $_=~s/[\-\.]+/\_/g; $tds.="TDS_$_\t"; $wds.="WDS_$_\t"; } END { $tds=~s/\s+$//g; $wds=~s/\s+$//g; print "$tds"; }')
     HEADER_SIGNAL=$(echo -e "$HEADER_SIGNAL" | sed -E 's/TDS\_//g' | tr '\t+' ',' | perl -ane 'print lc $_;')
 
     ## select CRE not overlapping with promoter; select hic gene as target, if defined; compute total (tds) and weighted (wds) distal signal for each gene.
