@@ -374,7 +374,7 @@ else
             -out $OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz \
             --beforeRegionStartLength $FLANKREGION --afterRegionStartLength $FLANKREGION \
             --sortRegions $SORT_REGIONS --sortUsing $SORT_USING \
-            --smartLabels -bs $BINSIZE -p "max/2" $ARG
+            --smartLabels -bs $BINSIZE -p $PROCESSORS $ARG
     fi
     echo "done" >&2
 
@@ -502,7 +502,7 @@ else
         ## determine unique gene names in the input file
         zless $INPUTFILE | bed2longestRegion -i stdin | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | sort -k 1,1 | perl -ane 'if(!$seen{$F[0]}) { print $_; $seen{$F[0]}=1; }' | cut -f 2- > $OUTDIR/input.$TMP
 
-        multiBigwigSummary BED-file -b $BWFILE --BED $OUTDIR/input.$TMP --outRawCounts $OUTDIR/counts.$TMP -o $OUTDIR/matrix.$TMP --smartLabels -p "max/2"
+        multiBigwigSummary BED-file -b $BWFILE --BED $OUTDIR/input.$TMP --outRawCounts $OUTDIR/counts.$TMP -o $OUTDIR/matrix.$TMP --smartLabels -p $PROCESSORS
 
         echo -e "$(bed2header -i $OUTDIR/input.$TMP -r)\t$(grep '#' $OUTDIR/counts.$TMP | cut -f 4- | sed s/\'//g)" > $OUTDIR/$OUT_DATA_FILE
         join -j 1 <(cat $OUTDIR/input.$TMP | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | sort -k 1,1) <(grep -v "#" $OUTDIR/counts.$TMP | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | cut -f 1,5- | sort -k 1,1) | tabEdit -i stdin -t | cut -f 2- >> $OUTDIR/$OUT_DATA_FILE 
