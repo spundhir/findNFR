@@ -93,13 +93,14 @@ usage() {
     echo " -g <string> [genome (default: mm9)]"
     echo " -X <int>    [number of processors to use (default: 1)"
     echo " -U          [overwrite deepToolsMatrix file]"
+    echo " -D          [copy bigwig file to current working directory before processing]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:O:L:m:r:Q:z:Z:Fxg:X:Uh ARG; do
+while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:O:L:m:r:Q:z:Z:Fxg:X:UDh ARG; do
 	case "$ARG" in
 		i) REGIONFILE=$OPTARG;;
 		j) BWDIR=$OPTARG;;
@@ -145,6 +146,7 @@ while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:O:L:m:
         g) GENOME=$OPTARG;;
         X) PROCESSORS=$OPTARG;;
         U) OVERWRITE=1;;
+        D) COPYBW=1;;
 		h) HELP=1;;
 	esac
 done
@@ -341,6 +343,15 @@ else
         usage
     fi
 
+    ## copy bigwig files to current working directory for faster processing
+    if [ "$COPYBW" ]; then
+        BWFILE_NEW=$(echo $BWFILE | perl -ane 'foreach(@F) { $_=~s/^.*\///g; print "./$_ "; }')
+        if [ "$(for i in $BWFILE_NEW; do if [ ! -f "$i" ]; then echo "not found"; fi done | wc -l)" -gt 0 ]; then
+            scp $BWFILE .
+        fi
+        BWFILE=$BWFILE_NEW
+    fi
+
     echo
     echo -n "Compute signal matrix using #region file(s): ${#INPUTFILES[@]}; #bigWig file(s): ${#BWFILES[@]} (`date`).. " >&2
 
@@ -513,5 +524,10 @@ else
         rm $OUTDIR/matrix.$TMP
         echo "done" >&2
     fi
+fi
+
+## delete bigWig files, if copied to current working directory for faster processing
+if [ "$COPYBW" ]; then
+    rm $BWFILE
 fi
 exit
