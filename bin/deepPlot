@@ -93,7 +93,7 @@ usage() {
     echo " -g <string> [genome (default: mm9)]"
     echo " -X <int>    [number of processors to use (default: 1)"
     echo " -U          [overwrite deepToolsMatrix file]"
-    echo " -D          [copy bigwig file to current working directory before processing]"
+    echo " -D          [copy bigwig file to current working directory for faster processing]"
 	echo " -h          [help]"
 	echo
 	exit 0
