@@ -157,30 +157,35 @@ echo "done"
 
 ## determine, if the input genes are from a file or stdin
 echo -n "Create gene file depending on if the input is from file or STDIN (`date`).. "
-if [ -f "$BEDFILE" ]; then
-    zless $BEDFILE | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/BEDFILE_INTEREST.TXT
-elif [ "$BEDFILE" == "stdin" ]; then
-    while read LINE; do echo ${LINE}; done | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/BEDFILE_INTEREST.TXT
-else
-    usage
-fi
+if [ ! -s "$OUTDIR/BEDFILE_INTEREST.TXT" ]; then
+    if [ -f "$BEDFILE" ]; then
+        zless $BEDFILE | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/BEDFILE_INTEREST.TXT
+    elif [ "$BEDFILE" == "stdin" ]; then
+        while read LINE; do echo ${LINE}; done | perl -ane '$line=(); foreach(@F) { chomp($_); $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/BEDFILE_INTEREST.TXT
+    else
+        usage
+    fi
 
-echo "Initiate motif analysis (`date`).. "
-if [ ! -z "$BKG_FILE" -a ! -f "$BKG_FILE" ]; then
-    echo -e "Reformatting input bed file as -b is a keyword (`date`).. "
-    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    zless $OUTDIR/BEDFILE_INTEREST.TXT | grep -vw $BKG_FILE > $OUTDIR/$TMP.target
-    zless $OUTDIR/BEDFILE_INTEREST.TXT | grep -w $BKG_FILE > $OUTDIR/$TMP.background
-    mv $OUTDIR/$TMP.target $OUTDIR/BEDFILE_INTEREST.TXT
-    BKG_FILE="$OUTDIR/$TMP.background"
-    echo "done"
+    echo "Initiate motif analysis (`date`).. "
+    if [ ! -z "$BKG_FILE" -a ! -f "$BKG_FILE" ]; then
+        echo -e "Reformatting input bed file as -b is a keyword (`date`).. "
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        zless $OUTDIR/BEDFILE_INTEREST.TXT | grep -vw $BKG_FILE > $OUTDIR/$TMP.target
+        zless $OUTDIR/BEDFILE_INTEREST.TXT | grep -w $BKG_FILE > $OUTDIR/$TMP.background
+        mv $OUTDIR/$TMP.target $OUTDIR/BEDFILE_INTEREST.TXT
+        BKG_FILE="$OUTDIR/$TMP.background"
+        echo "done"
+    fi
 fi
+echo "done"
 
+echo -ne "Analyzing for following classes: "
 MOTIFDIR_ALL=""
 CLASS_COUNT=0
 ## Date: Aug 2, 2019; changed input file requirement to ensure strand information is provided. If missing, motif position as histogram was wrong in analysis using motifAna
 STRAND_NOTGIVEN=$(cat $OUTDIR/BEDFILE_INTEREST.TXT | cut -f 6 | sort | uniq | grep -v '+\|-\|\.' | wc -l)
 #echo $STRAND_NOTGIVEN; exit
+echo -e "$(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { if('$STRAND_NOTGIVEN') { print "$F[5]\n"; } else { print "$F[6]\n"; } }' | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1] "; }';) (`date`)"
 
 for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { if('$STRAND_NOTGIVEN') { print "$F[5]\n"; } else { print "$F[6]\n"; } }' | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
     ID=$(echo $CLASS | perl -ane 'if($_=~/^\.$/) { print "other"; } else { $_=~s/\,/\_/g; print $_; }')
