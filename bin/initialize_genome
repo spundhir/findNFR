@@ -75,30 +75,33 @@ if [ -z "$GENOME" -o "$HELP" ]; then
 fi
 
 ## determine genome file location
-if [ ! -z "$MACS2" ]; then
-    grep -w $GENOME $FILE | head -n 2 | tail -n 1 | perl -ane 'print "$F[1]";'
-elif [ ! -z "$GSIZE" ] ; then
-    grep -w $GENOME $FILE | head -n 3 | tail -n 1 | perl -ane 'print "$F[1]";'
-elif [ ! -z "$GENE_COOR_BED" ] ; then
-    grep -w $GENOME $FILE | head -n 4 | tail -n 1 | perl -ane 'print "$F[1]";'
-elif [ ! -z "$TSS_COOR_BED" ] ; then
-    grep -w $GENOME $FILE | head -n 5 | tail -n 1 | perl -ane 'print "$F[1]";'
-elif [ ! -z "$GENE_COOR_GTF" ] ; then
-    grep -w $GENOME $FILE | head -n 6 | tail -n 1 | perl -ane 'print "$F[1]";'
-elif [ ! -z "$CPG_COOR_BED" ] ; then
-    grep -w $GENOME $FILE | head -n 7 | tail -n 1 | perl -ane 'print "$F[1]";'
-elif [ ! -z "$TSS_COOR_BED_CAGE" ] ; then
-    grep -w $GENOME $FILE | head -n 8 | tail -n 1 | perl -ane 'print "$F[1]";'
-elif [ ! -z "$REPEATS" ] ; then
-    grep -w $GENOME $FILE | head -n 9 | tail -n 1 | perl -ane 'print "$F[1]";'
-elif [ ! -z "$BLACKLIST" ] ; then
-    grep -w $GENOME $FILE | head -n 10 | tail -n 1 | perl -ane 'print "$F[1]";'
-elif [ ! -z "$DHS" ] ; then
-    grep -w $GENOME $FILE | head -n 11 | tail -n 1 | perl -ane 'print "$F[1]";'
-elif [ ! -z "$GENOME_FASTA" ] ; then
-    grep -w $GENOME $FILE | head -n 12 | tail -n 1 | perl -ane 'print "$F[1]";'
+if [ "$(grep -w $GENOME $FILE | wc -l)" -gt 0 ]; then
+    if [ ! -z "$MACS2" ]; then
+        grep -w $GENOME $FILE | head -n 2 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$GSIZE" ] ; then
+        grep -w $GENOME $FILE | head -n 3 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$GENE_COOR_BED" ] ; then
+        grep -w $GENOME $FILE | head -n 4 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$TSS_COOR_BED" ] ; then
+        grep -w $GENOME $FILE | head -n 5 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$GENE_COOR_GTF" ] ; then
+        grep -w $GENOME $FILE | head -n 6 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$CPG_COOR_BED" ] ; then
+        grep -w $GENOME $FILE | head -n 7 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$TSS_COOR_BED_CAGE" ] ; then
+        grep -w $GENOME $FILE | head -n 8 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$REPEATS" ] ; then
+        grep -w $GENOME $FILE | head -n 9 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$BLACKLIST" ] ; then
+        grep -w $GENOME $FILE | head -n 10 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$DHS" ] ; then
+        grep -w $GENOME $FILE | head -n 11 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$GENOME_FASTA" ] ; then
+        grep -w $GENOME $FILE | head -n 12 | tail -n 1 | perl -ane 'print "$F[1]";'
+    else
+        grep -w $GENOME $FILE | head -n 1 | tail -n 1 | perl -ane 'print "$F[1]";'
+    fi
 else
-    grep -w $GENOME $FILE | head -n 1 | tail -n 1 | perl -ane 'print "$F[1]";'
+    echo 0
 fi
-
 exit

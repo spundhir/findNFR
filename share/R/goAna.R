@@ -87,7 +87,7 @@ if(!is.null(opt$listAnnotation)) {
         #data <- ftr_results[,c(1,2,3,4,5,6,7,8,10)]
         colnames(data) <- c("Cluster", "V2", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "geneID", "Count", "geneIDf")
     } else if(!file.exists(opt$sessionFile)) {
-        ## convert gene symbol to entrex gene id
+        ## convert gene symbol to entrez gene id
         gene[gene==""]  <- NA
         #geneList <- lapply(gene, function(x) { list <- queryMany(x[!is.na(x)], scopes=opt$geneIdType, fields="entrezgene", OrgDb=genomeDb)$entrezgene; list[which(!is.na(list))]; } )
         geneList <- lapply(gene, function(x) { list <- bitr(x[!is.na(x)], fromType=opt$geneIdType, toType="ENTREZID", OrgDb=genomeDb)$ENTREZID; list[which(!is.na(list))]; } )
@@ -99,7 +99,7 @@ if(!is.null(opt$listAnnotation)) {
         ## compute go enrichment
         #opt$pValue <- 0.9
         if(opt$annotation=="DAVID"){
-            results=compareCluster(geneList, fun="enrichDAVID", idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user = "pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(geneList, fun="enrichDAVID", idType="ENTREZ_GENE_ID", annotation="GOTERM_BP_ALL", david.user = "pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="KEGG_PATHWAY") {
             results=compareCluster(geneList, fun="enrichKEGG", organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="DISEASE_ONTOLOGY") {
@@ -217,7 +217,7 @@ if(!is.null(opt$listAnnotation)) {
         #data <- ftr_results[,c(1,2,3,4,5,6,7,8,10)]
         colnames(data) <- c("Cluster", "V2", "ID", "Description", "GeneRatio", "BgRatio", "pvalue", "p.adjust", "qvalue", "geneID", "Count", "geneIDf")
     } else if(!file.exists(opt$sessionFile)) {
-        ## convert gene symbol to entrex gene id
+        ## convert gene symbol to entrez gene id
         geneList_conv <- bitr(geneList$V1, fromType=opt$geneIdType, toType="ENTREZID", OrgDb=genomeDb)
         if(!is.null(opt$bkgFile)) {
             bkgList_conv <- bitr(bkgList$V1, fromType=opt$geneIdType, toType="ENTREZID", OrgDb=genomeDb)
@@ -243,7 +243,7 @@ if(!is.null(opt$listAnnotation)) {
 
         ## compute go enrichment
         if(opt$annotation=="DAVID"){
-            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichDAVID", idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user = "pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
+            results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichDAVID", idType="ENTREZ_GENE_ID", annotation="GOTERM_BP_ALL", david.user = "pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="KEGG_PATHWAY"){
             results=compareCluster(ENTREZID~V2, organism=opt$genome, data=geneList, fun="enrichKEGG", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="DISEASE_ONTOLOGY"){
@@ -374,7 +374,7 @@ if(!is.null(opt$listAnnotation)) {
         ## compute go enrichment
         if(opt$annotation=="DAVID"){
             ## annotation options: GOTERM_BP_ALL, GOTERM_MF_ALL, GOTERM_CC_ALL, UP_TISSUE, UCSC_TFBS
-            results <- enrichDAVID(gene=gene$ENTREZID, idType="ENTREZ_GENE_ID", listType="Gene", annotation="GOTERM_BP_ALL", david.user="pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
+            results <- enrichDAVID(gene=gene$ENTREZID, idType="ENTREZ_GENE_ID", annotation="GOTERM_BP_ALL", david.user="pundhir@binf.ku.dk", species=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="KEGG_PATHWAY"){
             results=enrichKEGG(gene$ENTREZID, organism=opt$genome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
             #results=enrichKEGG(gene$ENTREZID, OrgDb=opt$genome, pvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene), use_internal_data=TRUE)
