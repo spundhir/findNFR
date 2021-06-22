@@ -30,6 +30,13 @@ if [ -z "$INFILE" -o "$HELP" ]; then
 	usage
 fi
 
+## check if file exists
+if [ ! -s $INFILE ]; then
+    echo 1
+    exit
+fi
+
+## check file format
 if [ "$(samtools view -H $INFILE 2>/dev/null | wc -l)" -gt "0" ]; then
     echo 0
 else

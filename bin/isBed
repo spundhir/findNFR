@@ -43,10 +43,17 @@ if [ "$INFILE" == "stdin" ]; then
     INFILE=$TMP
 fi
 
+## check if file exists
+if [ ! -s $INFILE ]; then
+    echo 1
+    exit
+fi
+
+## check file format
 if [ -z "$SIXCOL" ]; then
-    echo $(zless $INFILE | grep -v 'chr.*start.*end' | perl -ane 'BEGIN { $status=0; } if(($F[1]!~/^[0-9]+$/ || $F[2]!~/^[0-9]+$/) && $status==0) { $status=1; last } END { print "$status\n"; }')
+    echo $(zless $INFILE | grep -v 'chr.*start.*end\|seqnames.*start.*end' | perl -ane 'BEGIN { $status=0; } if(($F[1]!~/^[0-9]+$/ || $F[2]!~/^[0-9]+$/) && $status==0) { $status=1; last } END { print "$status\n"; }')
 else
-    echo $(zless $INFILE | grep -v 'chr.*start.*end' | perl -ane 'BEGIN { $status=0; } if(($F[1]!~/^[0-9]+$/ || $F[2]!~/^[0-9]+$/ || scalar(@F)<6) && $status==0) { $status=1; last } END { print "$status\n"; }')
+    echo $(zless $INFILE | grep -v 'chr.*start.*end\|seqnames.*start.*end' | perl -ane 'BEGIN { $status=0; } if(($F[1]!~/^[0-9]+$/ || $F[2]!~/^[0-9]+$/ || scalar(@F)<6) && $status==0) { $status=1; last } END { print "$status\n"; }')
 fi
 
 ## remove temporary file, if exists

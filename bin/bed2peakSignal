@@ -1,0 +1,156 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+AVG=0
+MAPQ=10
+
+#### usage ####
+usage() {
+	echo Program: "bed2peakSignal (compute read counts falling under peaks that overlap input BED file)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2peakSignal -i <file> -j <file(s)>"
+	echo "Options:"
+	echo " -i <file>   [input file containing genomic coordinate in BED format (can be stdin)]"
+    echo " -j <file>   [input mapped reads in BAM format]"
+    echo "             [if multiple separate by a comma]"
+    echo "             **OR**"
+    echo "             [input configuration file containing bam file information]"
+    echo "             [<id> <bam file> <bam file (spikeIn: optional)> (id should start with tpm)]"
+    echo "             **OR**"
+    echo "             [input directory containing bam files]"
+    echo "[OPTIONS]"
+    echo " -s <float>  [normalize expression by input size factor]"
+    echo "             [if multiple, seperate them by a comma]"
+    echo " -m          [normalize expression by counts per million mapped reads (RPM)]"
+    echo " -k          [normalize expression by counts per kilo base per million mapped reads (RPKM)]"
+    echo " -d          [remove duplicate reads]"
+    echo " -v <int>    [instead of giving expression for each replicate, output only the mean (deafult: 0)]"
+    echo "             [assumes that consecutive input files are replicates 1 and 2, respectively]"
+    echo " -n          [add 1 to all the raw expression counts - useful while taking log]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo " -f <string> [include bam files matching identifiers]"
+    echo "             [if multiple seperate them by a comma]"
+    echo " -F <string> [exclude bam files matching identifiers]"
+    echo "             [if multiple seperate them by a comma]"
+    echo " -c <file>   [input mapped reads in BAM format for control sample]"
+    echo " -A          [append read counts to the input file itself]"
+    echo " -N          [do not add header to file]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:s:mkdv:ng:f:F:c:ANh ARG; do
+	case "$ARG" in
+		i) INPUTBEDFILE=$OPTARG;;
+        j) INPUTBAMFILES=$OPTARG;;
+        s) INPUTSIZEFACTORS=$OPTARG;; 
+        m) CPM=1;;
+        k) FPKM=1;;
+        d) REMOVE_DUPLICATE=1;;
+        v) AVG=$OPTARG;;
+        n) ADDONE=1;;
+        g) GENOME=$OPTARG;;
+        f) INCLUDE_FILTER=$OPTARG;;
+        F) EXCLUDE_FILTER=$OPTARG;;
+        c) INPUTBAMCONTROL=$OPTARG;;
+        A) APPEND=1;;
+        N) NOHEADER=1;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INPUTBEDFILE" -o -z "$INPUTBAMFILES" -o "$HELP" ]; then
+	>&2 usage
+fi
+
+## populating files based on input genome
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_MACS2=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -m)
+#GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" -o -z "$GENOME_MACS2" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+# echo $GENOME_FILE; exit
+
+## check if input is BAM files or configuration file or directory containing BAM file information
+#TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+TMP="0CcMdodnWGmAG7cPYOVsL59gdHDr7jGK"
+FILTER_FILES=0
+if [ -d "$INPUTBAMFILES" ]; then
+    FILTER_FILES=1
+elif [ "$(samtools view -H $(echo $INPUTBAMFILES | perl -ane '$_=~s/\,.*//g; print $_;') | wc -l)" -le 0 ]; then
+    FILTER_FILES=1
+fi
+
+## filter BAM files for analysis
+if [ "$FILTER_FILES" -eq 1 ]; then
+    ## filter bam files based on input filters (include and/or exclude)
+    if [ ! -z "$INCLUDE_FILTER" -a ! -z "$EXCLUDE_FILTER" ]; then
+        filterFilesByName -i $INPUTBAMFILES -f $INCLUDE_FILTER -F $EXCLUDE_FILTER -e bam -M | tr '\,' '\n'
+    elif [ ! -z "$INCLUDE_FILTER" ]; then
+        filterFilesByName -i $INPUTBAMFILES -f $INCLUDE_FILTER -e bam -M | tr '\,' '\n'
+    elif [ ! -z "$EXCLUDE_FILTER" ]; then
+        filterFilesByName -i $INPUTBAMFILES -F $EXCLUDE_FILTER -e bam -M | tr '\,' '\n'
+    else
+        cat $INPUTBAMFILES
+    fi | grep -v "^$" | perl -ane 'chomp($_); if(scalar(@F)==1) { print "tpm\t$_\n"; } else { print "$_\n"; }' > ${TMP}.bamConfig
+    INPUTBAMFILES=${TMP}.bamConfig
+    
+    if [ "$(cat $INPUTBAMFILES | perl -ane 'print scalar(@F)."\n";' | sort | uniq | wc -l)" -gt 1 -o "$(cat $INPUTBAMFILES | wc -l)" -eq 0 ]; then
+        echo
+        echo "ERROR: input bam configuration file is not in correct format"
+        echo "possible reason: spikeIn control not provided for each sample, or"
+        echo "possible reason: none of the files fulfill the input filter criteria"
+        echo
+        usage
+    fi
+
+    ## read configuration file
+    INPUT=$(cat $INPUTBAMFILES | perl -ane '
+        $file.="$F[1],";
+        END {
+            $file=~s/\,$//g;
+            print "$file\n";
+        }'
+    )
+    INPUTBAMFILES=$INPUT
+fi
+
+## parse input bam files in an array
+oIFS=$IFS
+IFS=","
+BAMFILES=($INPUTBAMFILES)
+BAMFILES_COUNT=${#BAMFILES[@]}
+IFS=$oIFS
+
+## parse bam files in an array
+IFS=","
+INPUTBAMFILES=$(echo $INPUTBAMFILES | sed 's/\,/ /g')
+IFS=$oIFS
+
+## call peaks
+ARG=""
+if [ -f "$INPUTBAMCONTROL" ]; then ARG="$ARG -c $INPUTBAMCONTROL"; fi
+if [ -z "$REMOVE_DUPLICATE" ]; then ARG="$ARG --keep-dup"; fi 
+
+echo "macs2 callpeak -t $INPUTBAMFILES -g $GENOME_MACS2 $ARG"
+
+## remove temporary files
+if [ "$FILTER_FILES" -eq 1 ]; then
+    rm $TMP.bamConfig
+fi
+
+exit

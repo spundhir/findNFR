@@ -39,9 +39,9 @@ fi
 
 NCOL=$(head -n 1 $INFILE | perl -ane 'print scalar(@F);')
 if [ "$NCOL" -ge "4" ]; then
-    zless $INFILE | grep -v 'chr.*start.*end' | perl -ane '$len=$F[2]-$F[1]; chomp($_); print "$_\t$len\n";' | sort -k 4,4 -k $((NCOL+1))rn,$((NCOL+1)) | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }' | cut -f 1-$((NCOL))
+    zless $INFILE | grep -v 'chr.*start.*end\|seqnames.*start.*end' | perl -ane '$len=$F[2]-$F[1]; chomp($_); print "$_\t$len\n";' | sort -k 4,4 -k $((NCOL+1))rn,$((NCOL+1)) | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }' | cut -f 1-$((NCOL))
 else
-    zless $INFILE | grep -v 'chr.*start.*end'
+    zless $INFILE | grep -v 'chr.*start.*end\|seqnames.*start.*end'
 fi
 
 ## remove temporary file, if exists

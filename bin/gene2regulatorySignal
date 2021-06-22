@@ -29,6 +29,11 @@ usage() {
     echo "[OUTPUT]"
     echo "             [chr start end gene_name score strand (..) promoter_signal (..) total_distal_signal (..) weighted_distal_signal (..) enhancer_count class_frequencies]"
     echo "             [computed for each input peak: promoter_signal, total_distal_signal, weighted_distal_signal]"
+    echo "[NOTE]"
+    echo "             [if -k enlist BED file(s), column 4 is assumed as containing score column]"
+    echo "             [if different or multiple score columns, provide this information in -k file in following format]"
+    echo "             [<id> <bedfile>,6]"
+    echo "             [<id> <bedfile>,6,7,8,9]"
 	echo
 	exit 0
 }
@@ -76,9 +81,19 @@ mkdir -p $OUTDIR
 #####################################
 BEDFILES=()
 while read LINE; do
-    if [ "$(isBed -i $LINE)" -eq "0" ]; then
+    if [ "$(echo $LINE | tr '/,/' '/\n/' | wc -l)" -gt 1 ]; then
+        mkdir -p $OUTDIR/bed_files
+        FILE=$(echo $LINE | sed -E 's/\,.*//g')
+        for i in $(echo $LINE | sed -E 's/^[^,]+\,//g' | tr '/\,/' '/ /'); do
+            NAME=$(tabEdit -i $FILE -d | tabEdit -i stdin -f ${i})
+            if [ ! -s "$OUTDIR/bed_files/${NAME}.bed" ]; then
+                tabEdit -i $FILE -f 1-4,${i} > $OUTDIR/bed_files/${NAME}.bed
+            fi
+            BEDFILES+=($OUTDIR/bed_files/$NAME.bed)
+        done
+    elif [ "$(isBed -i $LINE)" -eq "0" ]; then
         BEDFILES+=($LINE)
-    fi;
+    fi
 done < <(zless $CONFIG_FILE  | perl -ane 'if($F[0]=~/^'$CONFIG_FILTER'/) { print "$F[1]\n"; }')
 
 #####################################
@@ -99,12 +114,14 @@ CONFIG_FILE="$OUTDIR/BAM.CONFIG"
 if [ ! -s "$OUTDIR/PROMOTER.BED" ]; then
     if [ "$(zless $PROMOTER_FILE | cut -f 8 | grep -E '\:[0-9]+\-[0-9]+' | wc -l)" -ge "1" -a "$(zless $PROMOTER_FILE | cut -f 7 | grep 'Y\|N' | wc -l)" -ge "1" ]; then
         if [ "$RAW" ]; then
-            bed2longestRegion -i $PROMOTER_FILE | sort -k 4,4 | bed2window -i stdin -x -w 500 > $OUTDIR/PROMOTER.BED
+            #bed2longestRegion -i $PROMOTER_FILE | sort -k 4,4 | bed2window -i stdin -x -w 500 > $OUTDIR/PROMOTER.BED
+            ## better to use this option, Hox9 issue in mll-af9 project
+            bed2longestRegion -i $PROMOTER_FILE | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $OUTDIR/PROMOTER.BED
         else
             bed2longestRegion -i $PROMOTER_FILE | sort -k 4,4 | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";' > $OUTDIR/PROMOTER.BED
         fi
     else
-        bed2longestRegion -i $PROMOTER_FILE | bed2window -i stdin -x -w 250 > $OUTDIR/PROMOTER.BED
+        bed2longestRegion -i $PROMOTER_FILE | bed2window -i stdin -x -w 500 > $OUTDIR/PROMOTER.BED
     fi
 fi
 
@@ -118,7 +135,7 @@ if [ ! -s "$OUTDIR/CRE.BED" ]; then
         done
     else
         zless $CRE_FILE 
-    fi | grep -v 'chr.*start.*end' | bed2window -i stdin -w 250 > $OUTDIR/CRE.BED
+    fi | grep -v 'chr.*start.*end\|seqnames.*start.*end' | bed2window -i stdin -w 250 > $OUTDIR/CRE.BED
 fi
 
 #####################################
@@ -136,18 +153,18 @@ if [ ! -s "$OUTDIR/PROMOTER.BED.tpm" ]; then
     if [ "${#BEDFILES[@]}" -gt 0 ]; then
         for (( i=0; i<${#BEDFILES[@]}; i++ )); do
             NCOL=$(head -n 1 $OUTDIR/PROMOTER.BED.tpm | perl -ane 'print scalar(@F);')
-            intersectBed -a $OUTDIR/PROMOTER.BED.tpm -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | grep -v 'chr.*start.*end' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $((NCOL+5)) -o sum -n $NCOL > $OUTDIR/PROMOTER.BED.tpm.tmp
+            intersectBed -a $OUTDIR/PROMOTER.BED.tpm -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | grep -v 'chr.*start.*end\|seqnames.*start.*end' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $((NCOL+5)) -o sum -n $NCOL > $OUTDIR/PROMOTER.BED.tpm.tmp
             mv $OUTDIR/PROMOTER.BED.tpm.tmp $OUTDIR/PROMOTER.BED.tpm
         done
     fi
 fi
 
 ## organize file header
-if [ "$(grep 'chr.*start.*end' $OUTDIR/PROMOTER.BED.tpm | wc -l)" -eq 0 ]; then
+if [ "$(grep 'chr.*start.*end\|seqnames.*start.*end' $OUTDIR/PROMOTER.BED.tpm | wc -l)" -eq 0 ]; then
     HEADER_PROXIMAL=$(tabEdit -i $PROMOTER_FILE -d)
-    HEADER_PROXIMAL="$HEADER_PROXIMAL $(zless $OUTDIR/BAM.CONFIG | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; $F[1]=~s/[\-\.]+/\_/g; print "$F[1]\t";')"
+    HEADER_PROXIMAL="$HEADER_PROXIMAL $(zless $CONFIG_FILE | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; $F[1]=~s/[\-\.]+/\_/g; print "$F[1]\t";')"
     for(( i=0; i<${#BEDFILES[@]}; i++ )); do
-        HEADER_PROXIMAL="$HEADER_PROXIMAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$//g; $_=~s/[\-\.]+/\_/g; print $_;')"
+        HEADER_PROXIMAL="$HEADER_PROXIMAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$/_peak/g; $_=~s/[\-\.]+/\_/g; print $_;')"
     done
 
     cat <(echo "$HEADER_PROXIMAL" | tabEdit -i stdin -t | perl -ane 'print lc $_;') $OUTDIR/PROMOTER.BED.tpm > $OUTDIR/PROMOTER.BED.tpm.tmp
@@ -169,18 +186,18 @@ if [ ! -s "$OUTDIR/CRE.BED.tpm" ]; then
     if [ "${#BEDFILES[@]}" -gt 0 ]; then
         for (( i=0; i<${#BEDFILES[@]}; i++ )); do
             NCOL=$(head -n 1 $OUTDIR/CRE.BED.tpm | perl -ane 'print scalar(@F);')
-            intersectBed -a $OUTDIR/CRE.BED.tpm -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | grep -v 'chr.*start.*end' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $((NCOL+5)) -o sum -n $NCOL > $OUTDIR/CRE.BED.tpm.tmp
+            intersectBed -a $OUTDIR/CRE.BED.tpm -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | grep -v 'chr.*start.*end\|seqnames.*start.*end' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $((NCOL+5)) -o sum -n $NCOL > $OUTDIR/CRE.BED.tpm.tmp
             mv $OUTDIR/CRE.BED.tpm.tmp $OUTDIR/CRE.BED.tpm
         done
     fi
 fi
 
 ## organize file header
-if [ "$(grep 'chr.*start.*end' $OUTDIR/CRE.BED.tpm | wc -l)" -eq 0 ]; then
+if [ "$(grep 'chr.*start.*end\|seqnames.*start.*end' $OUTDIR/CRE.BED.tpm | wc -l)" -eq 0 ]; then
     HEADER_DISTAL=$(tabEdit -i $CRE_FILE -d)
-    HEADER_DISTAL="$HEADER_DISTAL $(zless $OUTDIR/BAM.CONFIG | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; $F[1]=~s/[\-\.]+/\_/g; print "$F[1]\t";')"
+    HEADER_DISTAL="$HEADER_DISTAL $(zless $CONFIG_FILE | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; $F[1]=~s/[\-\.]+/\_/g; print "$F[1]\t";')"
     for(( i=0; i<${#BEDFILES[@]}; i++ )); do
-        HEADER_DISTAL="$HEADER_DISTAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$//g; $_=~s/[\-\.]+/\_/g; print $_;')"
+        HEADER_DISTAL="$HEADER_DISTAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$/_peak/g; $_=~s/[\-\.]+/\_/g; print $_;')"
     done
 
     cat <(echo "$HEADER_DISTAL" | tabEdit -i stdin -t | perl -ane 'print lc $_;') $OUTDIR/CRE.BED.tpm > $OUTDIR/CRE.BED.tpm.tmp
@@ -199,9 +216,9 @@ if [ ! -s "$OUTDIR/GENES.DistalSignal" ]; then
     #echo -e "$NCOL_CRE_FILE\t$SIGNAL_SCORE_COL"; exit
 
     ## define header for DistalSignal file
-    HEADER_SIGNAL="HiC_score $(zless $OUTDIR/BAM.CONFIG | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; print "$F[1]\t";')"
+    HEADER_SIGNAL="HiC_score $(zless $CONFIG_FILE | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; print "$F[1]\t";')"
     for(( i=0; i<${#BEDFILES[@]}; i++ )); do
-        HEADER_SIGNAL="$HEADER_DISTAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$//g; print $_;')"
+        HEADER_SIGNAL="$HEADER_SIGNAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$/_peak/g; print $_;')"
     done
     HEADER_SIGNAL=$(echo "$HEADER_SIGNAL" | perl -ane '$tds=""; $wds=""; foreach(@F) { $_=~s/[\-\.]+/\_/g; $tds.="TDS_$_\t"; $wds.="WDS_$_\t"; } END { $tds=~s/\s+$//g; $wds=~s/\s+$//g; print "$tds"; }')
     HEADER_SIGNAL=$(echo -e "$HEADER_SIGNAL" | sed -E 's/TDS\_//g' | tr '\t+' ',' | perl -ane 'print lc $_;')
@@ -225,10 +242,10 @@ fi
 
 ## join 'proximal' and 'distal' signal information
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-cat <(join -1 4 -2 1 -a 1 <(sort -k 4,4 $OUTDIR/PROMOTER.BED.tpm) <(sort -k 1,1 $OUTDIR/GENES.DistalSignal) | grep "chr.*start.*end" | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";' | tabEdit -i stdin -t) <(join -1 4 -2 1 -a 1 -e NA <(sort -k 4,4 $OUTDIR/PROMOTER.BED.tpm) <(sort -k 1,1 $OUTDIR/GENES.DistalSignal) | grep -v "chr.*start.*end" | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";' | tabEdit -i stdin -t) > $TMP
+cat <(join -1 4 -2 1 -a 1 <(sort -k 4,4 $OUTDIR/PROMOTER.BED.tpm) <(sort -k 1,1 $OUTDIR/GENES.DistalSignal) | grep 'chr.*start.*end\|seqnames.*start.*end' | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";' | tabEdit -i stdin -t) <(join -1 4 -2 1 -a 1 -e NA <(sort -k 4,4 $OUTDIR/PROMOTER.BED.tpm) <(sort -k 1,1 $OUTDIR/GENES.DistalSignal) | grep -v 'chr.*start.*end\|seqnames.*start.*end' | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";' | tabEdit -i stdin -t) > $TMP
 
 ## replace missing fields with 'NA'
-NCOL=$(tabEdit -i $TMP  | cut -f 2,2 -d " " | sort -k 1r,1 | head -n 1)
+NCOL=$(tabEdit -i $TMP  | cut -f 2,2 -d " " | sort -k 1rn,1 | head -n 1)
 tabEdit -i $TMP -n $NCOL
 
 #####################################

@@ -403,13 +403,13 @@ if [ ! -z "$APPEND" -a "$(cmp -s <(cut -f 1-${NCOL} ${TMP}.tpm) $BEDFILE && echo
     if [ ! -z "$NOHEADER" ]; then
         cat ${TMP}.tpm > $INPUTBEDFILE
     else
-        cat <(echo "#$HEADER" | tabEdit -i stdin -t) ${TMP}.tpm > $INPUTBEDFILE
+        cat <(echo "$HEADER" | tabEdit -i stdin -t) ${TMP}.tpm > $INPUTBEDFILE
     fi
 else
     if [ ! -z "$NOHEADER" ]; then
         cat ${TMP}.tpm
     else
-        cat <(echo "#$HEADER" | tabEdit -i stdin -t) ${TMP}.tpm
+        cat <(echo "$HEADER" | tabEdit -i stdin -t) ${TMP}.tpm
     fi
 fi
 

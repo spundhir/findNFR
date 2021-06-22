@@ -39,7 +39,7 @@ if [ "$INFILE" == "stdin" ]; then
 fi
 
 ## check, if header is already present
-HEADER=$(zless $INFILE | grep "chr.*start.*end")
+HEADER=$(zless $INFILE | grep 'chr.*start.*end\|seqnames.*start.*end')
 
 if [ -z "$HEADER" ]; then
     NCOL=$(head -n 1 $INFILE | perl -ane 'print scalar(@F);')
