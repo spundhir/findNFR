@@ -180,7 +180,11 @@ CPG_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GE
 if [ ! -z "$CPG_FILE" ]; then
     >&2 echo -n "Determine CpG island length (`date`).. "
     echo -ne "\tCpG_island_length"
-    intersectBed -a $PROMOTER_FILE -b <(cut -f 1-3,5 $CPG_FILE) -wao |  intersectBed2uniq -i stdin -o sum -c $((NCOL+4)) -n $NCOL > ${TMP}.cpg
+    if [ "$(zless $PROMOTER_FILE | cut -f 8 | grep -E '\:[0-9]+\-[0-9]+' | wc -l)" -ge "1" -a "$(zless $PROMOTER_FILE | cut -f 7 | grep 'Y\|N' | wc -l)" -ge "1" ]; then
+        intersectBed -a <(tabEdit -i $PROMOTER_FILE -D | perl -ane '@t=split(/[\:\-]/,$F[7]); print "$t[0]\t$t[1]\t$t[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$F[8]\t$F[9]\n";') -b <(cut -f 1-3,5 $CPG_FILE) -wao |  intersectBed2uniq -i stdin -o sum -c $((NCOL+4)) -n $NCOL
+    else
+        intersectBed -a $PROMOTER_FILE -b <(cut -f 1-3,5 $CPG_FILE) -wao |  intersectBed2uniq -i stdin -o sum -c $((NCOL+4)) -n $NCOL
+    fi > ${TMP}.cpg
     >&2 echo "done"
 else
     touch ${TMP}.cpg

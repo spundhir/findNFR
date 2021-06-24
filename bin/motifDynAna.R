@@ -113,7 +113,7 @@ cat(sprintf("%d out of %d motifs passed filter criteria..", length(sig_rows), nr
 cat("\n")
 
 if(length(sig_rows)>2) {
-    pdf(opt$outPdfFile, height=20)
+    pdf(opt$outPdfFile, height=20, width=10)
     #breaks <- as.vector(summary(as.vector(mat[sig_rows,])))
     #len=2
     #breaks1 <- seq(breaks[1], breaks[2], length=len)
