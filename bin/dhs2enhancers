@@ -1,0 +1,190 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm10"
+CONFIG_FILTER="RP"
+
+#### usage ####
+usage() {
+	echo Program: "dhs2enhancers (annotate enhancers from open chromatin elements)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: dhs2enhancers -i <file> -j <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input CRE coordinates in BED format (can be stdin)]"
+    echo "             [format: output from linkDHS2genes]"
+    echo "[OPTIONS]"
+	echo " -j <file>   [input gene coordinates in BED format (eg. gene2promoter)]"
+    echo "             [format: chr start end name score strand (..)]"
+    echo " -k <file>   [configuration file containing list of BAM/BED files used to compute signal values]"
+    echo "             [<id> <bamfile> (eg. RP h3k27me3_esc_Rep1.bam)]"
+    echo "             [<id> <bedfile> (eg. RP h3k4me3_esc_Rep1.bed)]"
+    echo " -o <dir>    [output directory to store signal values]"
+    echo " -g <string> [genome (default: mm10)]"
+    echo " -f <string> [filter bam files from configuration file based on input indentifier (default: RP)]"
+    echo " -r          [output raw read counts (default: TPM)]"
+	echo " -h          [help]"
+    echo "[OUTPUT]"
+    echo "             [chr start end dhs_name score strand tissue_information target_gene dist_to_target_gene interaction_class total_signal]"
+    echo "             [computed for each input peak: total_signal]"
+    echo "[NOTE]"
+    echo "             [if -k enlist BED file(s), column 4 is assumed as containing score column]"
+    echo "             [if different or multiple score columns, provide this information in -k file in following format]"
+    echo "             [<id> <bedfile>,6]"
+    echo "             [<id> <bedfile>,6,7,8,9]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:k:o:g:f:rh ARG; do
+    case "$ARG" in
+    i) CRE_FILE=$OPTARG;;
+    j) PROMOTER_FILE=$OPTARG;;
+    k) CONFIG_FILE=$OPTARG;;
+    o) OUTDIR=$OPTARG;;
+    g) GENOME=$OPTARG;;
+    f) CONFIG_FILTER=$OPTARG;;
+    r) RAW=1;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$CRE_FILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+
+#####################################
+## organize peaks file
+#####################################
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+TMP="0CcMdodnWGmAG7cPYOVsL59gdHDr7jGK"
+if [ "$CRE_FILE" == "stdin" ]; then
+    while read LINE; do
+        echo -e "${LINE}"
+    done
+else
+    zless $CRE_FILE 
+fi | grep -v 'chr.*start.*end\|seqnames.*start.*end' | bed2window -i stdin -w 250 > ${TMP}.cre
+CRE_FILE_TMP="${TMP}.cre"
+
+#####################################
+## compute signal at CRE using BAM and BED files
+#####################################
+if [ "$CONFIG_FILE" ]; then
+    ## create output directory
+    if [ "$OUTDIR" ]; then
+        mkdir -p $OUTDIR
+    else
+        >&2 echo
+        >&2 echo "-o (output directory) needs to be specified (`date`).. "
+        >&2 echo
+        usage
+    fi
+
+    ## check, if BED file(s) exist in input config file
+    BEDFILES=()
+    while read LINE; do
+        if [ "$(echo $LINE | tr '/,/' '/\n/' | wc -l)" -gt 1 ]; then
+            mkdir -p $OUTDIR/bed_files
+            FILE=$(echo $LINE | sed -E 's/\,.*//g')
+            for i in $(echo $LINE | sed -E 's/^[^,]+\,//g' | tr '/\,/' '/ /'); do
+                NAME=$(tabEdit -i $FILE -d | tabEdit -i stdin -f ${i})
+                if [ ! -s "$OUTDIR/bed_files/${NAME}.bed" ]; then
+                    tabEdit -i $FILE -f 1-4,${i} > $OUTDIR/bed_files/${NAME}.bed
+                fi
+                BEDFILES+=($OUTDIR/bed_files/$NAME.bed)
+            done
+        elif [ "$(isBed -i $LINE)" -eq "0" ]; then
+            BEDFILES+=($LINE)
+        fi
+    done < <(zless $CONFIG_FILE  | perl -ane 'if($F[0]=~/^'$CONFIG_FILTER'/) { print "$F[1]\n"; }')
+
+    ## create configuration file containing only BAM files
+    if [ ! -s "$OUTDIR/BAM.CONFIG" ]; then
+        while read LINE; do
+            if [ "$(isBam -i $LINE)" -eq "0" ]; then
+                echo -e "$CONFIG_FILTER\t$LINE"
+            fi;
+        done < <(zless $CONFIG_FILE  | perl -ane 'if($F[0]=~/^'$CONFIG_FILTER'/) { print "$F[1]\n"; }') > $OUTDIR/BAM.CONFIG
+    fi 
+    CONFIG_FILE="$OUTDIR/BAM.CONFIG"
+
+    ## compute tags per million mapped reads (TPM) unless 'RAW' is defined
+    >&2 echo -n "Compute signal values at enhancers (`date`).. "
+    if [ ! -s "$OUTDIR/CRE.BED.tpm" ]; then
+        ARG=""
+        if [ -z "$RAW" ]; then
+            ARG="-m";
+        fi
+
+        bed2expr -i $CRE_FILE -j $CONFIG_FILE -d -n -g $GENOME -f $CONFIG_FILTER -N $ARG > $OUTDIR/CRE.BED.tpm
+
+        if [ "${#BEDFILES[@]}" -gt 0 ]; then
+            for (( i=0; i<${#BEDFILES[@]}; i++ )); do
+                NCOL=$(head -n 1 $OUTDIR/CRE.BED.tpm | perl -ane 'print scalar(@F);')
+                intersectBed -a $OUTDIR/CRE.BED.tpm -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | grep -v 'chr.*start.*end\|seqnames.*start.*end' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $((NCOL+5)) -o sum -n $NCOL > $OUTDIR/CRE.BED.tpm.tmp
+                mv $OUTDIR/CRE.BED.tpm.tmp $OUTDIR/CRE.BED.tpm
+            done
+        fi
+    fi
+    
+    ## organize file header
+    if [ "$(grep 'chr.*start.*end\|seqnames.*start.*end' $OUTDIR/CRE.BED.tpm | wc -l)" -eq 0 ]; then
+        HEADER_DISTAL=$(tabEdit -i $CRE_FILE -d)
+        HEADER_DISTAL="$HEADER_DISTAL $(zless $CONFIG_FILE | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; $F[1]=~s/[\-\.]+/\_/g; print "$F[1]\t";')"
+        for(( i=0; i<${#BEDFILES[@]}; i++ )); do
+            HEADER_DISTAL="$HEADER_DISTAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$/_peak/g; $_=~s/[\-\.]+/\_/g; print $_;')"
+        done
+
+        cat <(echo "$HEADER_DISTAL" | tabEdit -i stdin -t | perl -ane 'print lc $_;') $OUTDIR/CRE.BED.tpm > $OUTDIR/CRE.BED.tpm.tmp
+        mv $OUTDIR/CRE.BED.tpm.tmp $OUTDIR/CRE.BED.tpm
+    fi
+    CRE_FILE_TMP="$OUTDIR/CRE.BED.tpm"
+    >&2 echo "done"
+else
+    ## organize file header
+    HEADER_DISTAL=$(tabEdit -i $CRE_FILE -d)
+    cat <(echo "$HEADER_DISTAL" | tabEdit -i stdin -t | perl -ane 'print lc $_;') ${TMP}.cre > ${TMP}.cre.tmp
+    mv ${TMP}.cre.tmp ${TMP}.cre
+    CRE_FILE_TMP="${TMP}.cre"
+fi
+
+#####################################
+## select CRE not overlapping with promoter; select hic gene as target
+#####################################
+>&2 echo -n "Select CRE not overlapping with promoter; select hic gene as target (`date`).. "
+TSS_FILE=$(initialize_genome -g $GENOME -t)
+echo -ne <(grep -w start $CRE_FILE_TMP | sed -E 's/closest_/target_/g') 
+intersectBed -a <(grep -v start $CRE_FILE_TMP) -b <(grep -v start $TSS_FILE | grep 'protein_coding\|gene' | bed2window -i stdin -w 500 -x) -v | perl -ane '$gene=$F[7]; $dist=$F[8]; if($F[13]!~/noHiCinteraction/) { $F[7]=$F[9]; $F[8]=$F[10]; } if($F[11]=~/^\.$/ && $F[11]=~/^NA$/) { $F[11]=1; } print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sortBed -i stdin | cut -f 1-9,12- > ${CRE_FILE_TMP}.enhancers
+>&2 echo "done"
+
+#####################################
+## house keeping or developmental enhancers
+#####################################
+>&2 echo -n "Classify enhancers as house keeping or developmental enhancers (`date`).. "
+
+>&2 echo "done"
+
+#####################################
+## remove temporary file
+#####################################
+#rm $TMP
+#if [ ! -z "$OUTDIR" ]; then
+#    rm -r $OUTDIR
+#fi
