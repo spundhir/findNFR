@@ -44,13 +44,14 @@ usage() {
     echo " -B          [file having genomic coordinates of blacklisted regions in BED format]"
     echo " -D          [file having genomic coordinates of DNase regions in BED format]"
     echo " -F          [file having chromosome sequences in FASTA format]"
+    echo " -G          [file having TF binding positions in the genome (GTRD)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts g:i:msetncTRBDFh ARG; do
+while getopts g:i:msetncTRBDFGh ARG; do
 	case "$ARG" in
         g) GENOME=$OPTARG;;
 		i) FILE=$OPTARG;;
@@ -65,6 +66,7 @@ while getopts g:i:msetncTRBDFh ARG; do
         B) BLACKLIST=1;;
         D) DHS=1;;
         F) GENOME_FASTA=1;;
+        G) GTRD=1;;
 		h) HELP=1;;
 	esac
 done
@@ -98,6 +100,8 @@ if [ "$(grep -w $GENOME $FILE | wc -l)" -gt 0 ]; then
         grep -w $GENOME $FILE | head -n 11 | tail -n 1 | perl -ane 'print "$F[1]";'
     elif [ ! -z "$GENOME_FASTA" ] ; then
         grep -w $GENOME $FILE | head -n 12 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$GTRD" ] ; then
+        grep -w $GENOME $FILE | head -n 13 | tail -n 1 | perl -ane 'print "$F[1]";'
     else
         grep -w $GENOME $FILE | head -n 1 | tail -n 1 | perl -ane 'print "$F[1]";'
     fi

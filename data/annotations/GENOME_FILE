@@ -11,6 +11,7 @@ mm9 /scratch/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz
 mm9 /scratch/genomes/annotations/BLACKLIST/mm9_blacklist.bed.gz
 mm9 NA
 mm9 /scratch/genomes/assemblies/Mus_musculus/mm9/mm9.fa
+mm9 NA
 mm10    /scratch/genomes/annotations/SIZE/mouse.mm10.genome
 mm10    mm
 mm10 2652783500
@@ -23,6 +24,7 @@ mm10    /scratch/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz
 mm10    /scratch/genomes/annotations/BLACKLIST/mm10_blacklist.bed.gz
 mm10    /scratch/genomes/annotations/BED/mm10_dhs.bed.gz
 mm10    /scratch/genomes/assemblies/Mus_musculus/mm10/mm10.fa
+mm10    /scratch/genomes/annotations/GTRD/Mus_musculus_meta_clusters.interval.gz
 hg19    /scratch/genomes/annotations/SIZE/human.hg19.genome
 hg19    hs
 hg19    2864785220
@@ -35,6 +37,7 @@ hg19    /scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz
 hg19    /scratch/genomes/annotations/BLACKLIST/hg19_blacklist.bed.gz
 hg19    NA
 hg19    /scratch/genomes/assemblies/Homo_sapiens/hg19/hg19.fa.chr
+hg19    NA
 hg38    /scratch/genomes/annotations/SIZE/human.hg38.genome
 hg38    hs
 hg38    2913022398
@@ -47,6 +50,7 @@ hg38    /scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz
 hg38    /scratch/genomes/annotations/BLACKLIST/hg38_blacklist.bed.gz
 hg38    /scratch/genomes/annotations/BED/hg38_dhs.bed.gz
 hg38    /scratch/genomes/assemblies/Homo_sapiens/hg38/hg38.fa.chr
+hg38    /scratch/genomes/annotations/GTRD/Homo_sapiens_meta_clusters.interval.gz
 danRer7 /scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome
 danRer7 dr
 danRer7 1369631918
@@ -59,9 +63,11 @@ danRer7 NA
 danRer7 NA
 danRer7 NA
 danRer7 NA
+danRer7 NA
 rn5 /scratch/genomes/annotations/SIZE/rat.rn5.genome
 rn5 rn
 rn5 2197995070
+rn5 NA
 rn5 NA
 rn5 NA
 rn5 NA

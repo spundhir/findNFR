@@ -50,10 +50,10 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
     echo "             [finding both primary and 'co-enriched' motifs for a transcription factor.  When looking at histone marked regions,   ]"
     echo "             [500-1000 bp is probably a good idea (i.e. H3K4me or H3/H4 acetylated regions).  In theory, HOMER can work with very  ]"
     echo "             [large regions (i.e. 10kb), but with the larger the regions comes more sequence and longer execution time.  These     ]"
-    echo "             [regions will be based off the center of the peaks.  If you prefer an offset, you can specify '-d -300,100' to     ]"
+    echo "             [regions will be based off the center of the peaks.  If you prefer an offset, you can specify '-d -300,100' to        ]"
     echo "             [search a region of size 400 that is centered 100 bp upstream of the peak center (useful if doing motif finding on    ]"
-    echo "             [putative TSS regions).  If you have variable length regions, use the option '-d given' and HOMER will use the     ]"
-    echo "             [exact regions that were used as input.]"
+    echo "             [putative TSS regions).  If you have variable length regions, use the option '-d given' and HOMER will use the        ]"
+    echo "             [exact regions that were used as input.                                                                               ]"
     echo " -l <string> [name of motifs that must be included in the final output]"
     echo "             [if multiple, separate them by a comma]"
 	echo " -h          [help]"
@@ -225,3 +225,5 @@ else
     echo "Only one class is found. Not performing differential motif enrichment analysis using motifDynAna" 
 fi
 echo "done"
+
+#for CHR in $(cut -f 1 $(initialize_genome -g mm10)); do intersectBed -a <(tabEdit -i analysis/DF_ENHANCER.BED -f 1-6,annotation | cut -f 1-6,9 | grep -w ${CHR}) -b <(zgrep -w ${CHR} ~/genomes/annotations/GTRD/Mus\ musculus_meta_clusters.interval.gz | cut -f 1-6) -wo > analysis/multiClassMotifAna/gtrd/ENHANCERS.GTRD.${CHR}; done
