@@ -243,7 +243,7 @@ elif [ ! -s "$TMP.mostActiveTSS" ]; then
     if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-s "); fi
     if [ ! -z "$OPPOSITE_STRAND" ]; then ARG=$(echo $ARG "-S "); fi
 
-    gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW_TSS $ARG | sortBed -i stdin > $TMP.mostActiveTSS
+    gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW_TSS $ARG | tabEdit -i stdin -D | sortBed -i stdin > $TMP.mostActiveTSS
 fi
 
 #############################
@@ -258,7 +258,7 @@ if [ "$NCOL" -lt "6" ]; then
 fi
 
 ## organize file header
-HEADER=$(tabEdit -i $TMP.mostActiveTSS -d)
+HEADER="chr\tstart\tend\tname\tscore\tstrand\tgene\tcoordinate_TSSR\tsignal_TSSR\tdist_to_closest_tss"
 
 #############################
 ## measure signal values using strand unaware data (eg. Pol2, histone etc)
@@ -406,7 +406,7 @@ fi
 #############################
 ## print results to STDOUT
 #############################
-echo -e "#${HEADER}"
+echo -e "${HEADER}" | tabEdit -i stdin -t
 paste $TMP.signalValues $TMP.signalValuesSameStrand $TMP.signalValuesOppositeStrand | sortBed -i stdin | perl -ane '$F[3]=~s/\-[0-9]+$//g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sort -k 4,4 -k 9rg,9 -k 10rn,10 | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }'
 
 #############################

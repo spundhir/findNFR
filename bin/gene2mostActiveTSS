@@ -43,7 +43,7 @@ usage() {
     echo " -s          [require same strand]"
     echo " -S          [require opposite strand]"
     echo "[OUTPUT]"
-    echo "             [chr start end name score strand gene coordinate (TSSR) signal (TSSR) distance (closest_tss)]"
+    echo "             [chr start end name score strand gene coordinate_TSSR signal_TSSR dist_to_closest_tss]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -138,6 +138,9 @@ else
         fi
     fi | bed2window -i stdin -w $WINDOW -S | bed2expr -i stdin -j $BAMFILE -m -d -g $GENOME $ARG | grep -v start | perl -ane '@coor=split(/[\:\-]+/,$F[7]); $mean_pol2=0; $sample_count=0; foreach(@F[8..scalar(@F)-1]) { $mean_pol2+=$_; $sample_count++; } $mean_pol2=sprintf("%0.5f", $mean_pol2/$sample_count); $width=$coor[2]-$coor[1]; print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]:$F[1]-$F[2]\t$mean_pol2\t$width\n";' | sort -k 7,7 -k 9rg,9 -k 10rn,10 | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }' | cut -f 1-9 | sortBed -i stdin > $TMP.mostActiveTSS
 fi
+
+## print header
+echo -e "chr\tstart\tend\tname\tscore\tstrand\tgene\tcoordinate_TSSR\tsignal_TSSR\tdist_to_closest_tss"
 
 ## add information about distance to closest gene TSS in the output file
 NCOL=$(zless $TMP.mostActiveTSS | perl -ane 'print scalar(@F)."\n";' | sort -k 1r,1 | head -n 1)

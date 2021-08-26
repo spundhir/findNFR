@@ -185,6 +185,14 @@ if [ ! -z "$SS" ]; then
         PLOTTITLE=NGSPLOT
     fi
 
+    ## reformat input file, if scale-regions
+    if [ "$PLOTREGION" == "scale-regions" ]; then
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        zless $OUTDIR/REGIONS_INTEREST.bed | cut -f 4,7 > $OUTDIR/REGIONS_INTEREST.bed.${TMP}
+        mv $OUTDIR/REGIONS_INTEREST.bed.${TMP} $OUTDIR/REGIONS_INTEREST.bed
+        ARG="$ARG -e genebody"
+    fi
+
     NGSPLOT_TITLE_SENSE=$PLOTTITLE"_sense"
     NGSPLOT_TITLE_ANTISENSE=$PLOTTITLE"_antisense"
 
@@ -345,11 +353,14 @@ else
 
     ## copy bigwig files to current working directory for faster processing
     if [ "$COPYBW" ]; then
+        echo
+        echo -n "Copy bigwig files to current working directory for faster processing (`date`).. " >&2
         BWFILE_NEW=$(echo $BWFILE | perl -ane 'foreach(@F) { $_=~s/^.*\///g; print "./$_ "; }')
         if [ "$(for i in $BWFILE_NEW; do if [ ! -f "$i" ]; then echo "not found"; fi done | wc -l)" -gt 0 ]; then
             scp $BWFILE .
         fi
         BWFILE=$BWFILE_NEW
+        echo "done" >&2
     fi
 
     echo
@@ -470,24 +481,8 @@ else
     #if [ ! -z "$OUT_DATA_FILE" ]; then
     #    ARG_HEATMAP="$ARG_PROFILE --outFileSortedRegions $OUT_DATA_FILE";
     #fi
-
     ## make the plot
-    if [ ! -z "$PLOTBYREGION" ]; then
-        if [ ! -z "$PLOT_PROFILE" ]; then
-            plotProfile -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
-                -o $OUTDIR/$PLOTTITLE.pdf \
-                --plotTitle $PLOTTITLE --averageType $AVERAGE_TYPE \
-                --plotType $PLOT_TYPE \
-                $ARG $ARG_PROFILE --perGroup
-        else
-            plotHeatmap -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
-                -o $OUTDIR/$PLOTTITLE.pdf \
-                --plotTitle $PLOTTITLE --averageTypeSummaryPlot $AVERAGE_TYPE \
-                --sortRegions $SORT_REGIONS --sortUsing $SORT_USING \
-                --plotType $PLOT_TYPE \
-                $ARG $ARG_HEATMAP --perGroup
-        fi
-    elif [ ! -z "$PLOTBYBWFILE" ]; then
+    if [ ! -z "$PLOTBYBWFILE" ]; then
         if [ ! -z "$PLOT_PROFILE" ]; then
             plotProfile -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
                 -o $OUTDIR/$PLOTTITLE.pdf \
@@ -501,6 +496,21 @@ else
                 --sortRegions $SORT_REGIONS --sortUsing $SORT_USING \
                 --plotType $PLOT_TYPE \
                 $ARG $ARG_HEATMAP
+        fi
+    elif [ ! -z "$PLOTBYREGION" ]; then
+        if [ ! -z "$PLOT_PROFILE" ]; then
+            plotProfile -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
+                -o $OUTDIR/$PLOTTITLE.pdf \
+                --plotTitle $PLOTTITLE --averageType $AVERAGE_TYPE \
+                --plotType $PLOT_TYPE \
+                $ARG $ARG_PROFILE --perGroup
+        else
+            plotHeatmap -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
+                -o $OUTDIR/$PLOTTITLE.pdf \
+                --plotTitle $PLOTTITLE --averageTypeSummaryPlot $AVERAGE_TYPE \
+                --sortRegions $SORT_REGIONS --sortUsing $SORT_USING \
+                --plotType $PLOT_TYPE \
+                $ARG $ARG_HEATMAP --perGroup
         fi
     fi
     echo "done" >&2
