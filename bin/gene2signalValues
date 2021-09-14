@@ -57,11 +57,13 @@ usage() {
     echo " -S          [require opposite strand (Nascent-seq)]"
     echo " -a          [output raw read counts (default: RPKM normalized)]"
     echo "[OPTIONS: MODE]"
+    echo " -t          [genebody mode (truncated): measure signal at TSSR, genebody, truncated (default: TSSR, genebody)]"
     echo " -e          [tesr mode: measure signal at TSSR, TESR (default: TSSR, genebody)]"
     echo " -d          [divergent mode: measure signal at NDR_UP, NDR_DOWN, genebody (default: TSSR, genebody)]"
 	echo " -h          [help]"
     echo "[NOTE]"
     echo "             [signal (genebody mode): TSSR/genebody]"
+    echo "             [signal (genebody mode, truncated): TSSR/genebody (2000 bp)]"
     echo "             [signal (tesr mode): TSSR/TESR]"
     echo "             [signal (divergent mode): NDR_UP/NDR_DOWN/genebody]"
     echo "             [TSSR: TSS-50 to TSS+w]"
@@ -74,7 +76,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:g:w:W:rc:f:F:sSaedh ARG; do
+while getopts i:j:g:w:W:rc:f:F:sSatedh ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
@@ -88,6 +90,7 @@ while getopts i:j:g:w:W:rc:f:F:sSaedh ARG; do
         s) SAME_STRAND=1;;
         S) OPPOSITE_STRAND=1;;
         a) RAW=1;;
+        t) GENEBODY_TRANCATED=1;;
         e) TESR_MODE=1;;
         d) DIVERGENT_MODE=1;;
 		h) HELP=1;;
@@ -302,6 +305,8 @@ if [ ! -z "$BAMFILE" ]; then
             }
         }
         print "\n";' 
+    elif [ ! -z "$GENEBODY_TRANCATED" ]; then
+        paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bed2window -i stdin -n -w 2000 | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_COUNT'; print "\t$F[$tssr_col]/$F[$genebody_col]"; } print "\n";' 
     else
         paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bedtools slop -i stdin -g $GENOME_FILE -l 0 -r $WINDOW_TES -s | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_COUNT'; print "\t$F[$tssr_col]/$F[$genebody_col]"; } print "\n";' 
     fi > $TMP.signalValues
@@ -351,6 +356,8 @@ if [ ! -z "$BAMFILE_SAMESTRAND" ]; then
             }
         }
         print "\n";' 
+    elif [ ! -z "$GENEBODY_TRANCATED" ]; then
+        paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE_SAMESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bed2window -i stdin -n -w 2000 | bed2expr -i stdin -j $BAMFILE_SAMESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_SAMESTRAND_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_SAMESTRAND_COUNT'; print "\t$F[$tssr_col]/$F[$genebody_col]"; } print "\n";' 
     else
         paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE_SAMESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bedtools slop -i stdin -g $GENOME_FILE -l 0 -r $WINDOW_TES -s | bed2expr -i stdin -j $BAMFILE_SAMESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_SAMESTRAND_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_SAMESTRAND_COUNT'; print "\t$F[$tssr_col]/$F[$genebody_col]"; } print "\n";' 
     fi | perl -ane 'print "$F['$NCOL']"; foreach(@F['$NCOL'+1..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $TMP.signalValuesSameStrand
@@ -398,6 +405,8 @@ if [ ! -z "$BAMFILE_OPPOSITESTRAND" ]; then
             }
         }
         print "\n";' 
+    elif [ ! -z "$GENEBODY_TRANCATED" ]; then
+        paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE_OPPOSITESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bed2window -i stdin -n -w 2000 | bed2expr -i stdin -j $BAMFILE_OPPOSITESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_OPPOSITESTRAND_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_OPPOSITESTRAND_COUNT'; print "\t$F[$tssr_col]/$F[$genebody_col]"; } print "\n";' 
     else
         paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE_OPPOSITESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bedtools slop -i stdin -g $GENOME_FILE -l 0 -r $WINDOW_TES -s | bed2expr -i stdin -j $BAMFILE_OPPOSITESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_OPPOSITESTRAND_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_OPPOSITESTRAND_COUNT'; print "\t$F[$tssr_col]/$F[$genebody_col]"; } print "\n";' 
     fi | perl -ane 'print "$F['$NCOL']"; foreach(@F['$NCOL'+1..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $TMP.signalValuesOppositeStrand
