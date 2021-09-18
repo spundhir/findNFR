@@ -75,7 +75,6 @@ usage() {
     echo " -V <int>    [y-axis maximum value]"
     echo " -G <int>    [plot height in cm (default: 7)]"
     echo " -W <int>    [plot width in cm (default: 11)]"
-    echo " -O <file>   [file name to save the underlying data for the average profile or heatmap]"
     echo "[OPTIONS: plotProfile]"
     echo " -L <string> [colors (name or hex string)]"
     echo "             [if multiple, separate them by a comma]"
@@ -94,13 +93,15 @@ usage() {
     echo " -X <int>    [number of processors to use (default: 1)"
     echo " -U          [overwrite deepToolsMatrix file]"
     echo " -D          [copy bigwig file to current working directory for faster processing]"
+    echo " -O          [save the signal values at input regions (multiBigwigSummary) (<plot title>_multiBigwigSummary.signal)]"
+    echo " -H          [plot correlation between ChIP-seq signal of input samples as a heatmap (multiBigwigSummary) (<plot title>_multiBigwigSummary.npz & .png)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:O:L:m:r:Q:z:Z:Fxg:X:UDh ARG; do
+while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:L:m:r:Q:z:Z:Fxg:X:UDOHh ARG; do
 	case "$ARG" in
 		i) REGIONFILE=$OPTARG;;
 		j) BWDIR=$OPTARG;;
@@ -134,7 +135,6 @@ while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:O:L:m:
         V) YAXIS_MAX=$OPTARG;;
         G) PLOT_HEIGHT=$OPTARG;;
         W) PLOT_WIDTH=$OPTARG;;
-        O) OUT_DATA_FILE=$OPTARG;;
         L) PLOT_COLOR=$OPTARG;;
         m) INTERPOLATION_METHOD=$OPTARG;;
         r) HEATMAP_COLOR=$OPTARG;;
@@ -147,6 +147,8 @@ while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:O:L:m:
         X) PROCESSORS=$OPTARG;;
         U) OVERWRITE=1;;
         D) COPYBW=1;;
+        O) OUT_DATA_FILE=1;;
+        H) HEATMAP_CLUSTERING=1;;
 		h) HELP=1;;
 	esac
 done
@@ -517,7 +519,7 @@ else
 
     if [ ! -z "$OUT_DATA_FILE" ]; then
         echo
-        echo -n "Export read counts for input regions in a file (`date`).. " >&2
+        echo -n "Export read counts for input regions to $OUTDIR/${PLOTTITLE}_multiBigwigSummary.signal (`date`).. " >&2
         TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 
         ## determine unique gene names in the input file
@@ -525,13 +527,21 @@ else
 
         multiBigwigSummary BED-file -b $BWFILE --BED $OUTDIR/input.$TMP --outRawCounts $OUTDIR/counts.$TMP -o $OUTDIR/matrix.$TMP --smartLabels -p $PROCESSORS
 
-        echo -e "$(bed2header -i $OUTDIR/input.$TMP -r)\t$(grep '#' $OUTDIR/counts.$TMP | cut -f 4- | sed s/\'//g)" > $OUTDIR/$OUT_DATA_FILE
-        join -j 1 <(cat $OUTDIR/input.$TMP | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | sort -k 1,1) <(grep -v "#" $OUTDIR/counts.$TMP | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | cut -f 1,5- | sort -k 1,1) | tabEdit -i stdin -t | cut -f 2- >> $OUTDIR/$OUT_DATA_FILE 
+        echo -e "$(bed2header -i $OUTDIR/input.$TMP -r)\t$(grep '#' $OUTDIR/counts.$TMP | cut -f 4- | sed s/\'//g)" > $OUTDIR/${PLOTTITLE}_multiBigwigSummary.signal
+        join -j 1 <(cat $OUTDIR/input.$TMP | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | sort -k 1,1) <(grep -v "#" $OUTDIR/counts.$TMP | perl -ane 'chomp($_); print "$F[0]_$F[1]_$F[2]\t$_\n";' | cut -f 1,5- | sort -k 1,1) | tabEdit -i stdin -t | cut -f 2- >> $OUTDIR/${PLOTTITLE}_multiBigwigSummary.signal
        
         ## remove temporary files
         rm $OUTDIR/input.$TMP
         rm $OUTDIR/counts.$TMP
         rm $OUTDIR/matrix.$TMP
+        echo "done" >&2
+    fi
+
+    if [ ! -z "$HEATMAP_CLUSTERING" ]; then
+        echo
+        echo -n "Plot correlation between ChIP-seq signal of input samples as a heatmap (`date`).. ">&2
+        multiBigwigSummary bins -b $BWFILE --smartLabels -o $OUTDIR/${PLOTTITLE}_multiBigwigSummary.npz
+        plotCorrelation -in $OUTDIR/${PLOTTITLE}_multiBigwigSummary.npz --corMethod pearson --skipZeros --whatToPlot heatmap --removeOutliers -o $OUTDIR/${PLOTTITLE}_multiBigwigSummary.png
         echo "done" >&2
     fi
 fi

@@ -41,15 +41,20 @@ usage() {
     echo " -c          [scale the coverage to TPM]"
     echo " -C          [scale the coverage to 1x]"
     echo " -z <float>  [scale the coverage by input factor (computed using DESeq2 or spike-in data)]"
+    echo "             [can also be bam file containing reads mapped to spike-in genome (eg. dm6)]"
+    echo " -Z <float>  [scale the coverage by rrpm (Rx) (spike-in data)]"
+    echo "             [can also be bam file containing reads mapped to spike-in genome (eg. dm6)]"
     echo " -b          [also output the BED file]"
     echo " -p <int>    [number of processors to use (default: 1)]"
+    echo " -y <dir>    [copy input bam file to specified directory for analysis]"
+    echo "             [useful when working on mounted directory]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:kecCz:bp:h ARG; do
+while getopts i:o:g:kecCz:Z:bp:y:h ARG; do
 	case "$ARG" in
 		i) BAMFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -59,8 +64,10 @@ while getopts i:o:g:kecCz:bp:h ARG; do
         c) SCALE=1;;
         C) SCALE1x=1;;
         z) SCALE_FACTOR=$OPTARG;;
+        Z) SCALE_FACTOR_RRPM=$OPTARG;;
         b) BED=1;;
         p) PROCESSORS=$OPTARG;;
+        y) COPYDIR=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -85,6 +92,16 @@ fi
 GENOME_MACS2=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -m)
 GENOME_SIZE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -s)
 echo done
+
+## copy bam file to specified directory for faster processing
+if [ ! -z "$COPYDIR" ]; then
+    echo -n "Copying ${BAMFILE} file to ${COPYDIR} for faster processing (`date`).. "
+    scp ${BAMFILE} ${BAMFILE}.bai $COPYDIR
+    ID=`echo $BAMFILE | perl -ane '$_=~s/^.+\///g; print $_;'`;
+    BAMFILE="$COPYDIR/$ID"
+    OUTDIR=${COPYDIR}
+    echo "done"
+fi
 
 ## determine read extension parameter, if required
 if [ ! -z "$EXTEND" ]; then
@@ -126,10 +143,19 @@ if [ ! -z "$OUTDIR" ]; then
 
     ## create bigwig files for viualization at the UCSC genome browser
     if [ ! -z "$SCALE_FACTOR" ]; then
-        #SCALE_FACTOR=$(echo $SCALE_FACTOR | perl -ane 'printf("%0.6f", 1/$_);')
-        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $OUTDIR/$ID.bedGraph
-
-        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR
+        ## RRPM (Rx) normaliztion; https://www.cell.com/cell-reports/pdfExtended/S2211-1247(14)00872-9
+        if [ "$(isBam -i $SCALE_FACTOR)" -eq 0 ]; then
+            bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $(bam2spikeInScale -i $SCALE_FACTOR)
+        else
+            bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR
+        fi
+    elif [ ! -z "$SCALE_FACTOR_RRPM" ]; then
+        ## RRPM (Rx) normaliztion; https://www.cell.com/cell-reports/pdfExtended/S2211-1247(14)00872-9
+        if [ "$(isBam -i $SCALE_FACTOR_RRPM)" -eq 0 ]; then
+            bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $(bam2spikeInScale -i $SCALE_FACTOR_RRPM) --normalizeUsing BPM
+        else
+            bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR_RRPM --normalizeUsing BPM
+        fi
     elif [ ! -z "$SCALE" ]; then
         #MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
         #SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
@@ -157,10 +183,19 @@ else
 
     ## create bigwig files for viualization at the UCSC genome browser
     if [ ! -z "$SCALE_FACTOR" ]; then
-        #SCALE_FACTOR=$(echo $SCALE_FACTOR | perl -ane 'printf("%0.6f", 1/$_);')
-        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $ID.bedGraph
-
-        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR
+        ## RRPM (Rx) normaliztion; https://www.cell.com/cell-reports/pdfExtended/S2211-1247(14)00872-9
+        if [ "$(isBam -i $SCALE_FACTOR)" -eq 0 ]; then
+            bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $(bam2spikeInScale -i $SCALE_FACTOR)
+        else
+            bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR
+        fi
+    elif [ ! -z "$SCALE_FACTOR_RRPM" ]; then
+        ## RRPM (Rx) normaliztion; https://www.cell.com/cell-reports/pdfExtended/S2211-1247(14)00872-9
+        if [ "$(isBam -i $SCALE_FACTOR_RRPM)" -eq 0 ]; then
+            bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $(bam2spikeInScale -i $SCALE_FACTOR_RRPM) --normalizeUsing BPM
+        else
+            bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR_RRPM --normalizeUsing BPM
+        fi
     elif [ ! -z "$SCALE" ]; then
         #MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
         #SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
@@ -191,5 +226,12 @@ if [ ! -z "$BED" ]; then
     bedtools bamtobed -i $BAMFILE > $ID.bed
 fi
 echo "done"
+
+## remove bam file from specified directory copied for faster processing
+if [ ! -z "$COPYDIR" ]; then
+    echo -n "Removing ${BAMFILE} file from ${COPYDIR} copied faster processing (`date`).. "
+    rm ${BAMFILE} ${BAMFILE}.bai
+    echo "done"
+fi
 
 #bigWigCmd = "./src/bamToBed -i " + name + "/mapped.bam " + "| ./src/slopBed -i stdin -g src/" + chromFile + " -s -l -0 -r " + str(args.fragment_length[0]-readLength) + " | ./src/genomeCoverageBed -bg -i stdin -g src/" + chromFile + "| ./src/wigToBigWig stdin src/" + chromFile + " " + name + "/mapped.bw"

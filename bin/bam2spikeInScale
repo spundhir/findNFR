@@ -25,8 +25,8 @@ usage() {
 while getopts i:g:uh ARG; do
 	case "$ARG" in
         i) INPUTBAMFILE=$OPTARG;;
-        u) UNIQUE=1;;
         g) GENOME=$OPTARG;;
+        u) UNIQUE=1;;
 		h) HELP=1;;
 	esac
 done
@@ -50,14 +50,11 @@ else
 fi
 
 ## determine spikeIn normalization values
-if [ ! -z "$UNIQUE" ]; then
-    SCALE=$(samtools view $INPUTBAMFILE | grep -v XS: | wc -l | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);'); 
-else
-    if [ "$(samtools flagstat $INPUTBAMFILE | grep 'properly paired (' | cut -f 1 -d " ")" -gt 0 ]; then
-        SCALE=$(samtools flagstat $INPUTBAMFILE | grep "properly paired (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
-    elif [ "$(samtools flagstat $INPUTBAMFILE | grep 'mapped (' | cut -f 1 -d " ")" -gt 0 ]; then
-        SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane 'printf("%0.6f", 1000000/$_);');
-    fi
+if [ "$(samtools flagstat $INPUTBAMFILE | grep 'properly paired (' | cut -f 1 -d " ")" -gt 0 ]; then
+    #SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
+    SCALE=$(samtools flagstat $INPUTBAMFILE | grep "properly paired (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
+elif [ "$(samtools flagstat $INPUTBAMFILE | grep 'mapped (' | cut -f 1 -d " ")" -gt 0 ]; then
+    SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane 'printf("%0.6f", 1000000/$_);');
 fi
 
 echo $SCALE
