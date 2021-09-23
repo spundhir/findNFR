@@ -1,0 +1,84 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "bam2signalVsNoise (compute signal to noise ratio in ChIP-seq data)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bam2signalVsNoise -i <file>"
+	echo "Options:"
+    echo " -i <file>   [input mapped reads in BAM format (antibody)]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+    echo " -P          [data is paired-end]"
+    echo " -c <file>   [input mapped reads in BAM format (control)]"
+    echo " -o <file>   [output file to keep identified peaks]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:c:g:Po:h ARG; do
+	case "$ARG" in
+        i) INPUTBAMFILE=$OPTARG;;
+        c) CONTROLBAMFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        P) PE=1;;
+        o) OUTFILE=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INPUTBAMFILE" -o "$HELP" ]; then
+	>&2 usage
+fi
+
+## populating files based on input genome
+GENOME_FILE=$(initialize_genome -g $GENOME)
+GENOME_MACS2=$(initialize_genome -g $GENOME -m)
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo "Presently the program only support analysis for mm9, mm10, hg19, hg38, rn5 and dm6"
+    >&2 echo
+    >&2 usage
+fi
+
+## call peaks and compute signal to noise ratio
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+mkdir -p $TMP
+ARG=""
+if [ "$CONTROLBAMFILE" ]; then
+    ARG=" -c $CONTROLBAMFILE"
+fi
+
+if [ "$PE" ]; then
+    macs2 callpeak -t $INPUTBAMFILE -f BAMPE -g $GENOME_MACS2 --outdir $TMP -n macs2 $ARG 2>/dev/null
+
+    ## compute signal in peaks
+    READS_IN_PEAKS=$(zless $TMP/macs2_peaks.xls | grep -v '#' | grep -v start | perl -ane '$sum+=$F[5]; END { print "$sum\n"; }')
+    READS_TOTAL=$(samtools idxstats $INPUTBAMFILE | perl -ane '$sum+=$F[2]; END { printf("%d", $sum/2); }')
+else
+    macs2 callpeak -t $INPUTBAMFILE -f BAM -g $GENOME_MACS2 --outdir $TMP -n macs2 $ARG 2>/dev/null
+
+    ## compute signal in peaks
+    READS_IN_PEAKS=$(zless $TMP/macs2_peaks.xls | grep -v '#' | grep -v start | perl -ane '$sum+=$F[5]; END { print "$sum\n"; }')
+    READS_TOTAL=$(samtools idxstats $INPUTBAMFILE | perl -ane '$sum+=$F[2]; END { printf("%d", $sum); }')
+fi
+
+## print results
+echo -e "$READS_IN_PEAKS\t$READS_TOTAL"
+
+## print peaks to output file
+if [ "$OUTFILE" ]; then
+    zless $TMP/macs2_peaks.xls > $OUTFILE
+fi
+
+## remove temporary output directory
+rm -r $TMP
+
+exit
