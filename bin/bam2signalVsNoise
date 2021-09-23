@@ -71,7 +71,7 @@ else
 fi
 
 ## print results
-echo -e "$READS_IN_PEAKS\t$READS_TOTAL"
+echo -e "$READS_IN_PEAKS\t$READS_TOTAL" | perl -ane '$snr=($F[0]*100)/$F[1]; printf("%d\t%d\t%0.2f", $F[0], $F[1], $snr);'
 
 ## print peaks to output file
 if [ "$OUTFILE" ]; then
