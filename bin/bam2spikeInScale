@@ -16,6 +16,8 @@ usage() {
     echo " -g <string> [genome (default: mm9)]"
     #echo " -u          [use only uniquely mapped reads (using xs: tag)]"
     #echo "             [only valid for bowtie2 output (FOR TESTING)]"
+    echo "[NOTE]"
+    echo "             [https://www.sciencedirect.com/science/article/pii/S2211124714008729#app3]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -51,8 +53,9 @@ fi
 
 ## determine spikeIn normalization values
 if [ "$(samtools flagstat $INPUTBAMFILE | grep 'properly paired (' | cut -f 1 -d " ")" -gt 0 ]; then
-    #SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
-    SCALE=$(samtools flagstat $INPUTBAMFILE | grep "properly paired (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
+    SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
+    ## not always valid, for example if samples have similar number of mapped reads but considerably different number of properly mapped paired reads. This can lead to artifitial inflation of signal of sample having low count of properly mapped paired reads
+    #SCALE=$(samtools flagstat $INPUTBAMFILE | grep "properly paired (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
 elif [ "$(samtools flagstat $INPUTBAMFILE | grep 'mapped (' | cut -f 1 -d " ")" -gt 0 ]; then
     SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane 'printf("%0.6f", 1000000/$_);');
 fi
