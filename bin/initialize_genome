@@ -105,7 +105,5 @@ if [ "$(grep -w $GENOME $FILE | wc -l)" -gt 0 ]; then
     else
         grep -w $GENOME $FILE | head -n 1 | tail -n 1 | perl -ane 'print "$F[1]";'
     fi
-else
-    echo 0
 fi
 exit

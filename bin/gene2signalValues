@@ -53,22 +53,24 @@ usage() {
     echo "             [if multiple seperate them by a comma]"
     echo " -F <string> [exclude bam files matching identifiers]"
     echo "             [if multiple seperate them by a comma]"
+    echo " -M          [match any one of the filter criteria (default: all)]"
     echo " -s          [require same strand (GRO-seq)]"
     echo " -S          [require opposite strand (Nascent-seq)]"
     echo " -a          [output raw read counts (default: RPKM normalized)]"
     echo "[OPTIONS: MODE]"
-    echo " -t          [genebody mode (truncated): measure signal at TSSR, genebody, truncated (default: TSSR, genebody)]"
-    echo " -e          [tesr mode: measure signal at TSSR, TESR (default: TSSR, genebody)]"
-    echo " -d          [divergent mode: measure signal at NDR_UP, NDR_DOWN, genebody (default: TSSR, genebody)]"
+    echo " -t          [truncated_genebody mode: measure signal at TSSR, truncated_genebody, TESR (default: genebody mode)]"
+    echo " -e          [tesr mode              : measure signal at TSSR, TESR                     (default: genebody mode)]"
+    echo " -d          [divergent mode         : measure signal at NDR_UP, NDR_DOWN, genebody     (default: genebody mode)]"
 	echo " -h          [help]"
     echo "[NOTE]"
-    echo "             [signal (genebody mode): TSSR/genebody]"
-    echo "             [signal (genebody mode, truncated): TSSR/genebody (2000 bp)]"
-    echo "             [signal (tesr mode): TSSR/TESR]"
-    echo "             [signal (divergent mode): NDR_UP/NDR_DOWN/genebody]"
-    echo "             [TSSR: TSS-50 to TSS+w]"
-    echo "             [TESR: TES-w to TES+50]"
-    echo "             [NDR: TSS-100 to TSS+10; NDR_UP: NDR-w; NDR_DOWN: NDR+w]"
+    echo "             [genebody mode          : TSSR/genebody]"
+    echo "             [truncated_genebody mode: TSSR/genebody (2000 bp)/TESR]"
+    echo "             [tesr mode              : TSSR/TESR]"
+    echo "             [divergent mode         : NDR_UP/NDR_DOWN/genebody]"
+    echo "[NOTE]"
+    echo "             [TSSR                   : TSS-50 to TSS+w]"
+    echo "             [TESR                   : TES-w to TES+50]"
+    echo "             [NDR                    : TSS-100 to TSS+10; NDR_UP: NDR-w; NDR_DOWN: NDR+w]"
     echo "[OUTPUT]"
     echo "             [chr start end name score strand gene coordinate (TSSR) signal (TSSR) distance (closest_tss) signal (per bam file)]"
 	echo
@@ -76,7 +78,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:g:w:W:rc:f:F:sSatedh ARG; do
+while getopts i:j:g:w:W:rc:f:F:MsSatedh ARG; do
 	case "$ARG" in
 		i) GTFFILE=$OPTARG;;
         j) BAMFILE=$OPTARG;;
@@ -87,10 +89,11 @@ while getopts i:j:g:w:W:rc:f:F:sSatedh ARG; do
         c) BAMFILECONTROL=$OPTARG;;
         f) INCLUDE_FILTER=$OPTARG;;
         F) EXCLUDE_FILTER=$OPTARG;;
+        M) MATCH=1;;
         s) SAME_STRAND=1;;
         S) OPPOSITE_STRAND=1;;
         a) RAW=1;;
-        t) GENEBODY_TRANCATED=1;;
+        t) GENEBODY_TRUNCATED=1;;
         e) TESR_MODE=1;;
         d) DIVERGENT_MODE=1;;
 		h) HELP=1;;
@@ -154,13 +157,18 @@ fi
 ## filter BAM files for analysis
 #############################
 if [ "$FILTER_FILES" -eq 1 ]; then
+    ARG=""
+    if [ "$MATCH" ]; then
+        ARG=" -M"
+    fi
+
     ## filter bam files based on input filters (include and/or exclude)
     if [ ! -z "$INCLUDE_FILTER" -a ! -z "$EXCLUDE_FILTER" ]; then
-        filterFilesByName -i $BAMFILE -f $INCLUDE_FILTER -F $EXCLUDE_FILTER -e bam -M | tr '\,' '\n'
+        filterFilesByName -i $BAMFILE -f $INCLUDE_FILTER -F $EXCLUDE_FILTER -e bam $ARG | tr '\,' '\n'
     elif [ ! -z "$INCLUDE_FILTER" ]; then
-        filterFilesByName -i $BAMFILE -f $INCLUDE_FILTER -e bam -M | tr '\,' '\n'
+        filterFilesByName -i $BAMFILE -f $INCLUDE_FILTER -e bam $ARG | tr '\,' '\n'
     elif [ ! -z "$EXCLUDE_FILTER" ]; then
-        filterFilesByName -i $BAMFILE -F $EXCLUDE_FILTER -e bam -M | tr '\,' '\n'
+        filterFilesByName -i $BAMFILE -F $EXCLUDE_FILTER -e bam $ARG | tr '\,' '\n'
     else
         cat $BAMFILE
     fi | grep -v "^$" | perl -ane 'chomp($_); if(scalar(@F)==1) { print "tpm\t$_\n"; } else { print "$_\n"; }' > ${TMP}.bamConfig
@@ -305,8 +313,8 @@ if [ ! -z "$BAMFILE" ]; then
             }
         }
         print "\n";' 
-    elif [ ! -z "$GENEBODY_TRANCATED" ]; then
-        paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bed2window -i stdin -n -w 2000 | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_COUNT'; print "\t$F[$tssr_col]/$F[$genebody_col]"; } print "\n";' 
+    elif [ ! -z "$GENEBODY_TRUNCATED" ]; then
+        paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bed2window -i stdin -n -w 2000 | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -E | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_COUNT'; $tesr_col=$tssr_col+'$BAMFILES_COUNT'*2; print "\t$F[$tssr_col]/$F[$genebody_col]/$F[$tesr_col]"; } print "\n";' 
     else
         paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bedtools slop -i stdin -g $GENOME_FILE -l 0 -r $WINDOW_TES -s | bed2expr -i stdin -j $BAMFILE -d -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_COUNT'; print "\t$F[$tssr_col]/$F[$genebody_col]"; } print "\n";' 
     fi > $TMP.signalValues
@@ -356,8 +364,8 @@ if [ ! -z "$BAMFILE_SAMESTRAND" ]; then
             }
         }
         print "\n";' 
-    elif [ ! -z "$GENEBODY_TRANCATED" ]; then
-        paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE_SAMESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bed2window -i stdin -n -w 2000 | bed2expr -i stdin -j $BAMFILE_SAMESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_SAMESTRAND_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_SAMESTRAND_COUNT'; print "\t$F[$tssr_col]/$F[$genebody_col]"; } print "\n";' 
+    elif [ ! -z "$GENEBODY_TRUNCATED" ]; then
+        paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE_SAMESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bed2window -i stdin -n -w 2000 | bed2expr -i stdin -j $BAMFILE_SAMESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -E | bed2expr -i stdin -j $BAMFILE_SAMESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_SAMESTRAND_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_SAMESTRAND_COUNT'; $tesr_col=$tssr_col+'$BAMFILES_SAMESTRAND_COUNT'*2; print "\t$F[$tssr_col]/$F[$genebody_col]/$F[$tesr_col]"; } print "\n";' 
     else
         paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE_SAMESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bedtools slop -i stdin -g $GENOME_FILE -l 0 -r $WINDOW_TES -s | bed2expr -i stdin -j $BAMFILE_SAMESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_SAMESTRAND_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_SAMESTRAND_COUNT'; print "\t$F[$tssr_col]/$F[$genebody_col]"; } print "\n";' 
     fi | perl -ane 'print "$F['$NCOL']"; foreach(@F['$NCOL'+1..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $TMP.signalValuesSameStrand
@@ -405,8 +413,8 @@ if [ ! -z "$BAMFILE_OPPOSITESTRAND" ]; then
             }
         }
         print "\n";' 
-    elif [ ! -z "$GENEBODY_TRANCATED" ]; then
-        paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE_OPPOSITESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bed2window -i stdin -n -w 2000 | bed2expr -i stdin -j $BAMFILE_OPPOSITESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_OPPOSITESTRAND_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_OPPOSITESTRAND_COUNT'; print "\t$F[$tssr_col]/$F[$genebody_col]"; } print "\n";' 
+    elif [ ! -z "$GENEBODY_TRUNCATED" ]; then
+        paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE_OPPOSITESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bed2window -i stdin -n -w 2000 | bed2expr -i stdin -j $BAMFILE_OPPOSITESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -E | bed2expr -i stdin -j $BAMFILE_OPPOSITESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_OPPOSITESTRAND_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_OPPOSITESTRAND_COUNT'; $tesr_col=$tssr_col+'$BAMFILES_OPPOSITESTRAND_COUNT'*2; print "\t$F[$tssr_col]/$F[$genebody_col]/$F[$tesr_col]"; } print "\n";' 
     else
         paste <(zless $TMP.mostActiveTSS) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -S | bed2expr -i stdin -j $BAMFILE_OPPOSITESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) <(zless $TMP.mostActiveTSS | bed2window -i stdin -w $WINDOW_TSS -v | bedtools slop -i stdin -g $GENOME_FILE -l 0 -r $WINDOW_TES -s | bed2expr -i stdin -j $BAMFILE_OPPOSITESTRAND -n -g $GENOME $ARG | cut -f $((NCOL+1))-$LAST_COL) | perl -ane 'print "$F[0]"; for($i=1; $i<'$NCOL'; $i++) { print "\t$F[$i]"; } for($i=0; $i<'$BAMFILES_OPPOSITESTRAND_COUNT'; $i++) { $tssr_col=$i+'$NCOL'; $genebody_col=$tssr_col+'$BAMFILES_OPPOSITESTRAND_COUNT'; print "\t$F[$tssr_col]/$F[$genebody_col]"; } print "\n";' 
     fi | perl -ane 'print "$F['$NCOL']"; foreach(@F['$NCOL'+1..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $TMP.signalValuesOppositeStrand

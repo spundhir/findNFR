@@ -14,6 +14,7 @@ usage() {
     echo " -i <file>   [input mapped reads in BAM format]"
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm9)]"
+    echo " -m          [only output spike-in mapped reads]"
     #echo " -u          [use only uniquely mapped reads (using xs: tag)]"
     #echo "             [only valid for bowtie2 output (FOR TESTING)]"
     echo "[NOTE]"
@@ -24,10 +25,11 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:g:uh ARG; do
+while getopts i:g:muh ARG; do
 	case "$ARG" in
         i) INPUTBAMFILE=$OPTARG;;
         g) GENOME=$OPTARG;;
+        m) MAPPED=1;;
         u) UNIQUE=1;;
 		h) HELP=1;;
 	esac
@@ -39,25 +41,32 @@ if [ -z "$INPUTBAMFILE" -o "$HELP" ]; then
 fi
 
 ## populating files based on input genome
-if [ "$GENOME" == "mm9" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/mouse.mm9.genome"
-elif [ "$GENOME" == "hg19" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/human.hg19.genome"
-elif [ "$GENOME" == "rn5" ]; then
-    GENOME_FILE="/home/pundhir/project/genome_annotations/rat.rn5.genome"
-else
-    >&2 echo "Presently the program only support analysis for mm9, hg19 or rn5"
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -g $GENOME)
+GENOME_MACS2=$(initialize_genome -g $GENOME -m)
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "Presently the program only support analysis for mm9, mm10, hg19, hg38, rn5 and dm6"
     >&2 echo
     >&2 usage
 fi
+>&2 echo "done"
 
 ## determine spikeIn normalization values
 if [ "$(samtools flagstat $INPUTBAMFILE | grep 'properly paired (' | cut -f 1 -d " ")" -gt 0 ]; then
-    SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
+    if [ "$MAPPED" ]; then
+            SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); print $_;');
+    else
+            SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
+    fi
     ## not always valid, for example if samples have similar number of mapped reads but considerably different number of properly mapped paired reads. This can lead to artifitial inflation of signal of sample having low count of properly mapped paired reads
     #SCALE=$(samtools flagstat $INPUTBAMFILE | grep "properly paired (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
 elif [ "$(samtools flagstat $INPUTBAMFILE | grep 'mapped (' | cut -f 1 -d " ")" -gt 0 ]; then
-    SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane 'printf("%0.6f", 1000000/$_);');
+    if [ "$MAPPED" ]; then
+        SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane 'print $_;');
+    else
+        SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane 'printf("%0.6f", 1000000/$_);');
+    fi
 fi
 
 echo $SCALE

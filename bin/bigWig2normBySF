@@ -1,0 +1,73 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "bigWig2normBySF (normalize bigWig file by scaling factor)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bigWig2normBySF -i <file>"
+	echo "Options:"
+    echo " -i <file>   [input bigWig file]"
+    echo " -j <file>   [input file containing multiBigwigSummary output (.signal or .bedSignal file from deepPlot -O argument)]"
+    echo "             [header of file should have name corresponding to input bigWig file]"
+    echo " -o <file>   [output bigWig file]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+    echo "[NOTE]"
+    echo "             [https://support.bioconductor.org/p/124180/]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:o:g:h ARG; do
+	case "$ARG" in
+        i) INBWFILE=$OPTARG;;
+        j) MATRIXFILE=$OPTARG;;
+        o) OUTBWFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INBWFILE" -o -z "$MATRIXFILE" -o -z "$OUTBWFILE" -o "$HELP" ]; then
+	>&2 usage
+fi
+
+## populating files based on input genome
+GENOME_FILE=$(initialize_genome -g $GENOME)
+GENOME_MACS2=$(initialize_genome -g $GENOME -m)
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo "Presently the program only support analysis for mm9, mm10, hg19, hg38, rn5 and dm6"
+    >&2 echo
+    >&2 usage
+fi
+
+## determine bigWig file id
+ID=$(echo $INBWFILE | parallel -j 1 'echo {/.}' | sed -E 's/[\-]/./g')
+
+## determine scaling factor
+>&2 echo
+>&2 echo -ne "determine scaling factor for ${ID}: "
+SF=$(multiBigwigSummary2TMM.R -i $MATRIXFILE | grep ${ID} | perl -ane 'print "$F[1]";')
+>&2 echo "${SF} (`date`).. done"
+
+## convert bigWig file to wig format and normalize bigWig file
+>&2 echo -ne "normalize bigWig file ${ID} (`date`).. "
+if [ "${SF}" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    bigWigToWig ${INBWFILE} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]/'${SF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | wigToBigWig stdin ${GENOME_FILE} ${OUTBWFILE} -clip 
+else
+	echo
+    echo "Can't find scaling factor for ${INBWFILE} in ${OUTBWFILE} (`date`).. "
+    echo
+fi
+>&2 echo done
+>&2 echo
+exit
