@@ -93,9 +93,10 @@ usage() {
     echo " -X <int>    [number of processors to use (default: 1)"
     echo " -U          [overwrite deepToolsMatrix file]"
     echo " -D          [copy bigwig file to current working directory for faster processing]"
-    echo " -O          [save the signal values at input regions and binned genome (multiBigwigSummary)]"
-    echo "             [<plot title>_multiBigwigSummary.bedSignal and <plot title>_multiBigwigSummary.signal]"
-    echo " -H          [plot correlation between ChIP-seq signal of input samples as a heatmap (multiBigwigSummary) (<plot title>_multiBigwigSummary.npz & .png)]"
+    echo " -O          [save the signal values at input regions (multiBigwigSummary)]"
+    echo "             [<plot title>_multiBigwigSummary.bedSignal]"
+    echo " -H          [plot correlation between ChIP-seq signal of input samples as a heatmap (multiBigwigSummary) (.npz & .png)]"
+    echo "             [<plot title>_multiBigwigSummary.binSignal]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -536,20 +537,20 @@ else
         rm $OUTDIR/counts.$TMP
         rm $OUTDIR/matrix.$TMP
         echo "done" >&2
-        
-        echo
-        echo -n "Export read counts for binned genome to $OUTDIR/${PLOTTITLE}_multiBigwigSummary.signal (`date`).. ">&2
-        if [ "$(initialize_genome -g $GENOME -B)" ]; then
-            multiBigwigSummary bins -b $BWFILE --smartLabels -o $OUTDIR/${PLOTTITLE}_multiBigwigSummary.npz --outRawCounts $OUTDIR/${PLOTTITLE}_multiBigwigSummary.signal --blackListFileName $(initialize_genome -g $GENOME -B) -p $PROCESSORS
-        else
-            multiBigwigSummary bins -b $BWFILE --smartLabels -o $OUTDIR/${PLOTTITLE}_multiBigwigSummary.npz --outRawCounts $OUTDIR/${PLOTTITLE}_multiBigwigSummary.signal -p $PROCESSORS
-        fi
     fi
 
     if [ ! -z "$HEATMAP_CLUSTERING" ]; then
         echo
+        echo -n "Export read counts for binned genome to $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignal (`date`).. ">&2
+        if [ "$(initialize_genome -g $GENOME -B)" ]; then
+            multiBigwigSummary bins -b $BWFILE --smartLabels -o $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignal.npz --outRawCounts $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignal --blackListFileName $(initialize_genome -g $GENOME -B) -p $PROCESSORS
+        else
+            multiBigwigSummary bins -b $BWFILE --smartLabels -o $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignalnpz --outRawCounts $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignal -p $PROCESSORS
+        fi
+
+        echo
         echo -n "Plot correlation between ChIP-seq signal of input samples as a heatmap (`date`).. ">&2
-        plotCorrelation -in $OUTDIR/${PLOTTITLE}_multiBigwigSummary.npz --corMethod pearson --skipZeros --whatToPlot heatmap --removeOutliers -o $OUTDIR/${PLOTTITLE}_multiBigwigSummary.png
+        plotCorrelation -in $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignal.npz --corMethod pearson --skipZeros --whatToPlot heatmap --removeOutliers -o $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignal.png
         echo "done" >&2
     fi
 fi

@@ -54,12 +54,14 @@ usage() {
     echo " -C          [normalize by spike-in scale and coverage (needs -G argument)]"
     echo " -G <string> [spike-in genome (eg. dm6)]"
     echo "             [assumes spike-in genome bam files are in the same folder as input bam files]"
+    echo " -Q <string> [plot quality plots using .peakSignal (NOTE: uses non-normalized read counts unless -G given)]"
+    echo "             [correlation plot and deseq2 analysis, eg. ko,ko,wt,wt,wt]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:f:F:Mp:I:TSPCG:h ARG; do
+while getopts i:o:g:f:F:Mp:I:TSPCG:Q:h ARG; do
 	case "$ARG" in
         i) BAMFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -74,6 +76,7 @@ while getopts i:o:g:f:F:Mp:I:TSPCG:h ARG; do
         P) TPM=1;;
         C) SPIKEIN_COV=1;;
         G) GENOME_SPIKEIN=$OPTARG;;
+        Q) QUALITY=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -208,10 +211,10 @@ BWFILE=$(echo ${BWFILE} | perl -ane '$_=~s/^\s+//; print $_;')
 ## compute signal at 10kb bins using multiBigwigSummary
 #############################
 >&2 echo -n "compute signal at 10kb bins using multiBigwigSummary (`date`).. "
-if [ ! -s "$OUTDIR/${FILEID}_multiBigwigSummary.signal" -a "$(initialize_genome -g $GENOME -B)" ]; then
-    multiBigwigSummary bins -b ${BWFILE} --labels ${ID} -o ${OUTDIR}/${FILEID}_multiBigwigSummary.npz --outRawCounts ${OUTDIR}/${FILEID}_multiBigwigSummary.signal --blackListFileName $(initialize_genome -g $GENOME -B) -p ${PROCESSOR}
-elif [ ! -s "$OUTDIR/${FILEID}_multiBigwigSummary.signal" ]; then
-    multiBigwigSummary bins -b ${BWFILE} --labels ${ID} -o ${OUTDIR}/${FILEID}_multiBigwigSummary.npz --outRawCounts ${OUTDIR}/${FILEID}_multiBigwigSummary.signal -p ${PROCESSOR}
+if [ ! -s "$OUTDIR/${FILEID}_multiBigwigSummary.binSignal" -a "$(initialize_genome -g $GENOME -B)" ]; then
+    multiBigwigSummary bins -b ${BWFILE} --labels ${ID} -o ${OUTDIR}/${FILEID}_multiBigwigSummary.binSignal.npz --outRawCounts ${OUTDIR}/${FILEID}_multiBigwigSummary.binSignal --blackListFileName $(initialize_genome -g $GENOME -B) -p ${PROCESSOR}
+elif [ ! -s "$OUTDIR/${FILEID}_multiBigwigSummary.binSignal" ]; then
+    multiBigwigSummary bins -b ${BWFILE} --labels ${ID} -o ${OUTDIR}/${FILEID}_multiBigwigSummary.binSignal.npz --outRawCounts ${OUTDIR}/${FILEID}_multiBigwigSummary.binSignal -p ${PROCESSOR}
 fi
 >&2 echo "done"
 
@@ -226,9 +229,9 @@ if [ ! -s "${OUTDIR}/macs2/${FILEID}_peaks.bed" ]; then
 fi
 
 if [ ! -s "$OUTDIR/${FILEID}_multiBigwigSummary.peakSignal" -a "$(initialize_genome -g $GENOME -B)" ]; then
-    multiBamSummary BED-file -b ${BAMFILE} --labels ${ID} -o ${OUTDIR}/${FILEID}_multiBigwigSummary.npz --outRawCounts ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal --blackListFileName $(initialize_genome -g $GENOME -B) -p ${PROCESSOR} --BED ${OUTDIR}/macs2/${FILEID}_peaks.bed
+    multiBamSummary BED-file -b ${BAMFILE} --labels ${ID} -o ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal.npz --outRawCounts ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal --blackListFileName $(initialize_genome -g $GENOME -B) -p ${PROCESSOR} --BED ${OUTDIR}/macs2/${FILEID}_peaks.bed
 elif [ ! -s "$OUTDIR/${FILEID}_multiBigwigSummary.peakSignal" ]; then
-    multiBamSummary BED-file -b ${BAMFILE} --labels ${ID} -o ${OUTDIR}/${FILEID}_multiBigwigSummary.npz --outRawCounts ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal -p ${PROCESSOR} --BED ${OUTDIR}/macs2/${FILEID}_peaks.bed
+    multiBamSummary BED-file -b ${BAMFILE} --labels ${ID} -o ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal.npz --outRawCounts ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal -p ${PROCESSOR} --BED ${OUTDIR}/macs2/${FILEID}_peaks.bed
 fi
 >&2 echo "done"
 
@@ -236,8 +239,8 @@ fi
 ## compute TMM scale factor
 #############################
 >&2 echo -n "compute TMM scale factor (`date`).. "
-if [ ! -s "${OUTDIR}/${FILEID}_multiBigwigSummary.tmm" ]; then
-    multiBigwigSummary2TMM.R -i $OUTDIR/${FILEID}_multiBigwigSummary.signal -l TMM > ${OUTDIR}/${FILEID}_multiBigwigSummary.tmm
+if [ ! -s "${OUTDIR}/${FILEID}_multiBigwigSummary.binSignal.tmm" ]; then
+    multiBigwigSummary2TMM.R -i $OUTDIR/${FILEID}_multiBigwigSummary.binSignal -l TMM > ${OUTDIR}/${FILEID}_multiBigwigSummary.binSignal.tmm
 fi
 >&2 echo "done"
 
@@ -245,8 +248,8 @@ fi
 ## compute read counts in peak regions
 #############################
 >&2 echo -n "compute total reads in peak regions (`date`).. "
-if [ ! -s "${OUTDIR}/${FILEID}_multiBigwigSummary.frip" ]; then
-    zless ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal | cut -f 4- | perl -ane 'if($_=~/[a-zA-Z]+/) { for($i=0; $i<scalar(@F); $i++) { $id{$i}=$F[$i]; } } else { for($i=0; $i<scalar(@F); $i++) { $count{$i}+=$F[$i]; } } END { for($i=0; $i<scalar(@F); $i++) { print "$id{$i}\t$count{$i}\n"; } }' | perl -pe "s/\'//g" > ${OUTDIR}/${FILEID}_multiBigwigSummary.frip
+if [ ! -s "${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal.frip" ]; then
+    zless ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal | cut -f 4- | perl -ane 'if($_=~/[a-zA-Z]+/) { for($i=0; $i<scalar(@F); $i++) { $id{$i}=$F[$i]; } } else { for($i=0; $i<scalar(@F); $i++) { $count{$i}+=$F[$i]; } } END { for($i=0; $i<scalar(@F); $i++) { print "$id{$i}\t$count{$i}\n"; } }' | perl -pe "s/\'//g" > ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal.frip
 fi
 >&2 echo "done"
 
@@ -260,7 +263,7 @@ if [ ! -z "$TMM" ]; then
 
     for(( i=0; i<${#BWFILES[@]}; i++ )); do
         if [ ! -s "${OUTDIR}/${IDS[i]}_normByTMM.bw" ]; then
-            TMM="$(grep ${IDS[i]} ${OUTDIR}/${FILEID}_multiBigwigSummary.tmm | perl -ane 'print "$F[1]";')"
+            TMM="$(grep ${IDS[i]} ${OUTDIR}/${FILEID}_multiBigwigSummary.binSignal.tmm | perl -ane 'print "$F[1]";')"
 
             bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]/'${TMM}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normByTMM.bw -clip
         fi
@@ -279,13 +282,13 @@ if [ ! -z "$SPIKEIN" -a ! -z "$GENOME_SPIKEIN" ]; then
     BAMFILE_SPIKEIN=$(echo $BAMFILE | sed -E 's/_hg19|_hg38|_mm9|_mm10/_'${GENOME_SPIKEIN}'/g')
     BAMFILES_SPIKEIN=($BAMFILE_SPIKEIN)
 
-    if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF.bw" ]; then
-        for(( i=0; i<${#BWFILES[@]}; i++ )); do
+    for(( i=0; i<${#BWFILES[@]}; i++ )); do
+        if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF.bw" ]; then
             SIF=$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)
 
             bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF.bw -clip
-        done
-    fi
+        fi
+    done
     >&2 echo "done"
 fi
 
@@ -297,13 +300,13 @@ if [ ! -z "$TPM" ]; then
     BWFILES=($BWFILE)
     IDS=($ID)
 
-    if [ ! -s "${OUTDIR}/${IDS[i]}_normByTPM.bw" ]; then
-        for(( i=0; i<${#BWFILES[@]}; i++ )); do
-            TPM="$(grep ${IDS[i]} ${OUTDIR}/${FILEID}_multiBigwigSummary.frip | perl -ane 'print "$F[1]";')"
+    for(( i=0; i<${#BWFILES[@]}; i++ )); do
+        if [ ! -s "${OUTDIR}/${IDS[i]}_normByTPM.bw" ]; then
+            TPM="$(grep ${IDS[i]} ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal.frip | perl -ane 'print "$F[1]";')"
 
             bigWigToWig ${BWFILES[i]} stdout | grep -v dm6 | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3]*1000000)/'${TPM}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normByTPM.bw -clip
-        done
-    fi
+        fi
+    done
     >&2 echo "done"
 fi
 
@@ -318,15 +321,15 @@ if [ ! -z "$SPIKEIN_COV" -a ! -z "$GENOME_SPIKEIN" ]; then
     BAMFILE_SPIKEIN=$(echo $BAMFILE | sed -E 's/_hg19|_hg38|_mm9|_mm10/_'${GENOME_SPIKEIN}'/g')
     BAMFILES_SPIKEIN=($BAMFILE_SPIKEIN)
 
-    if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF_TPM.bw" ]; then
-        for(( i=0; i<${#BWFILES[@]}; i++ )); do
+    for(( i=0; i<${#BWFILES[@]}; i++ )); do
+        if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF_COV.bw" ]; then
             SIF=$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)
             COV=$(bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
             #echo -e "${BWFILES[i]}\t${COV}"
 
             bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3])/'${COV}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF_COV.bw -clip
-        done
-    fi
+        fi
+    done
     >&2 echo "done"
 fi
 
@@ -341,9 +344,9 @@ fi
 #    BAMFILE_SPIKEIN=$(echo $BAMFILE | sed -E 's/_hg19|_hg38|_mm9|_mm10/_'${GENOME_SPIKEIN}'/g')
 #    BAMFILES_SPIKEIN=($BAMFILE_SPIKEIN)
 #
-#    if [ ! -s "${OUTDIR}/${IDS[i]}_normByTMM_SIF.bw" ]; then
+#    if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF_TMM.bw" ]; then
 #        for(( i=0; i<${#BWFILES[@]}; i++ )); do
-#            TMM="$(grep ${IDS[i]} ${OUTDIR}/${FILEID}_multiBigwigSummary.tmm | perl -ane 'print "$F[1]";')"
+#            TMM="$(grep ${IDS[i]} ${OUTDIR}/${FILEID}_multiBigwigSummary.binSignal.tmm | perl -ane 'print "$F[1]";')"
 #            SIF=$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)
 #
 #            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]/'${TMM}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF_TMM.bw -clip
@@ -353,12 +356,29 @@ fi
 #fi
 
 #############################
+## plot quality plots for input samples
+#############################
+if [ "${QUALITY}" -a ! -z "$GENOME_SPIKEIN" ]; then
+    >&2 echo -n "plot quality plots for input samples (`date`).. "
+    mkdir -p ${OUTDIR}/quality
+    BAMFILE_SPIKEIN=$(echo $BAMFILE | sed -E 's/_hg19|_hg38|_mm9|_mm10/_'${GENOME_SPIKEIN}'/g')
+    BAMFILES_SPIKEIN=($BAMFILE_SPIKEIN)
+
+    SIFS=""
+    for(( i=0; i<${#BAMFILES_SPIKEIN[@]}; i++ )); do
+        SIFS="$SIFS,$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)"
+    done
+    SIFS=$(echo $SIFS | perl -ane '$_=~s/^\,//g; print $_;')
+
+    #plotCorrelation -in ${OUTDIR}/${FILEID}_multiBigwigSummary.binSignal.npz --corMethod pearson --skipZeros --whatToPlot heatmap --removeOutliers -o ${OUTDIR}/quality/${FILEID}_multiBigwigSummary.binSignal.png
+    zless ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal | cut -f 4- | perl -ane '@SIFS=split(/\,/,"'$SIFS'"); if($_=~/[a-zA-Z]+/) { chomp($_); print "peak\t$_\n"; } else { $i++; print "peak_$i"; for($j=0; $j<scalar(@F); $j++) { printf("\t%0.0f", $F[$j]*$SIFS[$j]); } } print "\n";' | deseq2.R -i stdin -o ${OUTDIR}/quality -t ${QUALITY} -N ${FILEID}_multiBigwigSummary.peakSignal
+    >&2 echo "done"
+fi
+
+#############################
 ## remove temporary files
 #############################
 rm ${FILEID}.bamConfig
-if [ -f "${OUTDIR}/${FILEID}_multiBigwigSummary.npz" ]; then
-    rm ${OUTDIR}/${FILEID}_multiBigwigSummary.npz
-fi
 
 >&2 echo
 >&2 echo "All done.. bye"
