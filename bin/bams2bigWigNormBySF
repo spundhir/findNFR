@@ -54,14 +54,13 @@ usage() {
     echo " -C          [normalize by spike-in scale and coverage (needs -G argument)]"
     echo " -G <string> [spike-in genome (eg. dm6)]"
     echo "             [assumes spike-in genome bam files are in the same folder as input bam files]"
-    echo " -Q <string> [plot quality plots using .peakSignal (NOTE: uses non-normalized read counts unless -G given)]"
-    echo "             [correlation plot and deseq2 analysis, eg. ko,ko,wt,wt,wt]"
+    echo " -Q          [plot quality plots using plotFingerprint (NOTE: uses non-normalized read counts from bam files)]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:f:F:Mp:I:TSPCG:Q:h ARG; do
+while getopts i:o:g:f:F:Mp:I:TSPCG:Qh ARG; do
 	case "$ARG" in
         i) BAMFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -76,7 +75,7 @@ while getopts i:o:g:f:F:Mp:I:TSPCG:Q:h ARG; do
         P) TPM=1;;
         C) SPIKEIN_COV=1;;
         G) GENOME_SPIKEIN=$OPTARG;;
-        Q) QUALITY=$OPTARG;;
+        Q) QUALITY=1;;
 		h) HELP=1;;
 	esac
 done
@@ -324,7 +323,7 @@ if [ ! -z "$SPIKEIN_COV" -a ! -z "$GENOME_SPIKEIN" ]; then
     for(( i=0; i<${#BWFILES[@]}; i++ )); do
         if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF_COV.bw" ]; then
             SIF=$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)
-            COV=$(bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
+            COV=$(intersectBed -a <(bigWigToWig ${BWFILES[i]} stdout) -b ${OUTDIR}/macs2/${FILEID}_peaks.bed -v | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
             #echo -e "${BWFILES[i]}\t${COV}"
 
             bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3])/'${COV}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF_COV.bw -clip
@@ -358,20 +357,27 @@ fi
 #############################
 ## plot quality plots for input samples
 #############################
-if [ "${QUALITY}" -a ! -z "$GENOME_SPIKEIN" ]; then
+if [ "${QUALITY}" ]; then
     >&2 echo -n "plot quality plots for input samples (`date`).. "
     mkdir -p ${OUTDIR}/quality
-    BAMFILE_SPIKEIN=$(echo $BAMFILE | sed -E 's/_hg19|_hg38|_mm9|_mm10/_'${GENOME_SPIKEIN}'/g')
-    BAMFILES_SPIKEIN=($BAMFILE_SPIKEIN)
+    #BAMFILE_SPIKEIN=$(echo $BAMFILE | sed -E 's/_hg19|_hg38|_mm9|_mm10/_'${GENOME_SPIKEIN}'/g')
+    #BAMFILES_SPIKEIN=($BAMFILE_SPIKEIN)
 
-    SIFS=""
-    for(( i=0; i<${#BAMFILES_SPIKEIN[@]}; i++ )); do
-        SIFS="$SIFS,$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)"
-    done
-    SIFS=$(echo $SIFS | perl -ane '$_=~s/^\,//g; print $_;')
+    #SIFS=""
+    #for(( i=0; i<${#BAMFILES_SPIKEIN[@]}; i++ )); do
+    #    SIFS="$SIFS,$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)"
+    #done
+    #SIFS=$(echo $SIFS | perl -ane '$_=~s/^\,//g; print $_;')
 
     #plotCorrelation -in ${OUTDIR}/${FILEID}_multiBigwigSummary.binSignal.npz --corMethod pearson --skipZeros --whatToPlot heatmap --removeOutliers -o ${OUTDIR}/quality/${FILEID}_multiBigwigSummary.binSignal.png
-    zless ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal | cut -f 4- | perl -ane '@SIFS=split(/\,/,"'$SIFS'"); if($_=~/[a-zA-Z]+/) { chomp($_); print "peak\t$_\n"; } else { $i++; print "peak_$i"; for($j=0; $j<scalar(@F); $j++) { printf("\t%0.0f", $F[$j]*$SIFS[$j]); } } print "\n";' | deseq2.R -i stdin -o ${OUTDIR}/quality -t ${QUALITY} -N ${FILEID}_multiBigwigSummary.peakSignal
+
+    #zless ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal | cut -f 4- | perl -ane '@SIFS=split(/\,/,"'$SIFS'"); if($_=~/[a-zA-Z]+/) { chomp($_); print "peak\t$_\n"; } else { $i++; print "peak_$i"; for($j=0; $j<scalar(@F); $j++) { printf("\t%0.0f", $F[$j]*$SIFS[$j]); } } print "\n";' | deseq2.R -i stdin -o ${OUTDIR}/quality -t ${QUALITY} -N ${FILEID}_multiBigwigSummary.peakSignal
+   
+    if [ "$(initialize_genome -g $GENOME -B)" ]; then
+        plotFingerprint -b ${BAMFILE} --labels ${ID} --minMappingQuality 20 --ignoreDuplicates --skipZeros --blackListFileName $(initialize_genome -g $GENOME -B) -p ${PROCESSOR} -o ${OUTDIR}/quality/${FILEID}_quality.png 
+    else
+        plotFingerprint -b ${BAMFILE} --labels ${ID} --minMappingQuality 20 --ignoreDuplicates --skipZeros -p ${PROCESSOR} -o ${OUTDIR}/quality/${FILEID}_quality.png 
+    fi
     >&2 echo "done"
 fi
 
