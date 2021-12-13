@@ -71,7 +71,7 @@ p <- lapply(list.files(opt$inDir, pattern="chr", full.names = T), function(FILE)
 ## step-2 analysis on inFile
 #################################
 df <- fread(opt$inFile)
-colnames(df) <- c("gene", "gene2gene_dist", "gene_length", "dhs", "dhs2gene_dist")
+colnames(df) <- c("chr", "start", "end", "gene", "score", "strand", "gene2gene_dist", "gene_length", "dhs", "dhs2gene_dist")
 df$dhs_class <- ifelse(df$dhs2gene_dist==0, "intragenic", "intergenic")
 df$gene_class <- cut2((df$gene2gene_dist), g=10, levels.mean=T)
 df$gene_class <- factor(as.numeric(sprintf("%0.0f", as.numeric(gsub("\\ ", "", df$gene_class)))))
@@ -141,6 +141,6 @@ dev.off()
 #################################
 ## step-5 output file containing gene density information
 #################################
-write.table(unique(df[,c("gene", "gene_class", "gene_cluster")]), sprintf("%s/gene2genomeOrgStat.bed", opt$inDir), sep="\t", quote=F, row.names = F, col.names=T)
+write.table(unique(df[,c("chr", "start", "end", "gene", "score", "strand", "gene_class", "gene_cluster")]), sprintf("%s/gene2genomeOrgStat.bed", opt$inDir), sep="\t", quote=F, row.names = F, col.names=T)
 
 q()
