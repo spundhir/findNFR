@@ -1,0 +1,88 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+#### usage ####
+usage() {
+	echo Program: "gene2genomeOrgStat (compute genome wide organization statistics of genes)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: gene2genomeOrgStat -g <string> -o <dir> [OPTIONS]"
+	echo "Options:"
+    echo " -g <string> [genome (mm10 or hg38)]"
+    echo " -o <dir>    [output directory]"
+    echo "[OPTIONS]"
+    echo " -i <file>   [gene coodinate file (default: auto-retrieve based on -g)]"
+    echo "             [format: chr start end name score strand ensembl_id protein_coding]"
+    echo " -j <file>   [DHS coodinate file (default: auto-retrieve based on -g)]"
+    echo "             [format: chr start end name score strand]"
+    echo " -h          [help]"
+	exit 0
+}
+
+#### parse options ####
+while getopts g:o:i:j:h ARG; do
+    case "$ARG" in
+    g) GENOME=$OPTARG;;
+    o) OUTDIR=$OPTARG;;
+    i) GENE_FILE=$OPTARG;;
+    j) DHS_FILE=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$GENOME" -o -z "$OUTDIR" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+if [ -z "${GENE_FILE}" ]; then
+    GENE_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -e)
+fi
+if [ -z "${DHS_FILE}" ]; then
+    DHS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -D)
+fi
+if [ ! -f "$GENOME_FILE" -o ! -f "$GENE_FILE" -p ! -f "$DHS_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+
+## create output directory
+mkdir -p ${OUTDIR}
+
+## start analysis
+>&2 echo -n "Starting analysis (`date`).. "
+if [ ! -s "${OUTDIR}/gene2genomeOrgStat.pdf" ]; then
+    # -k parameter (grep -w protein_coding /scratch/genomes/annotations/BED/mm10_ensembl_gene.bed | cut -f 1 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1)
+    for CHR in $(less ${GENOME_FILE} | cut -f 1 | grep -v chrM); do closestBed -a <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }' | grep -w ${CHR}) -b <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }' | grep -w ${CHR}) -d -k 2500 -N -g ${GENOME_FILE} 2>/dev/null > ${OUTDIR}/${GENOME}_gene2geneDist.bed.${CHR}; done
+
+    ## output: "gene", "gene2gene_dist", "gene_length", "dhs", "dhs2gene_dist"
+    closestBed -a <(zgrep -v start ${DHS_FILE} | cut -f 1-4) -b <(closestBed -a <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1;}' | sortBed -i stdin) -b <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1;}' | sortBed -i stdin) -d -t first -io | cut -f 1-8,17) -d -t first | perl -ane '$len=$F[6]-$F[5]; print "$F[7]\t$F[12]\t$len\t$F[3]\t$F[13]\n";' > ${OUTDIR}/gene2distStat.bed
+
+    #gene2genomeOrgStat.R -i ${OUTDIR} -j ${OUTDIR}/gene2distStat.bed
+fi
+
+<<"COMMENT"
+## APPROACH-1
+#grep -w protein_coding ${INFILE} | sortBed -i stdin | mergeBed -i stdin -d 3000 -c 4 -o distinct,count | perl -ane 'chomp($_); $class="other"; if($F[4]>1) { $class="3k"; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$class\n";' | mergeBed -i stdin -d 10000 -c 4,5 -o distinct | perl -ane '$class="$F[4]"; if($F[4]=~/\,/) { $class="10k"; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$class\n";' | mergeBed -i stdin -d 20000 -c 4,5 -o distinct | perl -ane '$class="$F[4]"; if($F[4]=~/\,/) { $class="20k"; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$class\n";'
+
+## APPROACH-2
+#cat <(grep -w protein_coding ${INFILE} | sortBed -i stdin | mergeBed -i stdin -d 3000 -c 4 -o distinct,count | perl -ane 'if($F[scalar(@F)-1]>1) { chomp($_); $density=sprintf("%0.2f", ($F[scalar(@F)-1]*100000)/($F[2]-$F[1])); print "$_\t$density\t3k\n"; }') \
+#    <(grep -w protein_coding ${INFILE} | sortBed -i stdin | mergeBed -i stdin -d 3000 -c 4 -o distinct,count | perl -ane 'if($F[scalar(@F)-1]<=1) { print $_; }' | mergeBed -i stdin -d 10000 -c 4 -o distinct,count | perl -ane 'if($F[scalar(@F)-1]>1) { chomp($_); $density=sprintf("%0.2f", ($F[scalar(@F)-1]*100000)/($F[2]-$F[1])); print "$_\t$density\t10k\n"; }') \
+#    <(grep -w protein_coding ${INFILE} | sortBed -i stdin | mergeBed -i stdin -d 3000 -c 4 -o distinct,count | perl -ane 'if($F[scalar(@F)-1]<=1) { print $_; }' | mergeBed -i stdin -d 10000 -c 4 -o distinct,count | perl -ane 'if($F[scalar(@F)-1]<=1) { print $_; }' | mergeBed -i stdin -d 20000 -c 4 -o distinct,count | perl -ane 'if($F[scalar(@F)-1]>1) { chomp($_); $density=sprintf("%0.2f", ($F[scalar(@F)-1]*100000)/($F[2]-$F[1])); print "$_\t$density\t20k\n"; }') \
+#    <(grep -w protein_coding ${INFILE} | sortBed -i stdin | mergeBed -i stdin -d 3000 -c 4 -o distinct,count | perl -ane 'if($F[scalar(@F)-1]<=1) { print $_; }' | mergeBed -i stdin -d 10000 -c 4 -o distinct,count | perl -ane 'if($F[scalar(@F)-1]<=1) { print $_; }' | mergeBed -i stdin -d 20000 -c 4 -o distinct,count | perl -ane 'if($F[scalar(@F)-1]<=1) { chomp($_); $density=sprintf("%0.2f", ($F[scalar(@F)-1]*100000)/($F[2]-$F[1])); print "$_\t$density\tother\n"; }') | sortBed -i stdin 
+COMMENT
+>&2 echo "done"
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
