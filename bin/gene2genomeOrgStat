@@ -45,7 +45,7 @@ fi
 if [ -z "${DHS_FILE}" ]; then
     DHS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -D)
 fi
-if [ ! -f "$GENOME_FILE" -o ! -f "$GENE_FILE" -p ! -f "$DHS_FILE" ]; then
+if [ ! -f "$GENOME_FILE" -o ! -f "$GENE_FILE" -o ! -f "$DHS_FILE" ]; then
     >&2 echo
     >&2 echo "computation for $GENOME is not available yet"
     >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
@@ -67,7 +67,7 @@ if [ ! -s "${OUTDIR}/gene2genomeOrgStat.pdf" ]; then
     ## output: "gene", "gene2gene_dist", "gene_length", "dhs", "dhs2gene_dist"
     closestBed -a <(zgrep -v start ${DHS_FILE} | cut -f 1-4) -b <(closestBed -a <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1;}' | sortBed -i stdin) -b <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1;}' | sortBed -i stdin) -d -t first -io | cut -f 1-8,17) -d -t first | perl -ane '$len=$F[6]-$F[5]; print "$F[7]\t$F[12]\t$len\t$F[3]\t$F[13]\n";' > ${OUTDIR}/gene2distStat.bed
 
-    #gene2genomeOrgStat.R -i ${OUTDIR} -j ${OUTDIR}/gene2distStat.bed
+    gene2genomeOrgStat.R -i ${OUTDIR} -j ${OUTDIR}/gene2distStat.bed
 fi
 
 <<"COMMENT"
