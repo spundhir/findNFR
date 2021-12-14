@@ -65,9 +65,9 @@ if [ ! -s "${OUTDIR}/gene2genomeOrgStat.pdf" ]; then
     for CHR in $(less ${GENOME_FILE} | cut -f 1 | grep -v chrM); do closestBed -a <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }' | grep -w ${CHR}) -b <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }' | grep -w ${CHR}) -d -k 2500 -N -g ${GENOME_FILE} 2>/dev/null > ${OUTDIR}/${GENOME}_gene2geneDist.bed.${CHR}; done
 
     ## output: "chr", "start", "end", "gene", "score", "strand", "gene2gene_dist", "gene_length", "dhs", "dhs2gene_dist"
-    closestBed -a <(zgrep -v start ${DHS_FILE} | cut -f 1-4) -b <(closestBed -a <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1;}' | sortBed -i stdin) -b <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1;}' | sortBed -i stdin) -d -t first -io | cut -f 1-8,17) -d -t first | perl -ane '$len=$F[6]-$F[5]; print "$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$F[12]\t$len\t$F[3]\t$F[13]\n";' > ${OUTDIR}/gene2distStat.bed
+    closestBed -a <(zgrep -v start ${DHS_FILE} | cut -f 1-4) -b <(closestBed -a <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1;}' | sortBed -i stdin) -b <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1;}' | sortBed -i stdin) -d -t first -io | cut -f 1-8,17) -d -t first | perl -ane '$len=$F[6]-$F[5]; print "$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$F[12]\t$len\t$F[3]\t$F[13]\n";' > ${OUTDIR}/${GENOME}_gene2genomeOrgStat.bed
 
-    gene2genomeOrgStat.R -i ${OUTDIR} -j ${OUTDIR}/gene2distStat.bed
+    gene2genomeOrgStat.R -i ${OUTDIR} -j ${OUTDIR}/${GENOME}_gene2genomeOrgStat.bed
 fi
 
 <<"COMMENT"

@@ -21,12 +21,15 @@ if(is.null(opt$inDir)) {
 }
 
 suppressPackageStartupMessages(library(ggplot2))
-suppressPackageStartupMessages(library(data.table))
+suppressPackageStartupMessages(library(reshape2))
 suppressPackageStartupMessages(library(ggpubr))
 suppressPackageStartupMessages(library(ComplexHeatmap))
 suppressPackageStartupMessages(library(tiff))
 suppressPackageStartupMessages(library(Hmisc))
 suppressPackageStartupMessages(library(plyr))
+suppressPackageStartupMessages(library(RColorBrewer))
+suppressPackageStartupMessages(library(session))
+suppressPackageStartupMessages(library(tiff))
 
 #################################
 ## functions
@@ -45,11 +48,11 @@ cluster_info_matrix <- function(x, maxX=NULL, title=NULL) {
 }
 
 #################################
-## step-1 analysis on inDir
+## step-1 analysis on inDir (distribution of distance between genes on each chromosome)
 #################################
 p <- lapply(list.files(opt$inDir, pattern="chr", full.names = T), function(FILE) {
     df <- read.table(pipe(sprintf("cut -f 4,12,17 %s", FILE)))
-    test <- dcast(as.data.table(df, 2000), V1 ~ V2, value.var="V3")
+    test <- dcast(data.table::as.data.table(df, 2000), V1 ~ V2, value.var="V3")
     row.names(test) <- test$V1
     test$V1 <- NULL
     test[is.na(test)] <- 0
@@ -68,13 +71,13 @@ p <- lapply(list.files(opt$inDir, pattern="chr", full.names = T), function(FILE)
 })
 
 #################################
-## step-2 analysis on inFile
+## step-2 analysis on inFile (statistics on distance between genes and DHS)
 #################################
-df <- fread(opt$inFile)
+df <- data.table::fread(opt$inFile)
 colnames(df) <- c("chr", "start", "end", "gene", "score", "strand", "gene2gene_dist", "gene_length", "dhs", "dhs2gene_dist")
 df$dhs_class <- ifelse(df$dhs2gene_dist==0, "intragenic", "intergenic")
 df$gene_class <- cut2((df$gene2gene_dist), g=10, levels.mean=T)
-df$gene_class <- factor(as.numeric(sprintf("%0.0f", as.numeric(gsub("\\ ", "", df$gene_class)))))
+levels(df$gene_class) <- cut2((df$gene2gene_dist), g=10, onlycuts = T)[2:length(cut2((df$gene2gene_dist), g=10, onlycuts = T))]
 # df$gene_class <- cut(df$gene2gene_dist, breaks = c(0, 1000, 10000, 20000, 50000, 100000, 200000, 500000, 100000000))
 df$gene_cluster <- df$gene_class
 levels(df$gene_cluster) <- seq(1, length(levels(df$gene_cluster)))
@@ -131,16 +134,51 @@ theme(axis.text.x = element_text(size=10, angle=45)) + ylab("gene length (bp; lo
 # table(unique(df[,c("gene", "gene_cluster")])$gene_cluster)
 
 #################################
+## step-3 analysis on inDir (heatmap, clustering of genes based on their distance to each other)
+#################################
+h <- lapply(list.files(opt$inDir, pattern="chr", full.names = T), function(FILE) {
+    mat <- read.table(pipe(sprintf("cut -f 4,12,17 %s", FILE)))
+    mat <- dcast(data.table::as.data.table(mat, 2000), V1 ~ V2, value.var="V3")
+    row.names(mat) <- mat$V1
+    mat$V1 <- NULL
+    mat[is.na(mat)] <- 0
+    mat$Row.names <- row.names(mat)
+    mat <- merge(mat, unique(df[,c("gene", "gene_cluster")]), by.x="Row.names", by.y="gene", all.x="T")
+    row.names(mat) <- mat$Row.names
+    mat$Row.names <- NULL
+
+    col_cluster <- rev(colorRampPalette(brewer.pal(length(unique(mat$gene_cluster)), "RdBu"), bias=1)(length(unique(mat$gene_cluster))))
+    names(col_cluster) <- c(levels(mat$gene_cluster)[levels(mat$gene_cluster) %in% unique(mat$gene_cluster)], "UA")
+
+    ra <- rowAnnotation(na_col=NA,
+        gene_cluster = mat$gene_cluster,
+        col=list(gene_cluster = col_cluster)
+    )
+
+    grid.grabExpr(draw(Heatmap(as.matrix(mat[,-ncol(mat)]), cluster_rows=T, cluster_columns=T,
+        col=colorRampPalette(c("dodgerblue4","grey97", "sienna3"), bias=1.5)(250), use_raster=T,
+        show_row_names=F, show_column_names=F, raster_device="tiff", raster_quality = 10, right_annotation = ra,
+        column_title = sprintf("%s (N=%s)", gsub("^.*\\.", "", FILE), nrow(mat)))))
+})
+
+#save.session("test.session"); q()
+#################################
 ## step-4 output plots
 #################################
 pdf(sprintf("%s/gene2genomeOrgStat.pdf", opt$inDir), width=20, height=15)
     ggarrange(plotlist = p)
     ggarrange(p1, p2, p3, p4, p5, p6, nrow = 2, ncol=3)
-dev.off()
+    ggarrange(plotlist=h[1:4], nrow = 2, ncol=2)
+    ggarrange(plotlist=h[5:8], nrow = 2, ncol=2)
+    ggarrange(plotlist=h[9:12], nrow = 2, ncol=2)
+    ggarrange(plotlist=h[13:16], nrow = 2, ncol=2)
+    ggarrange(plotlist=h[17:20], nrow = 2, ncol=2)
+    ggarrange(plotlist=h[21:length(h)], nrow = 2, ncol=2)
+garbage <- dev.off()
 
 #################################
 ## step-5 output file containing gene density information
 #################################
-write.table(unique(df[,c("chr", "start", "end", "gene", "score", "strand", "gene_class", "gene_cluster")]), sprintf("%s/gene2genomeOrgStat.bed", opt$inDir), sep="\t", quote=F, row.names = F, col.names=T)
+write.table(unique(df[,c("chr", "start", "end", "gene", "score", "strand", "gene_class", "gene_cluster")]), "", sep="\t", quote=F, row.names = F, col.names=T)
 
 q()
