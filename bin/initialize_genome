@@ -45,13 +45,14 @@ usage() {
     echo " -D          [file having genomic coordinates of DNase regions in BED format]"
     echo " -F          [file having chromosome sequences in FASTA format]"
     echo " -G          [file having TF binding positions in the genome (GTRD)]"
+    echo " -M          [file having gene to gene distance map in BED format]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts g:i:msetncTRBDFGh ARG; do
+while getopts g:i:msetncTRBDFGMh ARG; do
 	case "$ARG" in
         g) GENOME=$OPTARG;;
 		i) FILE=$OPTARG;;
@@ -67,6 +68,7 @@ while getopts g:i:msetncTRBDFGh ARG; do
         D) DHS=1;;
         F) GENOME_FASTA=1;;
         G) GTRD=1;;
+        M) GENE_DIST_BED=1;;
 		h) HELP=1;;
 	esac
 done
@@ -102,6 +104,8 @@ if [ "$(grep -w $GENOME $FILE | wc -l)" -gt 0 ]; then
         grep -w $GENOME $FILE | head -n 12 | tail -n 1 | perl -ane 'print "$F[1]";'
     elif [ ! -z "$GTRD" ] ; then
         grep -w $GENOME $FILE | head -n 13 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$GENE_DIST_BED" ] ; then
+        grep -w $GENOME $FILE | head -n 14 | tail -n 1 | perl -ane 'print "$F[1]";'
     else
         grep -w $GENOME $FILE | head -n 1 | tail -n 1 | perl -ane 'print "$F[1]";'
     fi

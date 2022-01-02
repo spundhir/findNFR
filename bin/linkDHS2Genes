@@ -144,6 +144,9 @@ if [ ! -z "$HIC_FILE" ]; then
     tabEdit -i $HIC_FILE -f $FILTER_COL | tabEdit -i stdin -n 7 > ${TMP}.hic
     HIC_FILE=${TMP}.hic
 
+    # find the closest gene to each DHS
+    # check, if DHS overlaps with HiC interaction. If overlapping, select the higest scoring interaction for each DHS
+    # preference order: closest match with HiC support > HiC > closest match
     intersectBed -a <(closestBed -a <(zless ${DHS_FILE} | grep -v start | sortBed -i stdin | cut -f 1-7) -b <(less $TSS_FILE | sortBed -i stdin) -D b -t first | cut -f 1-7,11,$((NCOL_TSS_FILE+8))) -b $HIC_FILE -wao | perl -ane '
         $F[12]=~s/\-.*//g; chomp($_);
         $des="$F[0]"; foreach(@F[1..scalar(@F)-1]) { $des.="\t$_"; }
@@ -151,11 +154,13 @@ if [ ! -z "$HIC_FILE" ]; then
             $dhs{$F[3]}{'des'}="$des\t$F[12]";
             $dhs{$F[3]}{'idMatch'}=1;
             $dhs{$F[3]}{'seen'}=1;
+            if($F[13]=~/^\.$/) { $F[13]=0; }
             $dhs{$F[3]}{'score'}=$F[13];
         }
         elsif(!$dhs{$F[3]}) {
             $dhs{$F[3]}{'des'}="$des\t$F[12]";
             $dhs{$F[3]}{'seen'}=1;
+            if($F[13]=~/^\.$/) { $F[13]=0; }
             $dhs{$F[3]}{'score'}=$F[13];
         }
         elsif($F[13] > $dhs{$F[3]}{'score'} && $dhs{$F[3]}{'idMatch'}==0) {
