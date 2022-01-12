@@ -1,0 +1,76 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+MERGE_DISTANCE=25000
+GENOME="mm10"
+
+#### usage ####
+usage() {
+	echo Program: "hic2interactionDomains (compute interaction domains from HiC interactions)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: hic2interactionDomains -i <file> [OPTIONS]"
+	echo "Options:"
+    echo " -i <file>   [promoter capture HiC interaction file in iBED format (can be stdin)]"
+    echo "             [chr_bait start_bait end_bait id_bait chr_interaction start_interaction end_interaction score_interaction gene_bait gene_dist_to_bait]"
+    echo "[OPTIONS]"
+    echo " -d <int>    [distance to merge closesly spaced interactions (default: 25000)]"
+    echo " -g <string> [genome (default: mm10)]"
+    echo "[OUTPUT]"
+    echo "             [stdout: chr_domain start_domain end_domain genes genes_count total_interaction_score interactions_count norm_interaction_score pValue]"
+    echo " -h          [help]"
+	exit 0
+}
+
+#### parse options ####
+while getopts i:d:g:h ARG; do
+    case "$ARG" in
+    i) INFILE=$OPTARG;;
+    d) MERGE_DISTANCE=$OPTARG;;
+    g) GENOME=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+
+## create temporary BED file if input is from stdin
+if [ "$INFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo "${LINE}"
+    done > $TMP
+    INFILE=$TMP
+fi
+
+## code to determine optimal distance to merge closely spaced interactions
+# closestBed -a <(cat hic/chicago/pcHiC_mll_off.ibed | grep -v bait | cut -f 5- | sort -k 5,5 -k 1,1 -k 2n,2 -k 3n,3 | perl -ane 'if($F[4]!~/^\.$/) { print $_; }' | sortBed -i stdin) -b <(cat hic/chicago/pcHiC_mll_off.ibed | grep -v bait | cut -f 5- | sort -k 5,5 -k 1,1 -k 2n,2 -k 3n,3 | perl -ane 'if($F[4]!~/^\.$/) { print $_; }' | sortBed -i stdin) -d -t first -io | cut -f 13 > t
+
+## start analysis
+>&2 echo -n "Starting analysis (`date`).. "
+echo -e "chr_domain\tstart_domain\tend_domain\tgenes\tgenes_count\ttotal_interaction_score\tinteractions_count\tnorm_interaction_score\tpValue"
+#tabEdit -i ${INFILE} -D | cut -f 5- | sort -k 5,5 -k 1,1 -k 2n,2 -k 3n,3 | perl -ane 'if($F[4]!~/^\.$/) { print $_; }' | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[4]\t$F[3]\t.\t$F[5]\n";' | sortBed -i stdin | mergeBed -i stdin -d 25000 -c 4,4,5,5 -o collapse,count_distinct,sum,count | perl -ane '$score=$F[5]/$F[4]; chomp($_); print "$_\t$score\n";' | fitDistr.R -i stdin -d nbinom -l 8
+tabEdit -i ${INFILE} -D | cut -f 5- | sort -k 5,5 -k 1,1 -k 2n,2 -k 3n,3 | perl -ane 'if($F[4]!~/^\.$/) { print $_; }' | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[4]\t$F[3]\t.\t$F[5]\n";' | sortBed -i stdin | mergeBed -i stdin -d 25000 -c 4,4,5,5 -o collapse,count_distinct,collapse,count | perl -ane '@genes=split(/\,/,$F[3]); @scores=split(/\,/,$F[5]); for($i=0; $i<scalar(@scores); $i++) { $gene{$genes[$i]}{'score'}+=$scores[$i]; $gene{$genes[$i]}{'count'}+=1; } foreach(keys(%gene)) { print "$F[0]\t$F[1]\t$F[2]\t$_\t$gene{$_}{'score'}\t.\t$gene{$_}{'count'}\n"; } %gene=();' | fitDistr.R -i stdin -d nbinom -l 5
+>&2 echo "done"
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
