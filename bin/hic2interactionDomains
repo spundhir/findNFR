@@ -41,7 +41,8 @@ fi
 ## populating files based on input genome
 >&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
-if [ ! -f "$GENOME_FILE" ]; then
+TSS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -t)
+if [ ! -f "$GENOME_FILE" -o ! -f "$TSS_FILE" ]; then
     >&2 echo
     >&2 echo "computation for $GENOME is not available yet"
     >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
