@@ -67,9 +67,13 @@ fi
 ## start analysis
 >&2 echo -n "Starting analysis (`date`).. "
 echo -e "chr_domain\tstart_domain\tend_domain\ttarget_gene\tlog_interaction_score\tstrand\tinteractions_count\tpValue"
-tabEdit -i ${INFILE} -D | cut -f 5- | sort -k 5,5 -k 1,1 -k 2n,2 -k 3n,3 | perl -ane 'if($F[4]!~/^\.$/) { print $_; }' | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[4]\t$F[3]\t.\t$F[5]\n";' | sortBed -i stdin | mergeBed -i stdin -d 25000 -c 4,4,5,5 -o collapse,count_distinct,collapse,count | perl -ane '@genes=split(/\,/,$F[3]); @scores=split(/\,/,$F[5]); for($i=0; $i<scalar(@scores); $i++) { $gene{$genes[$i]}{'score'}+=$scores[$i]; $gene{$genes[$i]}{'count'}+=1; } foreach(keys(%gene)) { print "$F[0]\t$F[1]\t$F[2]\t$_\t".log($gene{$_}{'score'})."\t.\t$gene{$_}{'count'}\n"; } %gene=();' | fitDistr.R -i stdin -d lnorm -l 5
+for GENE in $(zless ${INFILE} | grep -v start | cut -f 5- | cut -f 5 | sort | uniq | perl -ane 'if($_!~/^\.$/) { print $_; }'); do zless ${INFILE} | grep -v start | cut -f 5- | grep -w ${GENE} | sortBed -i stdin | mergeBed -i stdin -d 25000 -c 4,4,5 -o sum,count_distinct,distinct; done | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[5]\t".log($F[3])."\t.\t$F[4]\n";' | fitDistr.R -i stdin -d lnorm -l 5
 
 ## approach-2
+#echo -e "chr_domain\tstart_domain\tend_domain\ttarget_gene\tlog_interaction_score\tstrand\tinteractions_count\tpValue"
+#tabEdit -i ${INFILE} -D | cut -f 5- | sort -k 5,5 -k 1,1 -k 2n,2 -k 3n,3 | perl -ane 'if($F[4]!~/^\.$/) { print $_; }' | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[4]\t$F[3]\t.\t$F[5]\n";' | sortBed -i stdin | mergeBed -i stdin -d 25000 -c 4,4,5,5 -o collapse,count_distinct,collapse,count | perl -ane '@genes=split(/\,/,$F[3]); @scores=split(/\,/,$F[5]); for($i=0; $i<scalar(@scores); $i++) { $gene{$genes[$i]}{'score'}+=$scores[$i]; $gene{$genes[$i]}{'count'}+=1; } foreach(keys(%gene)) { print "$F[0]\t$F[1]\t$F[2]\t$_\t".log($gene{$_}{'score'})."\t.\t$gene{$_}{'count'}\n"; } %gene=();' | fitDistr.R -i stdin -d lnorm -l 5
+
+## approach-3
 #echo -e "chr_domain\tstart_domain\tend_domain\tgenes\tgenes_count\ttotal_interaction_score\tinteractions_count\tnorm_interaction_score\tpValue"
 #tabEdit -i ${INFILE} -D | cut -f 5- | sort -k 5,5 -k 1,1 -k 2n,2 -k 3n,3 | perl -ane 'if($F[4]!~/^\.$/) { print $_; }' | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[4]\t$F[3]\t.\t$F[5]\n";' | sortBed -i stdin | mergeBed -i stdin -d 25000 -c 4,4,5,5 -o collapse,count_distinct,sum,count | perl -ane '$score=$F[5]/$F[4]; chomp($_); print "$_\t$score\n";' | fitDistr.R -i stdin -d nbinom -l 8
 ## df_hic_domains_dox <- read.table("~/project/chip-seq-analysis/analysis_mll-af9/mll-af9/hic/chicago/pcHiC_mll_on.domains", header=T)

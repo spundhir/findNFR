@@ -4,7 +4,8 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file containing motif enrichment dynamics (can be stdin)"),
-    make_option(c("-n", "--minFreq"), default="50", help="minimum frequency of NFRs in each nfr dynamic class (defaut=%default)"),
+    make_option(c("-n", "--minFreq"), default="50", help="minimum frequency of target sequences in each class (defaut=%default)"),
+    make_option(c("-p", "--minPer"), default="3", help="minimum percentage of target sequences that should have the motif (defaut=%default)"),
     make_option(c("-y", "--minIdentity"), default="0.8", help="minimum identity of denovo motif with the known motif (defaut=%default)"),
     make_option(c("-d", "--diffFreq"), default="0", help="minimum difference in enrichment between categories (defaut=%default)"),
 	make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
@@ -63,12 +64,14 @@ dataRaw$V13 <- log2((dataRaw$V8+0.01)/(dataRaw$V10+0.01))
 dataRaw$V14 <- gsub("^.*BestGuess:", "", dataRaw$V2)
 dataRaw$V14 <- gsub("\\(.*", "", dataRaw$V14)
 dataRaw$V15 <- gsub("^.*BestGuess:", "", dataRaw$V2)
-dataRaw <- dataRaw[which(dataRaw$V11>=as.numeric(opt$minFreq)),]
 dataRaw$V15 <- as.numeric(gsub("\\)", "", gsub("^.*\\(", "", dataRaw$V15)))
+
 if(length(which( !is.na(dataRaw$V15), arr.ind=TRUE))>0) {
-    data <- dataRaw[which(dataRaw$V11>=as.numeric(opt$minFreq) & dataRaw$V15>=as.numeric(opt$minIdentity)),]
+    data <- dataRaw[which(dataRaw$V11>=as.numeric(opt$minFreq) & dataRaw$V15>=as.numeric(opt$minIdentity) &
+                           dataRaw$V2 %in% unique(dataRaw[which(dataRaw$V8>=as.numeric(opt$minPer)),]$V2)),]
 } else {
-    data <- dataRaw[which(dataRaw$V11>=as.numeric(opt$minFreq)),]
+    data <- dataRaw[which(dataRaw$V11>=as.numeric(opt$minFreq) &
+                          dataRaw$V2 %in% unique(dataRaw[which(dataRaw$V8>=as.numeric(opt$minPer)),]$V2)),]
     data$V15 <- 0
 }
 
@@ -79,7 +82,7 @@ if(!is.null(opt$mustIncludeMotif)) {
     data <- unique(data)
 }
 
-cat(sprintf("%d out of %d motifs passed identity (%s) and frequency (%s) score criteria..", nrow(data)/length(unique(data$V1)), nrow(dataRaw)/length(unique(dataRaw$V1)), opt$minIdentity, opt$minFreq))
+cat(sprintf("%d out of %d motifs passed identity (%s) and percentage (%s) score criteria..", nrow(data)/length(unique(data$V1)), nrow(dataRaw)/length(unique(dataRaw$V1)), opt$minIdentity, opt$minPer))
 cat("\n")
 
 no_rows=nrow(data)/length(unique(data$V1))
