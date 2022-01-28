@@ -155,9 +155,15 @@ if(length(sig_rows)>2) {
     dat_df <- as.data.frame(dat)
     colnames(dat_df) <- unlist(lapply(colnames(dat_df), function(x) sprintf("%s (per_target)", x)))
     dat_df$class <- 0
-    dat_df[which(apply(dat_df, 1, function(x) max(x)>5)==T),]$class <- 1
-    dat_df[which(apply(dat_df, 1, function(x) max(x)>10)==T),]$class <- 2
-    #dat_df[which(apply(dat_df, 1, function(x) max(x)>20)==T),]$class <- 3
+    if(nrow(dat_df[which(apply(dat_df, 1, function(x) max(x)>5)==T),])>0) {
+        dat_df[which(apply(dat_df, 1, function(x) max(x)>5)==T),]$class <- 1
+    }
+    if(nrow(dat_df[which(apply(dat_df, 1, function(x) max(x)>10)==T),])>0) {
+        dat_df[which(apply(dat_df, 1, function(x) max(x)>10)==T),]$class <- 2
+    }
+    if(nrow(dat_df[which(apply(dat_df, 1, function(x) max(x)>20)==T),])>0) {
+        dat_df[which(apply(dat_df, 1, function(x) max(x)>20)==T),]$class <- 3
+    }
     mat_df <- merge(mat_df, dat_df, by=0)
     colnames(mat_df)[1] <- "motif"
     write.table(mat_df[order(-mat_df[,"diff"]),], txtFile, quote=F, append=F, sep="\t", col.names=T, row.names=F)

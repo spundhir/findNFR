@@ -17,17 +17,22 @@ usage() {
     echo "[OPTIONS]"
     echo " -d <int>    [distance to merge closesly spaced interactions (default: 25000)]"
     echo " -g <string> [genome (default: mm10)]"
+    echo " -a <string> [file containing changes in gene expression (up, down and neutral)]"
+    echo "             [input format: <file>,4,38; where 4: gene_name, and 38: expr_class]"
+    echo "             [purpose: annotate domains based on target gene expression class]"
+    echo "             [ambiguous: if targeting both up and down-regulated genes; up or down otherwise]"
     echo "[OUTPUT]"
-    echo "             [stdout: chr_domain start_domain end_domain target_gene log_interaction_score strand interactions_count pValue]"
+    echo "             [stdout: chr_domain start_domain end_domain target_gene log_interaction_score strand interactions_count pValue overlapping_domains domain_class]"
     echo " -h          [help]"
 	exit 0
 }
 
 #### parse options ####
-while getopts i:d:g:h ARG; do
+while getopts i:d:g:a:h ARG; do
     case "$ARG" in
     i) INFILE=$OPTARG;;
     d) MERGE_DISTANCE=$OPTARG;;
+    a) ANNO_FILE=$OPTARG;;
     g) GENOME=$OPTARG;;
     h) HELP=1;;
     esac
@@ -53,8 +58,9 @@ fi
 >&2 echo "done"
 
 ## create temporary BED file if input is from stdin
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+#TMP="6mGBexbmOQfqcW66OqZqLm91nIKta1tG"
 if [ "$INFILE" == "stdin" ]; then
-    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     while read LINE; do
         echo "${LINE}"
     done > $TMP
@@ -66,8 +72,36 @@ fi
 
 ## start analysis
 >&2 echo -n "Starting analysis (`date`).. "
-echo -e "chr_domain\tstart_domain\tend_domain\ttarget_gene\tlog_interaction_score\tstrand\tinteractions_count\tpValue"
-for GENE in $(zless ${INFILE} | grep -v start | cut -f 5- | cut -f 5 | sort | uniq | perl -ane 'if($_!~/^\.$/) { print $_; }'); do zless ${INFILE} | grep -v start | cut -f 5- | grep -w ${GENE} | sortBed -i stdin | mergeBed -i stdin -d 25000 -c 4,4,5 -o sum,count_distinct,distinct; done | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[5]\t".log($F[3])."\t.\t$F[4]\n";' | fitDistr.R -i stdin -d lnorm -l 5
+echo -e "chr_domain\tstart_domain\tend_domain\ttarget_gene\tlog_interaction_score\tstrand\tinteractions_count\tpValue\toverlapping_domains\tdomain_class"
+
+## merge interactions that target the same gene, if <25KB apart (interaction domains)
+for GENE in $(zless ${INFILE} | grep -v start | cut -f 5- | cut -f 5 | sort | uniq | perl -ane 'if($_!~/^\.$/) { print $_; }'); do zless ${INFILE} | grep -v start | cut -f 5- | grep -w ${GENE} | sortBed -i stdin | mergeBed -i stdin -d 25000 -c 4,4,5 -o sum,count_distinct,distinct; done | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[5]\t".log($F[3])."\t.\t$F[4]\n";' | fitDistr.R -i stdin -d lnorm -l 5 > ${TMP}.stat
+
+## count number of times a interaction domain overlaps with other interaction domains (which target other genes)
+intersectBed -a ${TMP}.stat -b <(cut -f 1-3 ${TMP}.stat | sort | uniq) -c > ${TMP}.domains
+
+## if information on the deregulation of interaction domain's target gene is provided, annotate the domain as up, down, neutral or ambiguous
+## ambiguous: if the an interaction domain whose target gene is for eg. up-regulated overlaps with an interaction domain whose target genes is for eg. down-regulated
+if [ ! -z "$ANNO_FILE" ]; then
+    if [ "$(echo $ANNO_FILE | perl -ane 'if($_=~/\,/) { print 1; }')" -eq 1 ]; then
+        FILTER_COL=$(echo $ANNO_FILE | perl -ane '$_=~s/^[^,]+\,//g; print $_;')
+        ANNO_FILE=$(echo $ANNO_FILE | perl -ane '$_=~s/\,.*$//g; print $_;')
+    else
+        FILTER_COL="all"
+    fi 
+
+    #echo -e "$ANNO_FILE\t$FILTER_COL"; exit
+    tabEdit -i $ANNO_FILE -f $FILTER_COL > ${TMP}.geneAnno
+    ANNO_FILE=${TMP}.geneAnno
+
+    join -1 4 -2 1 <(less ${TMP}.domains | sort -k 4,4) <(less ${ANNO_FILE} | sort -k 1,1) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\n";' | sortBed -i stdin | mergeBed -i stdin -c 4,10 -o collapse | perl -ane '$class="neutral"; if($F[4]=~/up/i && $F[4]=~/down/i) { $class="ambiguous"; } elsif($F[4]=~/up/i && $F[4]!~/down/i) { $class="up"; } elsif($F[4]!~/up/i && $F[4]=~/down/i) { $class="down"; } chomp($_); print "$_\t$class\n";' > ${TMP}.domainsMerged
+
+    intersectBed -a <(join -1 4 -2 1 <(less ${TMP}.domains | sort -k 4,4) <(less ${ANNO_FILE} | sort -k 1,1) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\n";') -b ${TMP}.domainsMerged -wao | cut -f 1-9,15 | sort -k 1,1 -k 2n,2 -k 3n,3 -k 5rg,5 | perl -ane '$id="$F[0]_$F[1]_$F[2]"; if(!$seen{$id}) { $seen{$id}{'class'}=$F[scalar(@F)-1]; $seen{$id}{'info'}=$_; } elsif($seen{$id}{'class'}=~/ambiguous/ & $F[scalar(@F)-1]!~/ambiguous/) { $seen{$id}{'class'}=$F[scalar(@F)-1]; $seen{$id}{'info'}=$_; } END { foreach(keys(%seen)) { print "$seen{$_}{'info'}"; } }'
+
+    #grep -v start | sortBed -i stdin | mergeBed -i stdin -c 4,10 -o distinct,distinct | cut -f 5 | sort | uniq -c
+else
+    cat ${TMP}.domains | perl -ane 'chomp($_); print "$_\tNA\n";'
+fi
 
 ## approach-2
 #echo -e "chr_domain\tstart_domain\tend_domain\ttarget_gene\tlog_interaction_score\tstrand\tinteractions_count\tpValue"
@@ -91,6 +125,9 @@ for GENE in $(zless ${INFILE} | grep -v start | cut -f 5- | cut -f 5 | sort | un
 >&2 echo "done"
 
 ## remove temporary file, if exists
-if [ ! -z "$TMP" ]; then
-    rm $TMP
+rm ${TMP}.stat
+rm ${TMP}.domains
+if [ ! -z "$ANNO_FILE" ]; then
+    rm ${TMP}.geneAnno
+    rm ${TMP}.domainsMerged
 fi
