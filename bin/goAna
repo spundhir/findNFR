@@ -49,7 +49,7 @@ echo Program: "goAna (perform gene ontology analysis on input gene list)"
     echo " -u <int>    [Plot top -m classes even if some are common between classes (0: No, 1: yes (default: 0))]"
     echo " -w <int>    [Width of output figure (default: 10)]"
     echo " -t <int>    [Height of output figure (default: 20)]"
-    echo " -b <file>   [input file containing background gene list]"
+    echo " -b <file>   [input file containing background gene list (can also be a class identifier)]"
     echo " -r <file>   [input file containing manually filtered GO categories to plot"]
     echo " -q          [plot count data in log]"
 	echo " -h          [help]"
@@ -131,6 +131,16 @@ echo "done"
 echo "Initiate GO analysis (`date`).. "
 ADD_ARG=""
 if [ ! -z "$BKGFILE" ]; then
+    if [ ! -f "$BKG_FILE" ]; then
+        echo -e "Reformatting input bed file as -b is a keyword (`date`).. "
+        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+        zless $OUTDIR/GENES_INTEREST.TXT | grep -vw $BKG_FILE > $OUTDIR/$TMP.target
+        zless $OUTDIR/GENES_INTEREST.TXT | grep -w $BKG_FILE > $OUTDIR/$TMP.background
+        mv $OUTDIR/$TMP.target $OUTDIR/GENES_INTEREST.TXT
+        BKG_FILE="$OUTDIR/$TMP.background"
+        echo "done"
+    fi  
+
     ADD_ARG="-b $BKGFILE "
 fi
 
@@ -160,4 +170,3 @@ else
     done
 fi
 echo "done"
-
