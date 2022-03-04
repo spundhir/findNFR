@@ -74,9 +74,9 @@ for (( i=0; i<$BEDFILES_COUNT; i++ )); do
     TMP_NAME[i]=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     #TMP_NAME[i]=$RANDOM
     if [ ! -z "$FILTER" ]; then
-        zless ${BEDFILES[$i]} | perl -ane 'for($i=0; $i<scalar(@F); $i++) { if($F[$i]=~/^'$FILTER'$/) { print $_; last; } }' |  bedtools sort -i - > ${TMP_NAME[$i]}.bed
+        zless ${BEDFILES[$i]} | tabEdit -i ${BEDFILES[$i]} -D | perl -ane 'for($i=0; $i<scalar(@F); $i++) { if($F[$i]=~/^'$FILTER'$/) { print $_; last; } }' |  bedtools sort -i - > ${TMP_NAME[$i]}.bed
     else
-        bedtools sort -i ${BEDFILES[$i]} > ${TMP_NAME[$i]}.bed
+        tabEdit -i ${BEDFILES[$i]} -D | bedtools sort -i - > ${TMP_NAME[$i]}.bed
     fi
     COMMAND_BED="$COMMAND_BED ${TMP_NAME[$i]}.bed"
     if [ ! -z "$NAME" ]; then
