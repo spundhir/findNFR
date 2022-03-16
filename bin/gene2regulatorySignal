@@ -167,7 +167,7 @@ if [ "$(grep 'chr.*start.*end\|seqnames.*start.*end' $OUTDIR/PROMOTER.BED.tpm | 
         HEADER_PROXIMAL="$HEADER_PROXIMAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$/_peak/g; $_=~s/[\-\.]+/\_/g; print $_;')"
     done
 
-    cat <(echo "$HEADER_PROXIMAL" | tabEdit -i stdin -t | perl -ane 'print lc $_;') $OUTDIR/PROMOTER.BED.tpm > $OUTDIR/PROMOTER.BED.tpm.tmp
+    cat <(echo "$HEADER_PROXIMAL" | perl -ane 'print lc $_;' | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";') $OUTDIR/PROMOTER.BED.tpm > $OUTDIR/PROMOTER.BED.tpm.tmp
     mv $OUTDIR/PROMOTER.BED.tpm.tmp $OUTDIR/PROMOTER.BED.tpm
 fi
 
