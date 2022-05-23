@@ -285,7 +285,7 @@ if [ ! -z "$SPIKEIN" -a ! -z "$GENOME_SPIKEIN" ]; then
         if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF.bw" ]; then
             SIF=$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)
 
-            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF.bw -clip
+            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF.bw -clip
         fi
     done
     >&2 echo "done"
@@ -323,10 +323,10 @@ if [ ! -z "$SPIKEIN_COV" -a ! -z "$GENOME_SPIKEIN" ]; then
     for(( i=0; i<${#BWFILES[@]}; i++ )); do
         if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF_COV.bw" ]; then
             SIF=$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)
-            COV=$(intersectBed -a <(bigWigToWig ${BWFILES[i]} stdout) -b ${OUTDIR}/macs2/${FILEID}_peaks.bed -v | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
+            COV=$(intersectBed -a <(bigWigToWig ${BWFILES[i]} stdout) -b ${OUTDIR}/macs2/${FILEID}_peaks.bed -v | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
             #echo -e "${BWFILES[i]}\t${COV}"
 
-            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3])/'${COV}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF_COV.bw -clip
+            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3])/'${COV}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF_COV.bw -clip
         fi
     done
     >&2 echo "done"
@@ -348,7 +348,7 @@ fi
 #            TMM="$(grep ${IDS[i]} ${OUTDIR}/${FILEID}_multiBigwigSummary.binSignal.tmm | perl -ane 'print "$F[1]";')"
 #            SIF=$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)
 #
-#            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]/'${TMM}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v dm6 | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF_TMM.bw -clip
+#            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]/'${TMM}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF_TMM.bw -clip
 #        done
 #    fi
 #    >&2 echo "done"
