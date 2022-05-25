@@ -131,13 +131,13 @@ echo "done"
 echo "Initiate GO analysis (`date`).. "
 ADD_ARG=""
 if [ ! -z "$BKGFILE" ]; then
-    if [ ! -f "$BKG_FILE" ]; then
+    if [ ! -f "$BKGFILE" ]; then
         echo -e "Reformatting input bed file as -b is a keyword (`date`).. "
         TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-        zless $OUTDIR/GENES_INTEREST.TXT | grep -vw $BKG_FILE > $OUTDIR/$TMP.target
-        zless $OUTDIR/GENES_INTEREST.TXT | grep -w $BKG_FILE > $OUTDIR/$TMP.background
+        zless $OUTDIR/GENES_INTEREST.TXT | grep -vw $BKGFILE > $OUTDIR/$TMP.target
+        zless $OUTDIR/GENES_INTEREST.TXT | grep -w $BKGFILE > $OUTDIR/$TMP.background
         mv $OUTDIR/$TMP.target $OUTDIR/GENES_INTEREST.TXT
-        BKG_FILE="$OUTDIR/$TMP.background"
+        BKGFILE="$OUTDIR/$TMP.background"
         echo "done"
     fi  
 
