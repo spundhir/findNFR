@@ -97,13 +97,14 @@ usage() {
     echo "             [<plot title>_multiBigwigSummary.bedSignal]"
     echo " -H          [plot correlation between ChIP-seq signal of input samples as a heatmap (multiBigwigSummary) (.npz & .png)]"
     echo "             [<plot title>_multiBigwigSummary.binSignal]"
+    echo " -K          [order bigWig files by given keywords (separated by a comma)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:L:m:r:Q:z:Z:Fxg:X:UDOHh ARG; do
+while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:L:m:r:Q:z:Z:Fxg:X:UDOHK:h ARG; do
 	case "$ARG" in
 		i) REGIONFILE=$OPTARG;;
 		j) BWDIR=$OPTARG;;
@@ -151,6 +152,7 @@ while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:L:m:r:
         D) COPYBW=1;;
         O) OUT_DATA_FILE=1;;
         H) HEATMAP_CLUSTERING=1;;
+        K) ORDER_BIGWIG=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -345,6 +347,22 @@ else
         done
     done
     BWFILES=($BWFILE)
+
+    ## order bigWig files by given keywords
+    if [ ! -z "$ORDER_BIGWIG" ]; then
+        oIFS=$IFS
+        IFS=","
+        ORDER_BIGWIGS=($ORDER_BIGWIG)
+        IFS=$oIFS
+        
+        BWFILE_REORDERED=""
+        for ORDER in "${ORDER_BIGWIGS[@]}"; do
+            for BIGWIGS in "${BWFILES[@]}"; do
+                BWFILE_REORDERED="$BWFILE_REORDERED $(echo $BIGWIGS | grep $ORDER)"
+            done
+        done
+        BWFILE=${BWFILE_REORDERED}
+    fi
     echo "done ($BWFILE)" >&2
 
     ## check, if atleast one bigWig file matching the input filter criteria is found
@@ -427,7 +445,7 @@ else
             usage
         fi
 
-        ARG="$ARG --samplesLabel $(echo $SAMPLE_LABEL | sed 's/\,/\n/g' | sort | uniq | tr '\r\n' ' ')";
+        ARG="$ARG --samplesLabel $(echo $SAMPLE_LABEL | sed 's/\,/\n/g' | uniq | tr '\r\n' ' ')";
     elif [ ! -s "$OUTDIR/$PLOTTITLE.deepToolsMatrix.gz" -o ! -z "$OVERWRITE" ]; then
         scp $OUTDIR/$PLOTTITLE.deepToolsMatrix.raw.gz $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz
     fi
