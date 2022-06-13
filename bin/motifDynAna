@@ -149,7 +149,7 @@ for CLASS in DENOVO KNOWN; do
     echo -n "Parse through each input directory to create a list of all $CLASS motifs found at any motifAna run (`date`).. "
     for (( i=0; i<${#INDIRS[@]}; i++)); do
         ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
-        head -n $NMOTIFS ${INDIRS[$i]}/"$CLASS"_MOTIFS.TXT | perl -ane 'print "'$ID'\t$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n";'
+        head -n ${NMOTIFS} ${INDIRS[$i]}/"$CLASS"_MOTIFS.TXT | perl -ane 'print "'$ID'\t$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n";'
     #done > $OUTDIR/"$CLASS"_MOTIFS.TXT
     done | perl -ane '$id=$F[1]; $id=~s/^.*BestGuess\://g; $id=~s/\s+.*//g; $score=$id; $score=~s/^.*\(//g; $score=~s/\)//g; $id=~s/\(.*//g; if(defined($seen{$id}) && $score > $seen{$id}{'score'}) { $seen{$id}{'score'}=$score; $seen{$id}{'entry'}=$_; } elsif(!defined($seen{$id})) { $seen{$id}{'score'}=$score; $seen{$id}{'entry'}=$_; } END { foreach(keys(%seen)) { print "$seen{$_}{'entry'}"; } }' > $OUTDIR/"$CLASS"_MOTIFS.TXT
 
