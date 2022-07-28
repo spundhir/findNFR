@@ -41,7 +41,7 @@ suppressPackageStartupMessages(library(DOSE))
 suppressPackageStartupMessages(library(ReactomePA))
 suppressPackageStartupMessages(library(clusterProfiler))
 suppressPackageStartupMessages(library(mygene))
-suppressPackageStartupMessages(library(RDAVIDWebService)) #R CMD javareconf -e
+#suppressPackageStartupMessages(library(RDAVIDWebService)) #R CMD javareconf -e
 suppressPackageStartupMessages(library(session))
 suppressPackageStartupMessages(library(ggplot2))
 

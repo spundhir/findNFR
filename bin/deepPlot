@@ -72,7 +72,9 @@ usage() {
     echo "             [useful to plot mean of replicates]"
     echo " -y <string> [y-axis label]"
     echo " -v <int>    [y-axis minimum value]"
+    echo "             [if multiple, separate them by a comma]"
     echo " -V <int>    [y-axis maximum value]"
+    echo "             [if multiple, separate them by a comma]"
     echo " -G <int>    [plot height in cm (default: 7)]"
     echo " -W <int>    [plot width in cm (default: 11)]"
     echo "[OPTIONS: plotProfile]"
@@ -454,9 +456,11 @@ else
         ARG="$ARG --yAxisLabel $YAXIS_LABEL";
     fi
     if [ ! -z "$YAXIS_MIN" ]; then
+        YAXIS_MIN=($(echo $YAXIS_MIN | sed 's/\,/ /g'))
         ARG="$ARG --yMin $YAXIS_MIN";
     fi
     if [ ! -z "$YAXIS_MAX" ]; then
+        YAXIS_MAX=($(echo $YAXIS_MAX | sed 's/\,/ /g'))
         ARG="$ARG --yMax $YAXIS_MAX";
     fi
 
