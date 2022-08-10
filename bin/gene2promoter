@@ -214,7 +214,7 @@ else
     >&2 echo
     >&2 echo -n "Identify most active TSS corresponding to each ENSEMBL gene id (`date`).. "
     if [ ! -s "$OUTDIR/define_promoter/GENES_TSS.BED" ]; then
-        gene2mostActiveTSS -i $GENEFILE -j $BAMFILE -g $GENOME -w 300 | sortBed -i stdin | bed2window -i stdin -w 0 -t | bed2window -i stdin -w 1 -r | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' | tabEdit -i stdin -D > $OUTDIR/define_promoter/GENES_TSS.BED
+        gene2mostActiveTSS -i $GENEFILE -j $BAMFILE -g $GENOME -w 300 | tabEdit -i stdin -D | sortBed -i stdin | bed2window -i stdin -w 0 -t | bed2window -i stdin -w 1 -r | perl -ane 'if($F[0]=~/\_/ || $F[0]=~/chrM/) { next; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n"; }' > $OUTDIR/define_promoter/GENES_TSS.BED
     fi 
     >&2 echo "done"
 
