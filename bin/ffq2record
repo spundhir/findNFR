@@ -1,0 +1,36 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+#### usage ####
+usage() {
+	echo Program: "ffq2record (retrieve url corresponding to GEO records)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: ffq2record -i <string> [OPTIONS]"
+	echo "Options:"
+	echo " -i <string> [GSE identifier]"
+    echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:h ARG; do
+    case "$ARG" in
+    i) ID=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$ID" -o "$HELP" ]; then
+	usage
+fi
+
+## retrieve JSON file corresponding to GEO id
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+if [ ! -s "${ID}.json" ]; then
+    ffq $ID -t GSE > $ID.json
+fi
+ffq2record.R -i $ID.json
