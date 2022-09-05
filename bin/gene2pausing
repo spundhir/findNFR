@@ -145,7 +145,7 @@ if [ ! -z "$OPPOSITE_STRAND" ]; then ARG=$(echo $ARG "-S "); fi
 if [ ! -z "$TESR_MODE" ]; then ARG=$(echo $ARG "-e "); fi
 if [ ! -z "$INCLUDE_FILTER" ]; then ARG=$(echo $ARG "-f $INCLUDE_FILTER "); fi
 if [ ! -z "$EXCLUDE_FILTER" ]; then ARG=$(echo $ARG "-F $EXCLUDE_FILTER "); fi
-if [ ! -z "$RAW" ]; then ARG=$(echo $ARG "-a "); fi
+#if [ "${RAW}" -eq 1 ]; then ARG=$(echo $ARG "-a "); fi
 
 ## measure pol2 pausing
 if [ -z "$TR" ]; then

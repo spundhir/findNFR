@@ -433,10 +433,10 @@ if [ -f "${TMP}.gtf" ]; then
     rm $TMP.gtf
 fi
 
-#rm $TMP.bamConfig
-#rm $TMP.mostActiveTSS
-#rm $TMP.signalValues
-#rm $TMP.signalValuesSameStrand
-#rm $TMP.signalValuesOppositeStrand
+rm $TMP.bamConfig
+rm $TMP.mostActiveTSS
+rm $TMP.signalValues
+rm $TMP.signalValuesSameStrand
+rm $TMP.signalValuesOppositeStrand
 
 >&2 echo "All done.. bye"
