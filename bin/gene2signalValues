@@ -251,10 +251,17 @@ elif [ ! -s "$TMP.mostActiveTSS" ]; then
     ARG=""
     if [ ! -z "$ONLYPROTEINCODING" ]; then ARG=$(echo $ARG "-r "); fi
     if [ ! -z "$BAMFILECONTROL" ]; then ARG=$(echo $ARG "-c $BAMFILECONTROL "); fi
-    if [ ! -z "$SAME_STRAND" ]; then ARG=$(echo $ARG "-s "); fi
-    if [ ! -z "$OPPOSITE_STRAND" ]; then ARG=$(echo $ARG "-S "); fi
 
-    gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW_TSS $ARG | tabEdit -i stdin -D | sortBed -i stdin > $TMP.mostActiveTSS
+    if [ ! -z "$BAMFILE" ]; then
+        gene2mostActiveTSS -i $GTFFILE -j $BAMFILE -g $GENOME -w $WINDOW_TSS $ARG | tabEdit -i stdin -D | sortBed -i stdin > $TMP.mostActiveTSS
+    elif [ ! -z "$BAMFILE_SAMESTRAND" ]; then
+        gene2mostActiveTSS -i $GTFFILE -j $BAMFILE_SAMESTRAND -g $GENOME -w $WINDOW_TSS -s $ARG | tabEdit -i stdin -D | sortBed -i stdin > $TMP.mostActiveTSS
+    elif [ ! -z "$BAMFILE_OPPOSITESTRAND" ]; then
+        gene2mostActiveTSS -i $GTFFILE -j $BAMFILE_OPPOSITESTRAND -g $GENOME -w $WINDOW_TSS -S $ARG | tabEdit -i stdin -D | sortBed -i stdin > $TMP.mostActiveTSS
+    else
+        >&2 echo "No input BAM files found.. "
+        >&2 usage
+    fi
 fi
 
 #############################
