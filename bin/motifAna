@@ -222,6 +222,7 @@ COMMENT
 
     echo -n "Create final output files (DENOVO_MOTIFS.TXT, KNOWN_MOTIFS.TXT)... "
     REGIONS_INTEREST_COUNT=$(cat $OUTDIR/REGIONS_INTEREST.bed | wc -l)
+    ## debug: REGIONS_INTEREST_COUNT=100; PVALUE="1e-15"; MIN_P_T=3; B=100;
     if [ -f "$OUTDIR/homerResults.html" ]; then
         grep png $OUTDIR/homerResults.html | grep -vE ">\*<" | perl -ane '$_=~s/<tr><td>//gi; $_=~s/<\/td><td>/\t/gi; $_=~s/<\/td><\/tr>//gi; $_=~s/^[0-9]*\s+//g; print $_;' | perl -an -F'/\t/' -e '$F[0]=~s/^.*\=\"//g; $F[0]=~s/\".*//g; $F[0]=~s/\.logo.*//g; $F[6]=~s/\<BR.*//g; print "$F[6]\t$F[1]\t$F[3]\t$F[4]\t'$OUTDIR/'$F[0].motif\t'$REGIONS_INTEREST_COUNT'\n";' | perl -ane '$pval=sprintf("%0.20f", $F[1]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[2]=~s/\%//g; $F[3]=~s/\%//g; if($pval < $my_pval && $F[2]>='$MIN_P_T' && $F[3]<='$B') { print "$_"; }' > $OUTDIR/DENOVO_MOTIFS.TXT
     else

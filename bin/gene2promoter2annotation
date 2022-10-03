@@ -53,7 +53,7 @@ usage() {
     echo "             [promoter_width | promoter_class | dist_to_geneTSS_antisense | dist_to_alternativeTSS_antisense]"
     echo "             [dist_to_alternativeTSS_sense | freq_alternative_tss | cage_tss | freq_cage_tss | gene_coordinate]"
     echo "             [gene_length | CpG_island_length | mean_conservation_score | max_conservation_score]"
-    echo "             [promoter_activity | geneDensity | intrageneic_dhs]"
+    echo "             [promoter_activity | geneDensity (1: dense - 10: sparse) | intrageneic_dhs]"
 	echo
 	exit 0
 }

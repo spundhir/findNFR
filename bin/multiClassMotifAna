@@ -196,6 +196,8 @@ for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$
         mkdir -p $MOTIFDIR
     fi
 
+<<"COMMENT"
+COMMENT
     if [ -z "$BKG_FILE" ]; then
         motifAna -i $OUTDIR/enhancer_$ID.bed -o $MOTIFDIR -m 1 -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x $PVALUE -y $MIN_P_T -n $S -g $GENOME -p $PROCESSOR -s $TFBS_FILE -d $SIZE &>$MOTIFDIR/$ID.log &
     else

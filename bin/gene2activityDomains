@@ -1,0 +1,83 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm10";
+
+#### usage ####
+usage() {
+	echo Program: "gene2activityDomains (compute consecutive stretches of genes (up, neutral or down))"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: gene2activityDomains -g <string> -o <dir> [OPTIONS]"
+	echo "Options:"
+    echo " -i <file>   [gene coodinate file (can be stdin)]"
+    echo "             [format: chr start end name score strand class_expr]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm10)]"
+    echo "[OUTPUT]"
+    echo "             [stdout: chr start end gene score strand class_expr]"
+    echo " -h          [help]"
+	exit 0
+}
+
+#### parse options ####
+while getopts i:g:h ARG; do
+    case "$ARG" in
+    i) INFILE=$OPTARG;;
+    g) GENOME=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+
+## create temporary BED file if input is from stdin
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+if [ "$INFILE" == "stdin" ]; then
+    while read LINE; do
+        echo "${LINE}"
+    done > $TMP.bed
+    INFILE=$TMP.bed
+fi
+
+## start analysis
+>&2 echo -e "Starting analysis (`date`).. "
+for CHR in $(cut -f 1 ${INFILE} | sort | uniq); do
+    FIRST_EXPR_CLASS=$(grep -w ${CHR} ${INFILE} | sortBed -i stdin | head -n 1 | cut -f 7)
+    INCL_EXPR_CLASS=$(grep -w ${CHR} ${INFILE} | grep -v neutral | sortBed -i stdin | head -n 1 | cut -f 7)
+    if [ "${INCL_EXPR_CLASS}" == "up" ]; then
+        EXCL_EXPR_CLASS="down"
+    else
+        EXCL_EXPR_CLASS="up"
+    fi
+
+    >&2 echo -e "\tanalyzing for ${CHR}\t${FIRST_EXPR_CLASS}\t${INCL_EXPR_CLASS}\t${EXCL_EXPR_CLASS}";
+
+    grep -w ${CHR} ${INFILE} | sortBed -i stdin | perl -ane 'BEGIN { $class='${FIRST_EXPR_CLASS}'; $defined=0; } if($F[6]=~/^$class$/) { if($defined==0) { $chr=$F[0]; $start=$F[1]; $end=$F[2]; $gene="$F[3]"; $defined=1; } else { $end=$F[2]; $gene.=",$F[3]";} } else { print "$chr\t$start\t$end\t$gene\t$class\n"; $chr=$F[0]; $start=$F[1]; $end=$F[2]; $gene="$F[3]"; $class=$F[6]; } END { print "$chr\t$start\t$end\t$gene\t$class\n"; }' | perl -ane 'BEGIN { $incl_expr_class='${INCL_EXPR_CLASS}'; $excl_expr_class='${EXCL_EXPR_CLASS}'; $class='${INCL_EXPR_CLASS}'; $defined=0; } if($F[4]!~/$excl_expr_class/) { if($defined==0) { $chr=$F[0]; $start=$F[1]; $end=$F[2]; $gene="$F[3]"; $defined=1; } else { $end=$F[2]; $gene.=",$F[3]"; } } else { print "$chr\t$start\t$end\t$gene\t$class\n"; $chr=$F[0]; $start=$F[1]; $end=$F[2]; $gene="$F[3]"; $incl_expr_class=$excl_expr_class; $excl_expr_class=$class; $class=$incl_expr_class; } END { print "$chr\t$start\t$end\t$gene\t$class\n"; }'
+done | perl -ane '@genes=split(/\,/,$F[3]); $genes_count=scalar(@genes); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$genes_count\t.\t$F[4]\n";'
+>&2 echo "done"
+
+#less analysis/DF_PROMOTER.BED | cut -f 1-6,19,38 | grep -v start | perl -ane '@coor=split(/[:-]+/,$F[6]); print "$coor[0]\t$coor[1]\t$coor[2]\t$F[3]\t$F[4]\t$F[5]\t$F[7]\n";' | sortBed -i stdin | grep -w chr1 | perl -ane 'BEGIN { $class="neutral"; $defined=0; } if($F[6]=~/^$class$/) { if($defined==0) { $chr=$F[0]; $start=$F[1]; $end=$F[2]; $gene="$F[3]"; $defined=1; } else { $end=$F[2]; $gene.=",$F[3]";} } else { print "$chr\t$start\t$end\t$gene\t$class\n"; $chr=$F[0]; $start=$F[1]; $end=$F[2]; $gene="$F[3]"; $class=$F[6]; }' | bedStat.R -i stdin
+
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP.bed
+fi

@@ -326,12 +326,13 @@ if [ ! -z "$SPIKEIN_COV" -a ! -z "$GENOME_SPIKEIN" ]; then
     for(( i=0; i<${#BWFILES[@]}; i++ )); do
         if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF_COV.bw" ]; then
             SIF=$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)
+
             if [ "$(initialize_genome -g $GENOME -B)" -a ! -z "$USE_BLACKLISTED" ]; then
                 COV=$(intersectBed -a <(bigWigToWig ${BWFILES[i]} stdout) -b $(initialize_genome -g $GENOME -B) | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
             else
                 COV=$(intersectBed -a <(bigWigToWig ${BWFILES[i]} stdout) -b ${OUTDIR}/macs2/${FILEID}_peaks.bed -v | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
             fi
-            #echo -e "${BWFILES[i]}\t${SIF}\t${COV}"; exit
+            #echo -e "${BWFILES[i]}\t${OUTDIR}/macs2/${FILEID}_peaks.bed\t${SIF}\t${GENOME_SIZE}\t${COV}";
 
             bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3])/'${COV}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF_COV.bw -clip
         fi

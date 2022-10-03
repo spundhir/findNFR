@@ -53,19 +53,19 @@ fi
 >&2 echo "done"
 
 ## determine spikeIn normalization values
-if [ "$(samtools flagstat $INPUTBAMFILE | grep 'properly paired (' | cut -f 1 -d " ")" -gt 0 ]; then
+if [ "$(samtools flagstat $INPUTBAMFILE | grep 'properly paired (' -m 1 | cut -f 1 -d " ")" -gt 0 ]; then
     if [ "$MAPPED" ]; then
-            SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); print $_;');
+            SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" -m 1 | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); print $_;');
     else
-            SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
+            SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" -m 1 | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
     fi
     ## not always valid, for example if samples have similar number of mapped reads but considerably different number of properly mapped paired reads. This can lead to artifitial inflation of signal of sample having low count of properly mapped paired reads
     #SCALE=$(samtools flagstat $INPUTBAMFILE | grep "properly paired (" | cut -f 1 -d " " | perl -ane '$_=sprintf("%0.0f", $_/2); printf("%0.6f", 1000000/$_);');
-elif [ "$(samtools flagstat $INPUTBAMFILE | grep 'mapped (' | cut -f 1 -d " ")" -gt 0 ]; then
+elif [ "$(samtools flagstat $INPUTBAMFILE | grep 'mapped (' -m 1 | cut -f 1 -d " ")" -gt 0 ]; then
     if [ "$MAPPED" ]; then
-        SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane 'print $_;');
+        SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" -m 1 | cut -f 1 -d " " | perl -ane 'print $_;');
     else
-        SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" | cut -f 1 -d " " | perl -ane 'printf("%0.6f", 1000000/$_);');
+        SCALE=$(samtools flagstat $INPUTBAMFILE | grep "mapped (" -m 1 | cut -f 1 -d " " | perl -ane 'printf("%0.6f", 1000000/$_);');
     fi
 fi
 
