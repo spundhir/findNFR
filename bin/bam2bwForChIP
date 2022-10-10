@@ -162,7 +162,7 @@ if [ ! -z "$OUTDIR" ]; then
         #EXTEND_VALUE=$(echo $EXTEND_VALUE | perl -ane 'printf("%0.0f", $_/2);')
         #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $OUTDIR/$ID.bedGraph
 
-        ## use deeptools instead
+        ## use deeptools instead (CPM)
         bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates --normalizeUsing RPKM -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
     elif [ ! -z "$SCALE1x" ]; then
         bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates --normalizeUsing RPGC --effectiveGenomeSize $GENOME_SIZE -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
