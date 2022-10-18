@@ -44,6 +44,7 @@ suppressPackageStartupMessages(library(mygene))
 #suppressPackageStartupMessages(library(RDAVIDWebService)) #R CMD javareconf -e
 suppressPackageStartupMessages(library(session))
 suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(msigdbr))
 
 ##It may help to represent the p-values of enrichment as a transformation whereby you represent the, as -10*log(P-value)
 
@@ -106,6 +107,10 @@ if(!is.null(opt$listAnnotation)) {
             results=compareCluster(geneList, fun="enrichDO", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         } else if(opt$annotation=="REACTOME_PATHWAY") {
             results=compareCluster(geneList, fun="enrichPathway", organism=genomeReactome, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
+        } else if(opt$annotation=="GSEA"){
+            gene_sets = msigdbr(species = "mouse", category = "C3", subcategory = "TFT:GTRD")
+            msigdbr_t2g = gene_sets %>% dplyr::distinct(gs_name, gene_symbol) %>% as.data.frame()
+            results=compareCluster(gene, fun="enricher", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene), TERM2GENE=msigdbr_t2g)
         } else {
             results=compareCluster(geneList, fun="enrichGO", ont="BP", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), minGSSize=as.numeric(opt$minGene))
         }
@@ -250,6 +255,10 @@ if(!is.null(opt$listAnnotation)) {
             results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichDO", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
         } else if(opt$annotation=="REACTOME_PATHWAY"){
             results=compareCluster(ENTREZID~V2, organism=genomeReactome, data=geneList, fun="enrichPathway", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue))
+        } else if(opt$annotation=="GSEA"){
+            gene_sets = msigdbr(species = "mouse", category = "C3", subcategory = "TFT:GTRD")
+            msigdbr_t2g = gene_sets %>% dplyr::distinct(gs_name, gene_symbol) %>% as.data.frame()
+            results=compareCluster(V1~V2, data=geneList, fun="enricher", pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), TERM2GENE=msigdbr_t2g)
         } else {
             if(!is.null(opt$bkgFile)) {
                 results=compareCluster(ENTREZID~V2, data=geneList, fun="enrichGO", ont="BP", OrgDb=genomeDb, pvalueCutoff=as.numeric(opt$pValue), qvalueCutoff=as.numeric(opt$pValue), universe=bkgList$ENTREZID, minGSSize=as.numeric(opt$minGene))
