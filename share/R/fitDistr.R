@@ -103,12 +103,13 @@ if(!is.null(opt$outFile)) {
 
         #gofstat(model[[i]], fitnames=distr)
         cdfcomp(model, legendtext=distr)
-        #qqcomp(model, legendtext=distr)
+        qqcomp(model, legendtext=distr)
         dev.off()
 
         ## HOW TO EVALUATE WHICH MODEL IS BETTER
         # one having lower AIC value (model[[i]]$aic
         # more details: http://stats.stackexchange.com/questions/132652/how-to-determine-which-distribution-fits-my-data-best
+        # https://cran.r-project.org/web/packages/fitdistrplus/vignettes/Optimalgo.html
     } else {
         data$pois <- 1
     }
@@ -153,7 +154,7 @@ if(!is.null(opt$outFile)) {
 
         #gofstat(model[[i]], fitnames=distr)
         #cdfcomp(model, legendtext=distr)
-        #qqcomp(model, legendtext=distr)
+        qqcomp(model, legendtext=distr)
 
         ## HOW TO EVALUATE WHICH MODEL IS BETTER
         # one having lower AIC value (model[[i]]$aic

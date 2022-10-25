@@ -51,8 +51,10 @@ usage() {
     echo " -B          [use blacklisted regions for coverage normalization (-C)]"
     echo "[OPTIONS: NORMALIZATION]"
     echo " -T          [normalize by TMM scale]"
-    echo " -S          [normalize by spike-in scale (needs -G argument)]"
+    echo " -A          [normalize by TMM scale and coverage]"
     echo " -P          [normalize by TPM scale]"
+    echo " -D          [normalize by TPM scale and coverage]"
+    echo " -S          [normalize by spike-in scale (needs -G argument)]"
     echo " -C          [normalize by spike-in scale and coverage (needs -G argument)]"
     echo " -G <string> [spike-in genome (default: dm6)]"
     echo "             [assumes spike-in genome bam files are in the same folder as input bam files]"
@@ -62,7 +64,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:g:f:F:Mp:I:BTSPCG:Qh ARG; do
+while getopts i:o:g:f:F:Mp:I:BTAPDSCG:Qh ARG; do
 	case "$ARG" in
         i) BAMFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -74,8 +76,10 @@ while getopts i:o:g:f:F:Mp:I:BTSPCG:Qh ARG; do
         I) FILEID=$OPTARG;;
         B) USE_BLACKLISTED=1;;
         T) TMM=1;;
-        S) SPIKEIN=1;;
+        A) TMM_COV=1;;
         P) TPM=1;;
+        D) TPM_COV=1;;
+        S) SPIKEIN=1;;
         C) SPIKEIN_COV=1;;
         G) GENOME_SPIKEIN=$OPTARG;;
         Q) QUALITY=1;;
@@ -153,11 +157,11 @@ if [ "$FILTER_FILES" -eq 1 ]; then
 
     ## filter bam files based on input filters (include and/or exclude)
     if [ ! -z "$INCLUDE_FILTER" -a ! -z "$EXCLUDE_FILTER" ]; then
-        filterFilesByName -i $BAMFILE -f $INCLUDE_FILTER,$GENOME -F $EXCLUDE_FILTER -e bam $ARG | tr '\,' '\n'
+        filterFilesByName -i $BAMFILE -f $INCLUDE_FILTER -F $EXCLUDE_FILTER -e bam $ARG | tr '\,' '\n'
     elif [ ! -z "$INCLUDE_FILTER" ]; then
-        filterFilesByName -i $BAMFILE -f $INCLUDE_FILTER,$GENOME -e bam $ARG | tr '\,' '\n'
+        filterFilesByName -i $BAMFILE -f $INCLUDE_FILTER -e bam $ARG | tr '\,' '\n'
     elif [ ! -z "$EXCLUDE_FILTER" ]; then
-        filterFilesByName -i $BAMFILE -F $EXCLUDE_FILTER,$GENOME -e bam $ARG | tr '\,' '\n'
+        filterFilesByName -i $BAMFILE -F $EXCLUDE_FILTER -e bam $ARG | tr '\,' '\n'
     else
         cat $BAMFILE
     fi | grep -v "^$" | perl -ane 'chomp($_); if(scalar(@F)==1) { print "tpm\t$_\n"; } else { print "$_\n"; }' > ${FILEID}.bamConfig
@@ -274,21 +278,25 @@ if [ ! -z "$TMM" ]; then
 fi
 
 #############################
-## normalize each bigWig file (spike-in scale factor) : ARG -S
+## normalize each bigWig file (TMM scale factor as well as coverage) : ARG -A
 #############################
-if [ ! -z "$SPIKEIN" -a ! -z "$GENOME_SPIKEIN" ]; then
-    >&2 echo -n "normalize each bigWig file by spike-in factors (`date`).. "
+if [ ! -z "$TMM_COV" ]; then
+    >&2 echo -n "normalize each bigWig file by TMM scale factor as well as coverage (`date`).. "
     BWFILES=($BWFILE)
     IDS=($ID)
 
-    BAMFILE_SPIKEIN=$(echo $BAMFILE | sed -E 's/_hg19|_hg38|_mm9|_mm10/_'${GENOME_SPIKEIN}'/g')
-    BAMFILES_SPIKEIN=($BAMFILE_SPIKEIN)
-
     for(( i=0; i<${#BWFILES[@]}; i++ )); do
-        if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF.bw" ]; then
-            SIF=$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)
+        if [ ! -s "${OUTDIR}/${IDS[i]}_normByTMM_COV.bw" ]; then
+            TMM="$(grep ${IDS[i]} ${OUTDIR}/${FILEID}_multiBigwigSummary.binSignal.tmm | perl -ane 'print "$F[1]";')"
 
-            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF.bw -clip
+            if [ "$(initialize_genome -g $GENOME -B)" -a ! -z "$USE_BLACKLISTED" ]; then
+                COV=$(intersectBed -a <(bigWigToWig ${BWFILES[i]} stdout) -b $(initialize_genome -g $GENOME -B) | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]/'${TMM}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
+            else
+                COV=$(intersectBed -a <(bigWigToWig ${BWFILES[i]} stdout) -b ${OUTDIR}/macs2/${FILEID}_peaks.bed -v | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]/'${TMM}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
+            fi
+            #echo -e "${BWFILES[i]}\t${OUTDIR}/macs2/${FILEID}_peaks.bed\t${TMM}\t${GENOME_SIZE}\t${COV}";
+
+            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]/'${TMM}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3])/'${COV}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normByTMM_COV.bw -clip
         fi
     done
     >&2 echo "done"
@@ -307,6 +315,52 @@ if [ ! -z "$TPM" ]; then
             TPM="$(grep ${IDS[i]} ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal.frip | perl -ane 'print "$F[1]";')"
 
             bigWigToWig ${BWFILES[i]} stdout | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3]*1000000)/'${TPM}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normByTPM.bw -clip
+        fi
+    done
+    >&2 echo "done"
+fi
+
+#############################
+## normalize each bigWig file (TPM scale factor as well as coverage) : ARG -D
+#############################
+if [ ! -z "$TPM_COV" ]; then
+    >&2 echo -n "normalize each bigWig file by TPM scale factor as well as coverage (`date`).. "
+    BWFILES=($BWFILE)
+    IDS=($ID)
+
+    for(( i=0; i<${#BWFILES[@]}; i++ )); do
+        if [ ! -s "${OUTDIR}/${IDS[i]}_normByTMM_COV.bw" ]; then
+            TPM="$(grep ${IDS[i]} ${OUTDIR}/${FILEID}_multiBigwigSummary.peakSignal.frip | perl -ane 'print "$F[1]";')"
+
+            if [ "$(initialize_genome -g $GENOME -B)" -a ! -z "$USE_BLACKLISTED" ]; then
+                COV=$(intersectBed -a <(bigWigToWig ${BWFILES[i]} stdout) -b $(initialize_genome -g $GENOME -B) | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3]*1000000)/'${TPM}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
+            else
+                COV=$(intersectBed -a <(bigWigToWig ${BWFILES[i]} stdout) -b ${OUTDIR}/macs2/${FILEID}_peaks.bed -v | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3]*1000000)/'${TPM}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
+            fi
+            #echo -e "${BWFILES[i]}\t${OUTDIR}/macs2/${FILEID}_peaks.bed\t${TPM}\t${GENOME_SIZE}\t${COV}";
+
+            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3]*1000000)/'${TPM}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3])/'${COV}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normByTPM_COV.bw -clip
+        fi
+    done
+    >&2 echo "done"
+fi
+
+#############################
+## normalize each bigWig file (spike-in scale factor) : ARG -S
+#############################
+if [ ! -z "$SPIKEIN" -a ! -z "$GENOME_SPIKEIN" ]; then
+    >&2 echo -n "normalize each bigWig file by spike-in factors (`date`).. "
+    BWFILES=($BWFILE)
+    IDS=($ID)
+
+    BAMFILE_SPIKEIN=$(echo $BAMFILE | sed -E 's/_hg19|_hg38|_mm9|_mm10/_'${GENOME_SPIKEIN}'/g')
+    BAMFILES_SPIKEIN=($BAMFILE_SPIKEIN)
+
+    for(( i=0; i<${#BWFILES[@]}; i++ )); do
+        if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF.bw" ]; then
+            SIF=$(bam2spikeInScale -i ${BAMFILES_SPIKEIN[i]} 2>/dev/null)
+
+            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF.bw -clip
         fi
     done
     >&2 echo "done"

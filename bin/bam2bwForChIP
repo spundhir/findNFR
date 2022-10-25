@@ -44,17 +44,19 @@ usage() {
     echo "             [can also be bam file containing reads mapped to spike-in genome (eg. dm6)]"
     #echo " -Z <float>  [scale the coverage by rrpm (Rx) (spike-in data) - not correct]"
     #echo "             [can also be bam file containing reads mapped to spike-in genome (eg. dm6)]"
+    echo " -D          [do not use --ignoreDuplicates (since duplicates are also removed in BAM file)]" 
     echo " -b          [also output the BED file]"
     echo " -p <int>    [number of processors to use (default: 1)]"
     echo " -y <dir>    [copy input bam file to specified directory for analysis]"
     echo "             [useful when working on mounted directory]"
+    echo " -S          [scale the coverage to TPM (old approach)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:kecCz:Z:bp:y:h ARG; do
+while getopts i:o:g:kecCz:Z:Dbp:y:Sh ARG; do
 	case "$ARG" in
 		i) BAMFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -65,9 +67,12 @@ while getopts i:o:g:kecCz:Z:bp:y:h ARG; do
         C) SCALE1x=1;;
         z) SCALE_FACTOR=$OPTARG;;
         Z) SCALE_FACTOR_RRPM=$OPTARG;;
+        D) DO_NOT_USE_IGNORE_DUPLICATES=1;;
         b) BED=1;;
         p) PROCESSORS=$OPTARG;;
         y) COPYDIR=$OPTARG;;
+        S) SCALE_OLD=1;;
+        C) SCALE1x=1;;
 		h) HELP=1;;
 	esac
 done
@@ -132,6 +137,12 @@ if [ ! -e "$BAMFILE.bai" ]; then
     samtools index $BAMFILE
 fi
 
+## bamCoverage arguments
+BAMCOVERAGE_ARG="--ignoreDuplicates"
+if [ ! -z "$DO_NOT_USE_IGNORE_DUPLICATES" ]; then
+    BAMCOVERAGE_ARG=""
+fi
+
 ## retrieve file name
 echo -n "Converting bam to bigwig format (`date`).. "
 if [ ! -z "$OUTDIR" ]; then
@@ -145,33 +156,33 @@ if [ ! -z "$OUTDIR" ]; then
     if [ ! -z "$SCALE_FACTOR" ]; then
         ## RRPM (Rx) normaliztion; https://www.cell.com/cell-reports/pdfExtended/S2211-1247(14)00872-9
         if [ "$(isBam -i $SCALE_FACTOR)" -eq 0 ]; then
-            bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $(bam2spikeInScale -i $SCALE_FACTOR)
+            bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $(bam2spikeInScale -i $SCALE_FACTOR) $BAMCOVERAGE_ARG
         else
-            bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR
+            bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR $BAMCOVERAGE_ARG
         fi
     elif [ ! -z "$SCALE_FACTOR_RRPM" ]; then
         ## RRPM (Rx) normaliztion; https://www.cell.com/cell-reports/pdfExtended/S2211-1247(14)00872-9
         if [ "$(isBam -i $SCALE_FACTOR_RRPM)" -eq 0 ]; then
-            bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $(bam2spikeInScale -i $SCALE_FACTOR_RRPM) --normalizeUsing BPM
+            bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $(bam2spikeInScale -i $SCALE_FACTOR_RRPM) --normalizeUsing BPM $BAMCOVERAGE_ARG
         else
-            bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR_RRPM --normalizeUsing BPM
+            bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR_RRPM --normalizeUsing BPM $BAMCOVERAGE_ARG
         fi
+    elif [ ! -z "$SCALE_OLD" ]; then
+        MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
+        SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
+        EXTEND_VALUE=$(echo $EXTEND_VALUE | perl -ane 'printf("%0.0f", $_/2);')
+        bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$ID.bedGraph
     elif [ ! -z "$SCALE" ]; then
-        #MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
-        #SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
-        #EXTEND_VALUE=$(echo $EXTEND_VALUE | perl -ane 'printf("%0.0f", $_/2);')
-        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $OUTDIR/$ID.bedGraph
-
         ## use deeptools instead (CPM)
-        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates --normalizeUsing RPKM -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --normalizeUsing RPKM -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS $BAMCOVERAGE_ARG
     elif [ ! -z "$SCALE1x" ]; then
-        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates --normalizeUsing RPGC --effectiveGenomeSize $GENOME_SIZE -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --normalizeUsing RPGC --effectiveGenomeSize $GENOME_SIZE -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS $BAMCOVERAGE_ARG
     else
         #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split > $OUTDIR/$ID.bedGraph
-        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+        bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS $BAMCOVERAGE_ARG
     fi
 
-    if [ -e "$ID.bedGraph" ]; then
+    if [ -e "$OUTDIR/$ID.bedGraph" ]; then
         bedGraphToBigWig $OUTDIR/$ID.bedGraph $GENOME_FILE $OUTDIR/$ID.bw
 
         if [ -z "$KEEP" ]; then
@@ -185,30 +196,30 @@ else
     if [ ! -z "$SCALE_FACTOR" ]; then
         ## RRPM (Rx) normaliztion; https://www.cell.com/cell-reports/pdfExtended/S2211-1247(14)00872-9
         if [ "$(isBam -i $SCALE_FACTOR)" -eq 0 ]; then
-            bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $(bam2spikeInScale -i $SCALE_FACTOR)
+            bamCoverage -b $BAMFILE -o $ID.bw -of bigwig -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $(bam2spikeInScale -i $SCALE_FACTOR) $BAMCOVERAGE_ARG
         else
-            bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR
+            bamCoverage -b $BAMFILE -o $ID.bw -of bigwig -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR $BAMCOVERAGE_ARG
         fi
     elif [ ! -z "$SCALE_FACTOR_RRPM" ]; then
         ## RRPM (Rx) normaliztion; https://www.cell.com/cell-reports/pdfExtended/S2211-1247(14)00872-9
         if [ "$(isBam -i $SCALE_FACTOR_RRPM)" -eq 0 ]; then
-            bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $(bam2spikeInScale -i $SCALE_FACTOR_RRPM) --normalizeUsing BPM
+            bamCoverage -b $BAMFILE -o $ID.bw -of bigwig -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $(bam2spikeInScale -i $SCALE_FACTOR_RRPM) --normalizeUsing BPM $BAMCOVERAGE_ARG
         else
-            bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR_RRPM --normalizeUsing BPM
+            bamCoverage -b $BAMFILE -o $ID.bw -of bigwig -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR_RRPM --normalizeUsing BPM $BAMCOVERAGE_ARG
         fi
+    elif [ ! -z "$SCALE_OLD" ]; then
+        MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
+        SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
+        EXTEND_VALUE=$(echo $EXTEND_VALUE | perl -ane 'printf("%0.0f", $_/2);')
+        bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR | sort -k 1,1 -k 2n,2 -k 3n,3 > $ID.bedGraph
     elif [ ! -z "$SCALE" ]; then
-        #MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
-        #SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
-        #EXTEND_VALUE=$(echo $EXTEND_VALUE | perl -ane 'printf("%0.0f", $_/2);')
-        #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR > $ID.bedGraph
-
         ## use deeptools instead
-        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeUsing RPKM -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --normalizeUsing RPKM -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS $BAMCOVERAGE_ARG
     elif [ ! -z "$SCALE1x" ]; then
-        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates --normalizeUsing RPGC --effectiveGenomeSize $GENOME_SIZE -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --normalizeUsing RPGC --effectiveGenomeSize $GENOME_SIZE -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS $BAMCOVERAGE_ARG
     else
         #bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split > $ID.bedGraph
-        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig --ignoreDuplicates -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS
+        bamCoverage -b $BAMFILE -o $ID.bw -of bigwig -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS $BAMCOVERAGE_ARG
 
     fi
 
