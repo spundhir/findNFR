@@ -205,14 +205,14 @@ if [ ! -z "$SS" ]; then
     NGSPLOT_TITLE_ANTISENSE=$PLOTTITLE"_antisense"
 
     if [ ! -z "$CLASS_SPLIT" ]; then
-        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_SENSE -r same $ARG
-        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_ANTISENSE -r opposite $ARG
+        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_SENSE -r same $ARG -M 3
+        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_ANTISENSE -r opposite $ARG -M 3
     elif [ ! -z "$RANDOM_SPLIT" ]; then
-        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_SENSE -r same $ARG -u $RANDOM_SPLIT
-        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_ANTISENSE -r opposite $ARG -u $RANDOM_SPLIT
+        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_SENSE -r same $ARG -u $RANDOM_SPLIT -M 3
+        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_ANTISENSE -r opposite $ARG -u $RANDOM_SPLIT -M 3
     else
-        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_SENSE -r same $ARG -x
-        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_ANTISENSE -r opposite $ARG -x
+        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_SENSE -r same $ARG -x -M 3
+        nfrDynAna2Matrix2SortedHeatmap -i $REGIONFILE -k $BWDIR -o $OUTDIR -g $GENOME -p $PROCESSORS -w $FLANKREGION -T $NGSPLOT_TITLE_ANTISENSE -r opposite $ARG -x -M 3
     fi
 else
     echo
