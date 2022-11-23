@@ -44,7 +44,7 @@ fi
 >&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 GENOME_FILE=$(initialize_genome -g $GENOME)
 GENOME_MACS2=$(initialize_genome -g $GENOME -m)
-if [ ! -f "$GENOME_FILE" ]; then
+if [ ! -f "$GENOME_FILE" -a "${GENOME}" != "ercc" ]; then
     >&2 echo
     >&2 echo "Presently the program only support analysis for mm9, mm10, hg19, hg38, rn5 and dm6"
     >&2 echo
