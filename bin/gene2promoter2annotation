@@ -160,8 +160,8 @@ if [ -f "$TSS_FILE" ]; then
     intersectBed -a <(grep -v start $PROMOTER_FILE | perl -ane '@coor=split(/[:-]+/,$F[7]); print "$coor[0]\t$coor[1]\t$coor[2]"; foreach(@F[3..scalar(@F)-1]) { print "\t$_"; } print "\t$F[0]:$F[1]-$F[2]\n";' | sortBed -i stdin) -b <(zless $TSS_FILE | sortBed -i stdin) -c | perl -ane '@coor=split(/[:-]+/,$F['$((NCOL))']); print "$coor[0]\t$coor[1]\t$coor[2]"; foreach(@F[3..'$((NCOL-1))']) { print "\t$_"; } print "\t".$F[scalar(@F)-1]."\n";' > ${TMP}.cageFreq
     >&2 echo "done"
 else
-    touch ${TMP}.cage
-    touch ${TMP}.cageFreq
+    tabEdit -i $PROMOTER_FILE -D > ${TMP}.cage
+    tabEdit -i $PROMOTER_FILE -D > ${TMP}.cageFreq
 fi
 
 ## gene length
@@ -176,7 +176,7 @@ if [ -f "$GENE_FILE" ]; then
     done < <(grep -v "^#" $PROMOTER_FILE) > ${TMP}.length
     >&2 echo "done"
 else
-    touch ${TMP}.length
+    tabEdit -i $PROMOTER_FILE -D > ${TMP}.length
 fi
 
 ## gene CpG island length
@@ -191,7 +191,7 @@ if [ ! -z "$CPG_FILE" ]; then
     fi > ${TMP}.cpg
     >&2 echo "done"
 else
-    touch ${TMP}.cpg
+    tabEdit -i $PROMOTER_FILE -D > ${TMP}.cpg
 fi
 
 ## gene phylogenetic conservation
@@ -201,7 +201,7 @@ if [ "$GENOME" == "mm9" -o "$GENOME" == "mm10" -o "$GENOME" == "hg19" -o "$GENOM
     bed2window -i $PROMOTER_FILE -w 500 | bed2conservation -i stdin -g $GENOME > ${TMP}.conservation
     >&2 echo "done"
 else
-    touch ${TMP}.conservation
+    tabEdit -i $PROMOTER_FILE -D > ${TMP}.conservation
 fi
 
 ## define bivalent promoters
@@ -217,7 +217,7 @@ if [ ! -z "$BIVALENT_FILE" ]; then
     intersectBed -a $PROMOTER_FILE -b $OUTDIR/h3k27me3_peaks/PEAKS.BED -wao | intersectBed2uniq -i stdin -o sum -c $((NCOL+4)),$((NCOL+5)) -n ${NCOL} | perl -ane '$activity="1_inactive"; if($F[6]=~/^Y_N$/) { $activity="2_moderate"; } elsif($F['$((NCOL))'] > 0) { if($F[6]=~/^Y$/) { $activity="4_bivalent"; } else {  $activity="3_repressed"; } } elsif($F[6]=~/^Y$/) { $activity="5_active"; } foreach(@F[0..'$((NCOL-1))']) { print "$_\t"; } print "$activity\n";' > ${TMP}.bivalent
     >&2 echo "done"
 else
-    touch ${TMP}.bivalent
+    tabEdit -i $PROMOTER_FILE -D | cut -f 4 > ${TMP}.bivalent
 fi
 
 ## define gene density
