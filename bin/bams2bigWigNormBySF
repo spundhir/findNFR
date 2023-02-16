@@ -22,7 +22,6 @@ copyright_info
 VERSION="0.01"
 GENOME="mm9"
 PROCESSOR=1
-GENOME_SPIKEIN="dm6"
 
 #### usage ####
 usage() {
@@ -56,7 +55,7 @@ usage() {
     echo " -D          [normalize by TPM scale and coverage]"
     echo " -S          [normalize by spike-in scale (needs -G argument)]"
     echo " -C          [normalize by spike-in scale and coverage (needs -G argument)]"
-    echo " -G <string> [spike-in genome (default: dm6)]"
+    echo " -G <string> [spike-in genome, if experiment include spike-in genome]"
     echo "             [assumes spike-in genome bam files are in the same folder as input bam files]"
     echo " -Q          [plot quality plots using plotFingerprint (NOTE: uses non-normalized read counts from bam files)]"
 	echo
@@ -155,6 +154,11 @@ if [ "$FILTER_FILES" -eq 1 ]; then
         ARG=" -M"
     fi
 
+    ## edit INCLUDE_FILTER, if spikein genome is provided
+    if [ ! -z "${GENOME_SPIKEIN}" ]; then
+        INCLUDE_FILTER="${INCLUDE_FILTER},${GENOME}"
+    fi
+
     ## filter bam files based on input filters (include and/or exclude)
     if [ ! -z "$INCLUDE_FILTER" -a ! -z "$EXCLUDE_FILTER" ]; then
         filterFilesByName -i $BAMFILE -f $INCLUDE_FILTER -F $EXCLUDE_FILTER -e bam $ARG | tr '\,' '\n'
@@ -187,6 +191,9 @@ if [ "$FILTER_FILES" -eq 1 ]; then
     BAMFILE=$INPUT
 fi
 #echo -e "$BAMFILE"; exit
+if [ -z "${GENOME_SPIKEIN}" ]; then
+    GENOME_SPIKEIN="DUMMY"
+fi
 >&2 echo "done"
 
 #############################
@@ -348,7 +355,7 @@ fi
 #############################
 ## normalize each bigWig file (spike-in scale factor) : ARG -S
 #############################
-if [ ! -z "$SPIKEIN" -a ! -z "$GENOME_SPIKEIN" ]; then
+if [ ! -z "$SPIKEIN" -a "${GENOME_SPIKEIN}" != "DUMMY" ]; then
     >&2 echo -n "normalize each bigWig file by spike-in factors (`date`).. "
     BWFILES=($BWFILE)
     IDS=($ID)
@@ -369,7 +376,7 @@ fi
 #############################
 ## normalize each bigWig file (spike-in scale factor as well as coverage) : ARG -C
 #############################
-if [ ! -z "$SPIKEIN_COV" -a ! -z "$GENOME_SPIKEIN" ]; then
+if [ ! -z "$SPIKEIN_COV" -a "${GENOME_SPIKEIN}" != "DUMMY" ]; then
     >&2 echo -n "normalize each bigWig file by spike-in scale factor as well as coverage (`date`).. "
     BWFILES=($BWFILE)
     IDS=($ID)
@@ -397,7 +404,7 @@ fi
 #############################
 ## normalize each bigWig file (spike-in scale factor as well as TMM scale factor) : ARG -B (does not seem useful)
 #############################
-#if [ ! -z "$SPIKEIN_TMM" -a ! -z "$GENOME_SPIKEIN" ]; then
+#if [ ! -z "$SPIKEIN_TMM" -a "${GENOME_SPIKEIN}" != "DUMMY" ]; then
 #    >&2 echo -n "normalize each bigWig file by spike-in scale factor as well as TMM scale factor (`date`).. "
 #    BWFILES=($BWFILE)
 #    IDS=($ID)
