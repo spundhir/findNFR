@@ -16,7 +16,7 @@ FIGHEIGHT=20
 usage() {
 echo Program: "goAna (perform gene ontology analysis on input gene list)"
 	echo Author: BRIC, University of Copenhagen, Denmark
-	echo Version: 1.0
+	echo Version: 2.0
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: goAna -i <file> -o <dir> [OPTIONS]"
 	echo "Options:"
