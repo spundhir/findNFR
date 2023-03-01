@@ -16,7 +16,11 @@ option_list <- list(
     make_option(c("-k", "--breaks"), default="0.3", help="breaks for rescale color bar (default=%default)"),
     make_option(c("-c", "--color"), default="RdBu", help="color palette (default=%default)"),
     make_option(c("-b", "--colorBias"), default="1", help="bias in color (default=%default)"),
-    make_option(c("-l", "--mustIncludeMotif"), help="name of motifs that must be included in the final output (if multiple, separate them by a comma)")
+    make_option(c("-l", "--mustIncludeMotif"), help="name of motifs that must be included in the final output (if multiple, separate them by a comma)"),
+    make_option(c("-R", "--clusterRows"), default=F, help="cluster rows in the heatmap (default=%default)"),
+    make_option(c("-C", "--clusterCols"), default=T, help="cluster columns in the heatmap (default=%default)"),
+    make_option(c("-W", "--plotWidth"), default=5, help="width of the heatmap (default=%default)"),
+    make_option(c("-H", "--plotHeight"), default=5, help="height of the heatmap (default=%default)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -116,7 +120,7 @@ cat(sprintf("%d out of %d motifs passed filter criteria..", length(sig_rows), nr
 cat("\n")
 
 if(length(sig_rows)>2) {
-    pdf(opt$outPdfFile, height=20, width=10)
+    pdf(opt$outPdfFile, height=opt$plotHeight, width=opt$plotWidth)
     #breaks <- as.vector(summary(as.vector(mat[sig_rows,])))
     #len=2
     #breaks1 <- seq(breaks[1], breaks[2], length=len)
@@ -138,12 +142,12 @@ if(length(sig_rows)>2) {
         #}
         myCol <- rev(colorRampPalette(brewer.pal(11, opt$color), bias=as.numeric(opt$colorBias))(length(breaks)-1))
         #heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1, breaks=breaks)
-        pheatmap(mat[sig_rows,], col=myCol, border_color = NA, cluster_rows=F, breaks=breaks)
+        pheatmap(mat[sig_rows,], col=myCol, border_color = NA, cluster_rows=opt$clusterRows, cluster_cols=opt$clusterCols, breaks=breaks)
     } else {
         myCol <- rev(colorRampPalette(brewer.pal(11, opt$color), bias=as.numeric(opt$colorBias))(256))
         #myCol <- rev(brewer.pal(11, opt$color))
         #heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1)
-        pheatmap(mat[sig_rows,], col=myCol, border_color = NA, cluster_rows=F)
+        pheatmap(mat[sig_rows,], col=myCol, border_color = NA, cluster_rows=opt$clusterRows, cluster_cols=opt$clusterCols)
         #heatmap.2(mat, trace="none", col=myCol, margins=c(15,20), cexCol=1, cexRow=1)
     }
     dev.off()
