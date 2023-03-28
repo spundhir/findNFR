@@ -1,0 +1,75 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm9"
+
+#### usage ####
+usage() {
+	echo Program: "bed2gc_content (compute gc content for sequences corresponding to input coordinates)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2gc_content -i <file> -o <dir> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input BED file (can be stdin)]"
+    echo " -o <dir>    [output directory]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm9)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:g:h ARG; do
+	case "$ARG" in
+        i) INFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+GENOME_FASTA=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -F)
+#GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" -o ! -f "$GENOME_FASTA" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+# echo $GENOME_FILE; exit
+
+## create temporary file if input is from stdin
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+if [ "$INFILE" == "stdin" ]; then
+    while read LINE; do
+        echo ${LINE}
+    done | perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
+else
+    zless ${INFILE}    
+fi > ${TMP}
+INFILE=${TMP}
+
+bedtools getfasta -fi $GENOME_FASTA -bed $INFILE -fo $TMP.fasta -s -name
+get_gc_content.pl $TMP.fasta &>/dev/null
+#bed2gc_content.R -i gc_out.txt
+#fasta2seqlogo.R -i $TMP.fasta
+cat gc_out.txt
+
+## remove temporary file
+if [ ! -z "${TMP}" ]; then
+    rm $TMP
+    rm $TMP.fasta
+    rm gc_out.txt
+fi
