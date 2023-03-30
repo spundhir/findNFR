@@ -1,0 +1,175 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm10"
+PROCESSOR=1
+
+#### usage ####
+usage() {
+	echo Program: "bed2exprUsingBigWig (compute read count corresponding to input BED file using bigWig files)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2exprUsingBigWig -i <file> -j <file(s)>"
+	echo "Options:"
+	echo " -i <file>   [input file containing genomic coordinate in BED format (can be stdin)]"
+    echo " -j <file>   [input mapped reads in bigWig format]"
+    echo "             [if multiple separate by a comma]"
+    echo "             **OR**"
+    echo "             [input configuration file containing bigWig file information]"
+    echo "             [<id> <bam file> <bigWig file> (id should start with tpm)]"
+    echo "             **OR**"
+    echo "             [input directory containing bigWig files]"
+    echo " -o <file>   [File name to save the compressed matrix file (npz format) 
+                        needed by the plotPCA and plotCorrelation tools]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm10)]"
+    echo " -f <string> [include bam files matching identifiers]"
+    echo "             [if multiple seperate them by a comma]"
+    echo " -F <string> [exclude bam files matching identifiers]"
+    echo "             [if multiple seperate them by a comma]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
+    echo " -A          [append read counts to the input file itself]"
+    echo " -N          [do not add header to file]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:o:g:f:F:p:ANh ARG; do
+	case "$ARG" in
+		i) INPUTBEDFILE=$OPTARG;;
+        j) INPUTBWFILES=$OPTARG;;
+        o) OUTFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        f) INCLUDE_FILTER=$OPTARG;;
+        F) EXCLUDE_FILTER=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        A) APPEND=1;;
+        N) NOHEADER=1;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INPUTBEDFILE" -o -z "$INPUTBWFILES" -o -z "$OUTFILE" -o "$HELP" ]; then
+	>&2 usage
+fi
+
+## populating files based on input genome
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+#GENOME_FILE=$FINDNFRPATH/data/annotations/$GENOME_FILE
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+# echo $GENOME_FILE; exit
+
+## check if input is BigWig files or configuration file or directory containing BigWig file information
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+TMP="0CcMdodnWGmAG7cPYOVsL59gdHDr7jGK"
+FILTER_FILES=0
+if [ -d "$INPUTBWFILES" ]; then
+    FILTER_FILES=1
+elif [ "$(bigWigInfo $(echo $INPUTBWFILES | perl -ane '$_=~s/\,.*//g; print $_;') 2>/dev/null | wc -l)" -le 0 ]; then
+    FILTER_FILES=1
+fi
+
+## filter BigWig files for analysis
+if [ "$FILTER_FILES" -eq 1 ]; then
+    ## filter bam files based on input filters (include and/or exclude)
+    if [ ! -z "$INCLUDE_FILTER" -a ! -z "$EXCLUDE_FILTER" ]; then
+        filterFilesByName -i $INPUTBWFILES -f $INCLUDE_FILTER -F $EXCLUDE_FILTER -e bw -M | tr '\,' '\n'
+    elif [ ! -z "$INCLUDE_FILTER" ]; then
+        filterFilesByName -i $INPUTBWFILES -f $INCLUDE_FILTER -e bw -M | tr '\,' '\n'
+    elif [ ! -z "$EXCLUDE_FILTER" ]; then
+        filterFilesByName -i $INPUTBWFILES -F $EXCLUDE_FILTER -e bw -M | tr '\,' '\n'
+    else
+        cat $INPUTBWFILES
+    fi | grep -v "^$" | perl -ane 'chomp($_); if(scalar(@F)==1) { print "tpm\t$_\n"; } else { print "$_\n"; }' > ${TMP}.bwConfig
+    INPUTBWFILES=${TMP}.bwConfig
+    
+    if [ "$(cat $INPUTBWFILES | perl -ane 'print scalar(@F)."\n";' | sort | uniq | wc -l)" -gt 1 -o "$(cat $INPUTBWFILES | wc -l)" -eq 0 ]; then
+        echo
+        echo "ERROR: input bigWig configuration file is not in correct format"
+        echo "possible reason: none of the files fulfill the input filter criteria"
+        echo
+        usage
+    fi
+
+    ## read configuration file
+    INPUT=$(cat $INPUTBWFILES | perl -ane '
+        $file.="$F[1],";
+        END {
+            $file=~s/\,$//g;
+            print "$file\n";
+        }'
+    )
+    INPUTBWFILES=$INPUT
+fi
+
+## parse input bam files in an array
+oIFS=$IFS
+IFS=","
+BWFILES=($INPUTBWFILES)
+BWFILES_COUNT=${#BWFILES[@]}
+IFS=$oIFS
+
+## parse bam files in an array
+IFS=","
+INPUTBWFILES=$(echo $INPUTBWFILES | sed 's/\,/ /g')
+IFS=$oIFS
+
+## create temporary BED file without header
+if [ "$INPUTBEDFILE" == "stdin" ]; then
+    while read LINE; do
+        echo -e "${LINE}"
+    done
+    #| perl -ane '$line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t$//g; print "$line\n";'
+else
+    zless $INPUTBEDFILE
+fi > ${TMP}
+tabEdit -i ${TMP} -D > $TMP.bed
+BEDFILE=${TMP}.bed
+
+## organize file header
+HEADER=$(tabEdit -i ${TMP} -d)
+for(( i=0; i<${#BWFILES[@]}; i++ )); do
+    HEADER="$HEADER $(echo ${BWFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bw$//g; print $_;')"
+done
+
+multiBigwigSummary BED-file -b ${INPUTBWFILES} --BED ${BEDFILE} --smartLabels -p ${PROCESSOR} -o ${OUTFILE}.npz --outRawCounts ${TMP}.tpm
+
+## append to the input file, if required
+NCOL=$(zless $BEDFILE | head -n 1 | perl -ane 'print scalar(@F);')
+if [ ! -z "$APPEND" -a "$(cmp -s <(cut -f 1-${NCOL} ${TMP}.tpm) $BEDFILE && echo 0 || echo 1)" -eq 0 -a "$INPUTBEDFILE" != "stdin" ]; then
+    echo "$INPUTBEDFILE is updated"
+    if [ ! -z "$NOHEADER" ]; then
+        cat ${TMP}.tpm > $INPUTBEDFILE
+    else
+        cat <(echo "$HEADER" | tabEdit -i stdin -t) ${TMP}.tpm > $INPUTBEDFILE
+    fi
+else
+    if [ ! -z "$NOHEADER" ]; then
+        cat ${TMP}.tpm
+    else
+        cat <(echo "$HEADER" | tabEdit -i stdin -t) ${TMP}.tpm
+    fi
+fi
+
+## remove temporary files
+rm $TMP
+rm $TMP.bed
+rm $TMP.tpm
+if [ "$FILTER_FILES" -eq 1 ]; then
+    rm $TMP.bwConfig
+fi
+
+exit
