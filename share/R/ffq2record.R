@@ -34,7 +34,7 @@ NAME <- names(df)
 lst <- lapply(names(df[[NAME]]$study$runs), function(x) {
             name <- tolower(gsub("\"", "", gsub("^.*\\s+", "", unlist(strsplit(df[[NAME]]$study$runs[[x]]$title, ";"))[2])))
             record <- t(as.data.frame(lapply(1:length(df[[NAME]]$study$runs[[x]]$files), function (y) {
-                t <- (as.data.frame(c(x, name, df[[NAME]]$study$runs[[x]]$files[[y]]$url, df[[NAME]]$study$runs[[x]]$title)))
+                t <- (as.data.frame(c(x, name, df[[NAME]]$study$runs[[x]]$files[[y]]$url, df[[NAME]]$study$runs[[x]]$title, df[[NAME]]$study$runs[[x]]$sample$attributes$`cell type`)))
                 row.names(t) <- NULL
                 t
             })))
@@ -44,6 +44,6 @@ lst <- lapply(names(df[[NAME]]$study$runs), function(x) {
 lst <- lst[lapply(lst,length)>0]
 lst <- do.call(rbind.data.frame, lst)
 row.names(lst) <- NULL
-colnames(lst) <- c("sra_id", "name", "url", "title")
+colnames(lst) <- c("sra_id", "name", "url", "title", "cell_type")
 write.table(lst, "", col.names=T, row.names=F, quote=F, sep="\t")
 q()
