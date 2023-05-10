@@ -134,7 +134,7 @@ COMMENT
 
 ## create index file of bam file, if does not exit
 if [ ! -e "$BAMFILE.bai" ]; then
-    samtools index $BAMFILE
+    samtools index -@ $PROCESSORS $BAMFILE
 fi
 
 ## bamCoverage arguments
@@ -168,7 +168,7 @@ if [ ! -z "$OUTDIR" ]; then
             bamCoverage -b $BAMFILE -o $OUTDIR/$ID.bw -of bigwig -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR_RRPM --normalizeUsing BPM $BAMCOVERAGE_ARG
         fi
     elif [ ! -z "$SCALE_OLD" ]; then
-        MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
+        MAPPEDREADS=`samtools idxstats -@ $PROCESSORS $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
         SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
         EXTEND_VALUE=$(echo $EXTEND_VALUE | perl -ane 'printf("%0.0f", $_/2);')
         bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR | sort -k 1,1 -k 2n,2 -k 3n,3 > $OUTDIR/$ID.bedGraph
@@ -208,7 +208,7 @@ else
             bamCoverage -b $BAMFILE -o $ID.bw -of bigwig -e $EXTEND_VALUE --numberOfProcessors $PROCESSORS --scaleFactor $SCALE_FACTOR_RRPM --normalizeUsing BPM $BAMCOVERAGE_ARG
         fi
     elif [ ! -z "$SCALE_OLD" ]; then
-        MAPPEDREADS=`samtools idxstats $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
+        MAPPEDREADS=`samtools idxstats -@ $PROCESSORS $BAMFILE | grep -wE "^[0-9a-zA-Z]+" | perl -ane '$sum+=$F[2]; END { print "$sum"; }'`;
         SCALE_FACTOR=$(echo $MAPPEDREADS | perl -ane 'printf("%0.6f", 1000000/'$MAPPEDREADS');')
         EXTEND_VALUE=$(echo $EXTEND_VALUE | perl -ane 'printf("%0.0f", $_/2);')
         bedtools bamtobed -i $BAMFILE -bed12 | bedtools slop -i stdin -g $GENOME_FILE -s -l 0 -r $EXTEND_VALUE | bedtools genomecov -bg -i stdin -g $GENOME_FILE -split -scale $SCALE_FACTOR | sort -k 1,1 -k 2n,2 -k 3n,3 > $ID.bedGraph
