@@ -75,7 +75,7 @@ fi
 echo -e "chr_domain\tstart_domain\tend_domain\ttarget_gene\tlog_interaction_score\tstrand\tinteractions_count\tpValue\toverlapping_domains\tdomain_class"
 
 ## merge interactions that target the same gene, if <25KB apart (interaction domains)
-for GENE in $(zless ${INFILE} | grep -v start | cut -f 5- | cut -f 5 | sort | uniq | perl -ane 'if($_!~/^\.$/) { print $_; }'); do zless ${INFILE} | grep -v start | cut -f 5- | grep -w ${GENE} | sortBed -i stdin | mergeBed -i stdin -d 25000 -c 4,4,5 -o sum,count_distinct,distinct; done | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[5]\t".log($F[3])."\t.\t$F[4]\n";' | fitDistr.R -i stdin -d lnorm -l 5 > ${TMP}.stat
+for GENE in $(zless ${INFILE} | grep -v start | cut -f 5- | cut -f 5 | sort | uniq | perl -ane 'if($_!~/^\.$/) { print $_; }'); do zless ${INFILE} | grep -v start | cut -f 5- | grep -w ${GENE} | sortBed -i stdin | mergeBed -i stdin -d 25000 -c 4,5,5 -o sum,count_distinct,distinct; done | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[5]\t".log($F[3])."\t.\t$F[4]\n";' | fitDistr.R -i stdin -d lnorm -l 5 > ${TMP}.stat
 
 ## count number of times a interaction domain overlaps with other interaction domains (which target same or other gene(s))
 intersectBed -a ${TMP}.stat -b <(cut -f 1-3 ${TMP}.stat | sort | uniq) -c > ${TMP}.domains
