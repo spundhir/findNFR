@@ -31,7 +31,7 @@ while getopts i:d:g:e:h ARG; do
     i) INFILE=$OPTARG;;
     d) MERGE_DISTANCE=$OPTARG;;
     g) GENOME=$OPTARG;;
-    a) ENHANCER_FILE=$OPTARG;;
+    e) ENHANCER_FILE=$OPTARG;;
     g) GENOME=$OPTARG;;
     h) HELP=1;;
     esac
@@ -74,39 +74,57 @@ INFILES=($INFILE)
 INFILES_COUNT=${#INFILES[@]}
 IFS=$oIFS
 
-for(( i=0; i<$INFILES_COUNT; i++ )); do
-    less ${INFILES[$i]} | perl -ane 'if($F[7]=~/^\.$/) { print "$F[4]\t$F[5]\t$F[6]\t$F[3]_rep'${i}'\t$F[9]\t.\n"; }' | grep -v start
-done | sortBed -i stdin | mergeBed -i stdin -c 4,5 -o collapse,collapse | perl -ane '
-        @ids=split(/\,/,$F[3]); 
-        @scores=split(/\,/,$F[4]); 
-        %seen=(); 
-        foreach(@ids) { $_=~s/\_rep.*//g; $seen{$_}++; } 
-        $SIG=0; 
-        foreach $id(keys(%seen)) { 
-            if($seen{$id}>=2) { 
-                $SCORE=0; 
-                for($i=0;$i<scalar(@ids);$i++){ 
-                    $ids[$i]=~s/\_rep.*//g; 
-                    if($ids[$i]=~/^$id$/) { 
-                        $SCORE+=$scores[$i]; 
-                    }
-                } 
-                chomp($_); 
-                print "$_\t$id\t$SCORE\n"; $SIG=1;
-            }
-        }
-        if($SIG==0) { chomp($_); print "$_\tNA\tNA\n"; }' | sort -k 6,6 > ${TMP}.txt
+#for(( i=0; i<$INFILES_COUNT; i++ )); do
+#    less ${INFILES[$i]} | perl -ane 'if($F[7]=~/^\.$/) { print "$F[4]\t$F[5]\t$F[6]\t$F[3]_rep'${i}'\t$F[9]\t.\n"; }' | grep -v start
+#done | sortBed -i stdin | mergeBed -i stdin -c 4,5 -o collapse,collapse | perl -ane '
+#        @ids=split(/\,/,$F[3]); 
+#        @scores=split(/\,/,$F[4]); 
+#        %seen=(); 
+#        foreach(@ids) { $_=~s/\_rep.*//g; $seen{$_}++; } 
+#        $SIG=0; 
+#        foreach $id(keys(%seen)) { 
+#            if($seen{$id}>=2) { 
+#                $SCORE=0; 
+#                for($i=0;$i<scalar(@ids);$i++){ 
+#                    $ids[$i]=~s/\_rep.*//g; 
+#                    if($ids[$i]=~/^$id$/) { 
+#                        $SCORE+=$scores[$i]; 
+#                    }
+#                } 
+#                chomp($_); 
+#                print "$_\t$id\t$SCORE\n"; $SIG=1;
+#            }
+#        }
+#        if($SIG==0) { chomp($_); print "$_\tNA\tNA\n"; }' | sort -k 6,6 > ${TMP}
 >&2 echo done
 
->&2 echo "Organize robust set of interacting regions (`date`).. "
-cat <(echo -e "chr_bait\tstart_bait\tend_bait\tid_bait\tchr_interaction\tstart_interaction\tend_interaction\tscore_interaction\tgene_bait") <(intersectBed -a <(join -1 4 -2 4 <(cat $(echo $INFILE | sed -e 's/\,/ /g') | grep -v start | perl -ane 'if($F[7]=~/^\.$/) { print $_; }' | cut -f 1-4 | sort -k 4,4 | uniq) <(grep -wv NA ${TMP}.txt | cut -f 1-3,6,7) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\n";' | sortBed -i stdin) -b <(grep -w protein_coding ${TSS_FILE}) -wo | cut -f 1-8,12 | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 5,5 -k 6n,6 -k 7n,7 -k 8g,8 -k 9,9 | uniq) > ${TMP}.ibed
+>&2 echo -n "Organize robust set of interacting regions (`date`).. "
+#cat <(echo -e "chr_bait\tstart_bait\tend_bait\tid_bait\tchr_interaction\tstart_interaction\tend_interaction\tscore_interaction\tgene_bait") <(intersectBed -a <(join -1 4 -2 4 <(cat $(echo $INFILE | sed -e 's/\,/ /g') | grep -v start | perl -ane 'if($F[7]=~/^\.$/) { print $_; }' | cut -f 1-4 | sort -k 4,4 | uniq) <(grep -wv NA ${TMP} | cut -f 1-3,6,7) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\n";' | sortBed -i stdin) -b <(grep -w protein_coding ${TSS_FILE}) -wo | cut -f 1-8,12 | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 5,5 -k 6n,6 -k 7n,7 -k 8g,8 -k 9,9 | uniq) > ${TMP}.ibed
 >&2 echo done
 
->&2 echo "Annotate enhancers with interacting gene (`date`).. "
-closestBed -a <(less ${ENHANCER_FILE} | cut -f 1-6 | grep -v start | sortBed -i stdin) -b <(less ${TMP}.ibed | perl -ane 'if($F[0]=~/^$F[4]$/) { print $_; }' | cut -f 5- | grep -v start | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[0]_$F[1]_$F[2]_$F[3]_$F[4]"; foreach(@F[3..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sortBed -i stdin | uniq) -d -t all | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 11rg,11 | perl -ane 'if($F[11]!~/^$/ && $F[11]!~/^\.$/ && $F[scalar(@F)-1]<10000) { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[10]\t.\t$F[11]\t$F[9]\t".$F[scalar(@F)-1]."\tHiC\n"; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[10]\t.\t$F[11]\t$F[9]\t".$F[scalar(@F)-1]."\tnonHiC\n"; }' | bedtools groupby -i stdin -g 1-4 -c 5,7,10 -o collapse,collapse,distinct
->&2 echo done
+if [ -s ${ENHANCER_FILE} ]; then
+    >&2 echo -n "Annotate enhancers with interacting gene (`date`).. "
+    #closestBed -a <(less ${ENHANCER_FILE} | cut -f 1-6 | grep -v start | sortBed -i stdin) -b <(less ${TMP}.ibed | perl -ane 'if($F[0]=~/^$F[4]$/) { print $_; }' | cut -f 5- | grep -v start | perl -ane 'print "$F[0]\t$F[1]\t$F[2]\t$F[0]_$F[1]_$F[2]_$F[3]_$F[4]"; foreach(@F[3..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sortBed -i stdin | uniq) -d -t all | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 11rg,11 | perl -ane 'if($F[11]!~/^$/ && $F[11]!~/^\.$/ && $F[scalar(@F)-1]<10000) { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[10]\t.\t$F[11]\t$F[9]\t".$F[scalar(@F)-1]."\tHiC\n"; } else { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[10]\t.\t$F[11]\t$F[9]\t".$F[scalar(@F)-1]."\tnonHiC\n"; }' > ${TMP}
+
+    ## Approach-1 (find all 10 more consecutive stretches of enhancers of which at least 1 of them is interacting with a gene, X as identified by pcHiC. Mark all the non-interacting enhancers in this stretch as HiC_neighbor and targeting the gene X)
+    STRETCH_LEN=10
+    join -1 4 -2 1 -a 1 <(sort -k 4,4 ${TMP}) <(less ${TMP} | groupBy -i stdin -g 7 -c 4,4,10 -o distinct,count_distinct,distinct | sort -k 3rn,3 | perl -ane '@t=split(/\,/, $F[3]); $sig=0; foreach(@t) { if($_=~/^HiC$/) { $sig=1; } } if($sig==1 && $F[2]>'${STRETCH_LEN}') { print $_; }' | cut -f 2 | sed -E 's/\,/\n/g' | sort | perl -ane 'chomp($_); print "$_\tHiC_neighbor\n";') | perl -ane 'if($F[9]=~/nonHiC/ && $F[10]=~/HiC_neighbor/) { $F[9]="HiC_neighbor"; } print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\n";' | sortBed -i stdin | bedtools groupby -i stdin -g 1-4 -c 5,6,7,10 -o mean,distinct,collapse,distinct 2>/dev/null
+
+    ## Approach-2
+    #GENES=""
+    #for GENE in $(grep -w HiC ${TMP} | cut -f 7 | sort | uniq); do
+    #    N=$(sed '/\b'${GENE}'\b/,$!d;H;/\b'${GENE}'\b/!d;s/.*//;x;s/\n//' ${TMP}.enhancers | cut -f 7 | sort | uniq | wc -l);
+    #    if [ "${N}" -eq 1 ]; then
+    #        GENES="$GENES,${GENE}"
+    #    fi
+    #done
+    #echo "${GENES},"
+    #cat ${TMP} | perl -ane '$genes="'${GENES}'"; if($genes=~/,$F[6],/ & $F[9]=~/nonHiC/) { $F[9]="HiC_neighbor"; } print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | bedtools groupby -i stdin -g 1-4 -c 5,7,10 -o mean,collapse,distinct 2>/dev/null | perl -ane 'if($F[6]=~/nonHiC/) { $F[6]="nonHiC"; } print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t.\t$F[5]\t$F[6]\n";'
+    >&2 echo done
+fi
 exit
 
 ## remove temporary file, if exists
-rm ${TMP}.txt
+rm ${TMP}
 rm ${TMP}.ibed
+rm ${TMP}.enhancers
