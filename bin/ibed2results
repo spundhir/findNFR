@@ -113,9 +113,9 @@ cat <(echo -e "chr_bait\tstart_bait\tend_bait\tid_bait\tchr_interaction\tstart_i
 >&2 echo "Created output file $OUTDIR/${TMP}.ibed (`date`)"
 >&2 echo
 
-## identify domains of interactions for each gene
->&2 echo -n "Identify domains of interactions for each gene (`date`).. "
-grep -v start $OUTDIR/${TMP}.ibed | cut -f 5- | sortBed -i stdin | groupBy -i stdin -g 5 -c 1,2,3,4,5 -o distinct,collapse,collapse,sum,distinct | perl -ane '$F[2]=~s/\,.*//g; $F[3]=~s/^.*\,//g; print "$F[1]\t$F[2]\t$F[3]\t$F[5]\t$F[4]\t.\n";' > $OUTDIR/${TMP}.domains
+## identify consecutive set of regions targeting the same gene as regulatory domains (`date`).. "
+>&2 echo -n "Identify consecutive set of regions targeting the same gene as regulatory domains (`date`).. "
+grep -v start $OUTDIR/${TMP}.ibed | cut -f 5- | sortBed -i stdin | groupBy -i stdin -g 5 -c 1,2,3,4,5 -o distinct,collapse,collapse,sum,distinct | perl -ane '$F[2]=~s/\,.*//g; $F[3]=~s/^.*\,//g; print "$F[1]\t$F[2]\t$F[3]\t$F[5]\t$F[4]\t.\n";' | mergeBed -i stdin -c 4,5,6,4 -o distinct,sum,distinct,count_distinct > $OUTDIR/${TMP}.domains
 >&2 echo done
 >&2 echo "Created output file $OUTDIR/${TMP}.domains (`date`)"
 >&2 echo
