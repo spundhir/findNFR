@@ -105,8 +105,8 @@ done | sortBed -i stdin | mergeBed -i stdin -c 4,5 -o collapse,collapse | perl -
         if($SIG==0) { chomp($_); print "$_\tNA\tNA\n"; }' | sort -k 6,6 > $OUTDIR/${TMP}
 >&2 echo done
 
->&2 echo -n "Organize robust set of interacting regions (`date`).. "
-cat <(echo -e "chr_bait\tstart_bait\tend_bait\tid_bait\tchr_interaction\tstart_interaction\tend_interaction\tscore_interaction\tgene_bait") <(intersectBed -a <(join -1 4 -2 4 <(cat $(echo $INFILE | sed -e 's/\,/ /g') | grep -v start | perl -ane 'if($F[7]=~/^\.$/) { print $_; }' | cut -f 1-4 | sort -k 4,4 | uniq) <(grep -wv NA $OUTDIR/${TMP} | cut -f 1-3,6,7) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\n";' | sortBed -i stdin) -b <(grep -w protein_coding ${TSS_FILE}) -wo | cut -f 1-8,12 | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 5,5 -k 6n,6 -k 7n,7 -k 8g,8 -k 9,9 | uniq) > $OUTDIR/${TMP}.ibed
+>&2 echo -n "Annotate reproducible set of interacting regions with their target gene information (`date`).. "
+cat <(echo -e "chr_bait\tstart_bait\tend_bait\tid_bait\tchr_interaction\tstart_interaction\tend_interaction\tscore_interaction\tgene_bait") <(intersectBed -a <(join -1 4 -2 4 <(cat $(echo $INFILE | sed -e 's/\,/ /g') | grep -v start | perl -ane 'if($F[7]=~/^\.$/) { print $_; }' | cut -f 1-4 | sort -k 4,4 | uniq) <(grep -wv NA $OUTDIR/${TMP} | cut -f 1-3,6,7) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\n";' | sortBed -i stdin) -b <(grep -w protein_coding ${TSS_FILE}) -wo | cut -f 1-8,12 | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 5,5 -k 6n,6 -k 7n,7 -k 8g,8 -k 9,9 | uniq | perl -ane 'if($F[0]=~/^$F[4]$/) { print $_; }') > $OUTDIR/${TMP}.ibed
 >&2 echo done
 >&2 echo "Created output file $OUTDIR/${TMP}.ibed (`date`)"
 
@@ -117,20 +117,23 @@ if [ -s ${ENHANCER_FILE} ]; then
 
     ## find all 10 more consecutive stretches of enhancers of which at least 1 of them is interacting with a gene, X as identified by pcHiC. Mark all the non-interacting enhancers in this stretch as HiC_neighbor and targeting the gene X)
     >&2 echo -n "Find all ${STRETCH_LEN} or more consecutive stretches of enhancers linked to same gene X. If ${MIN_HIC_INTER} or more interactions in this stretch are supported by pcHiC. Mark all the remaining non-pcHiC supported enhancers as HiC_neighbor and targeting the gene X (`date`).. "
-    #join -1 4 -2 1 -a 1 <(sort -k 4,4 $OUTDIR/${TMP}) <(less $OUTDIR/${TMP} | groupBy -i stdin -g 7 -c 4,4,10 -o distinct,count_distinct,distinct | sort -k 3rn,3 | perl -ane '@t=split(/\,/, $F[3]); $sig=0; foreach(@t) { if($_=~/^HiC$/) { $sig=1; } } if($sig==1 && $F[2]>'${STRETCH_LEN}') { print $_; }' | cut -f 2 | sed -E 's/\,/\n/g' | sort | perl -ane 'chomp($_); print "$_\tHiC_neighbor\n";') | perl -ane 'if($F[9]=~/nonHiC/ && $F[10]=~/HiC_neighbor/) { $F[9]="HiC_neighbor"; } print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\n";' | sortBed -i stdin | bedtools groupby -i stdin -g 1-4 -c 5,6,7,10 -o mean,distinct,collapse,distinct 2>/dev/null
     join -1 4 -2 1 -a 1 <(sort -k 4,4 $OUTDIR/${TMP}) <(less $OUTDIR/${TMP} | bedtools groupby -i stdin -g 1-4 -c 5,6,7,10 -o mean,distinct,distinct,distinct 2>/dev/null | groupBy -i stdin -g 7 -c 4,4,8 -o distinct,count_distinct,collapse | sort -k 3rn,3 | perl -ane '@t=split(/\,/, $F[3]); $sig=0; foreach(@t) { if($_=~/^HiC$/) { $sig++; } } if($sig>='${MIN_HIC_INTER}' && $F[2]>'${STRETCH_LEN}') { print $_; }' | cut -f 2 | sed -E 's/\,/\n/g' | sort | perl -ane 'chomp($_); print "$_\tHiC_neighbor\n";') | perl -ane 'if($F[9]=~/nonHiC/ && $F[10]=~/HiC_neighbor/) { $F[9]="HiC_neighbor"; } print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\n";' | sortBed -i stdin | bedtools groupby -i stdin -g 1-4 -c 5,6,7,10 -o mean,distinct,distinct,distinct 2>/dev/null > $OUTDIR/${TMP}.enhancers
+
+    cat <(echo -e "chr_dhs\tstart_dhs\tend_dhs\tname_dhs\tinteraction_score\tstrand\ttarget_gene\tinteraction_class\tclosest_gene_tss") <(closestBed -a $OUTDIR/${TMP}.enhancers -b <(grep -w protein_coding ${TSS_FILE} | cut -f 1-6) -d -t first | cut -f 1-8,12) > $OUTDIR/${TMP}
+    mv $OUTDIR/${TMP} $OUTDIR/${TMP}.enhancers
+    
     >&2 echo done
     >&2 echo "Created output file $OUTDIR/${TMP}.enhancers (`date`)"
 fi
 
 ## remove temporary file, if exists
-rm $OUTDIR/${TMP}
-#rm $OUTDIR/${TMP}.ibed
-#rm $OUTDIR/${TMP}.enhancers
-    
+if [ -s $OUTDIR/${TMP} ]; then
+    rm $OUTDIR/${TMP}
+fi
 
+###########################
 ## miscellaneous code
-
+###########################
 ## Approach-2
 #GENES=""
 #for GENE in $(grep -w HiC $OUTDIR/${TMP} | cut -f 7 | sort | uniq); do
