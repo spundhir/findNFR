@@ -20,9 +20,9 @@ usage() {
     echo "             [<id> <bam file> <bigWig file> (id should start with tpm)]"
     echo "             **OR**"
     echo "             [input directory containing bigWig files]"
+    echo "[OPTIONS]"
     echo " -o <file>   [File name to save the compressed matrix file (npz format) 
                         needed by the plotPCA and plotCorrelation tools]"
-    echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm10)]"
     echo " -f <string> [include bam files matching identifiers]"
     echo "             [if multiple seperate them by a comma]"
@@ -53,7 +53,7 @@ while getopts i:j:o:g:f:F:p:ANh ARG; do
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ -z "$INPUTBEDFILE" -o -z "$INPUTBWFILES" -o -z "$OUTFILE" -o "$HELP" ]; then
+if [ -z "$INPUTBEDFILE" -o -z "$INPUTBWFILES" -o "$HELP" ]; then
 	>&2 usage
 fi
 
@@ -148,7 +148,11 @@ done
 
 <<"COMMENT"
 COMMENT
-multiBigwigSummary BED-file -b ${INPUTBWFILES} --BED ${BEDFILE} --smartLabels -p ${PROCESSOR} -o ${OUTFILE}.npz --outRawCounts ${TMP}.tpm
+if [ ! -z "${OUTFILE}" ]; then
+    multiBigwigSummary BED-file -b ${INPUTBWFILES} --BED ${BEDFILE} --smartLabels -p ${PROCESSOR} -o ${OUTFILE}.npz --outRawCounts ${TMP}.tpm
+else
+    multiBigwigSummary BED-file -b ${INPUTBWFILES} --BED ${BEDFILE} --smartLabels -p ${PROCESSOR} --outRawCounts ${TMP}.tpm
+fi
 
 ## edit output file
 if [ "$(cmp -s <(grep -v '#' ${TMP}.tpm | cut -f 1-3) <(cut -f 1-3 $BEDFILE) && echo 0 || echo 1)" -eq 0 ]; then
