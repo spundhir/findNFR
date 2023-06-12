@@ -151,18 +151,19 @@ COMMENT
 if [ ! -z "${OUTFILE}" ]; then
     multiBigwigSummary BED-file -b ${INPUTBWFILES} --BED ${BEDFILE} --smartLabels -p ${PROCESSOR} -o ${OUTFILE}.npz --outRawCounts ${TMP}.tpm
 else
-    multiBigwigSummary BED-file -b ${INPUTBWFILES} --BED ${BEDFILE} --smartLabels -p ${PROCESSOR} --outRawCounts ${TMP}.tpm
+    multiBigwigSummary BED-file -b ${INPUTBWFILES} --BED ${BEDFILE} --smartLabels -p ${PROCESSOR} -o ${TMP}.npz --outRawCounts ${TMP}.tpm
+    rm ${TMP}.npz
 fi
 
 ## edit output file
-if [ "$(cmp -s <(grep -v '#' ${TMP}.tpm | cut -f 1-3) <(cut -f 1-3 $BEDFILE) && echo 0 || echo 1)" -eq 0 ]; then
-    paste ${BEDFILE} <(grep -v "#" ${TMP}.tpm | cut -f 4-) > ${TMP}.tmp
+if [ "$(cmp -s <(grep -v '#' ${TMP}.tpm | cut -f 1-3 | sortBed -i stdin) <(cut -f 1-3 $BEDFILE | sortBed -i stdin) && echo 0 || echo 1)" -eq 0 ]; then
+    paste <(cat ${BEDFILE} | sortBed -i stdin) <(grep -v "#" ${TMP}.tpm | sortBed -i stdin | cut -f 4-) > ${TMP}.tmp
     mv ${TMP}.tmp ${TMP}.tpm
 fi
 
 ## append to the input file, if required
 NCOL=$(zless $BEDFILE | head -n 1 | perl -ane 'print scalar(@F);')
-if [ ! -z "$APPEND" -a "$(cmp -s <(cut -f 1-${NCOL} ${TMP}.tpm) $BEDFILE && echo 0 || echo 1)" -eq 0 -a "$INPUTBEDFILE" != "stdin" ]; then
+if [ ! -z "$APPEND" -a "$(cmp -s <(cut -f 1-${NCOL} ${TMP}.tpm | sortBed -i stdin) <(cat $BEDFILE | sortBed -i stdin) && echo 0 || echo 1)" -eq 0 -a "$INPUTBEDFILE" != "stdin" ]; then
     echo "$INPUTBEDFILE is updated"
     if [ ! -z "$NOHEADER" ]; then
         cat ${TMP}.tpm > $INPUTBEDFILE
