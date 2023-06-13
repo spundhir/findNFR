@@ -137,6 +137,12 @@ if [ -s "${TXN_FILE}" ]; then
     >&2 echo done
 fi
 
+## determine loop length
+>&2 echo -n "Determine loop length (`date`).. "
+cat $OUTDIR/${TMP}.ibed | perl -ane 'chomp($_); if($_=~/start/) { print "$_\tloop_length\n"; } else { $bait=($F[1]+$F[2])/2; $interaction=($F[5]+$F[6])/2; $len=sprintf("%0.0f", abs($bait-$interaction)); print "$_\t$len\n"; }' > ${TMP}.tmp
+mv ${TMP}.tmp $OUTDIR/${TMP}.ibed
+>&2 echo done
+
 ## identify consecutive set of regions targeting the same gene as regulatory domains (`date`).. "
 >&2 echo -n "Identify consecutive set of regions targeting the same gene as regulatory domains (`date`).. "
 cat <(echo -e "chr_domain\tstart_start\tend_domain\ttarget_genes\ttotal_interaction_score\tstrand\ttarget_genes_count") <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 5- | sortBed -i stdin | groupBy -i stdin -g 5 -c 1,2,3,4,5 -o distinct,collapse,collapse,sum,distinct | perl -ane '$F[2]=~s/\,.*//g; $F[3]=~s/^.*\,//g; print "$F[1]\t$F[2]\t$F[3]\t$F[5]\t$F[4]\t.\n";' | mergeBed -i stdin -c 4,5,6,4 -o distinct,sum,distinct,count_distinct) > $OUTDIR/${TMP}.domains
