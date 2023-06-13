@@ -24,14 +24,18 @@ usage() {
     echo " -n <string> [name of the output files]"
     echo " -g <string> [genome (default: mm10)]"
     echo " -e <file>   [file containing genomic coordinates of enhancer regions]"
+    echo " -c <file>   [file containing genomic coordinates of CTCF peaks]"
+    echo "             [used to annotate loops in .ibed file]"
+    echo " -t <file>   [file containing genomic coordinates of RNAPII or H3K27ac (TXN) peaks]"
+    echo "             [used to annotate loops in .ibed file]"
     echo "[OUTPUT]"
-    echo "             [filename.ibed AND filename.enhancers]"
+    echo "             [filename.ibed, filename.domains AND filename.enhancers]"
     echo " -h          [help]"
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:n:g:e:h ARG; do
+while getopts i:o:n:g:e:c:t:h ARG; do
     case "$ARG" in
     i) INFILE=$OPTARG;;
     o) OUTDIR=$OPTARG;;
@@ -39,6 +43,8 @@ while getopts i:o:n:g:e:h ARG; do
     g) GENOME=$OPTARG;;
     e) ENHANCER_FILE=$OPTARG;;
     g) GENOME=$OPTARG;;
+    c) CTCF_FILE=$OPTARG;;
+    t) TXN_FILE=$OPTARG;;
     h) HELP=1;;
     esac
 done
@@ -113,6 +119,24 @@ cat <(echo -e "chr_bait\tstart_bait\tend_bait\tid_bait\tchr_interaction\tstart_i
 >&2 echo "Created output file $OUTDIR/${TMP}.ibed (`date`)"
 >&2 echo
 
+## annotate loops using CTCF file
+if [ -s "${CTCF_FILE}" ]; then
+    >&2 echo -n "Annotate loops using CTCF file (`date`).. "
+    echo -e "$(grep start $OUTDIR/${TMP}.ibed)\tCTCF_bait\tCTCF_interaction" > ${TMP}.tmp
+    paste <(grep -v start $OUTDIR/${TMP}.ibed) <(intersectBed -a <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 1-3) -b <(tabEdit -i ${CTCF_FILE} -D) -c | perl -ane 'chomp($_); $class="non-ctcf"; if($F[3]>0) { $class="ctcf"; } print "$class\n";') <(intersectBed -a <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 5-7) -b <(tabEdit -i ${CTCF_FILE} -D) -c | perl -ane 'chomp($_); $class="non-ctcf"; if($F[3]>0) { $class="ctcf"; } print "$class\n";') >> ${TMP}.tmp
+    mv ${TMP}.tmp $OUTDIR/${TMP}.ibed
+    >&2 echo done
+fi
+
+## annotate loops using TXN file
+if [ -s "${TXN_FILE}" ]; then
+    >&2 echo -n "Annotate loops using TXN file (`date`).. "
+    echo -e "$(grep start $OUTDIR/${TMP}.ibed)\tTXN_bait\tTXN_interaction" > ${TMP}.tmp
+    paste <(grep -v start $OUTDIR/${TMP}.ibed) <(intersectBed -a <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 1-3) -b <(tabEdit -i ${TXN_FILE} -D) -c | perl -ane 'chomp($_); $class="non-txn"; if($F[3]>0) { $class="txn"; } print "$class\n";') <(intersectBed -a <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 5-7) -b <(tabEdit -i ${TXN_FILE} -D) -c | perl -ane 'chomp($_); $class="non-txn"; if($F[3]>0) { $class="txn"; } print "$class\n";') >> ${TMP}.tmp
+    mv ${TMP}.tmp $OUTDIR/${TMP}.ibed
+    >&2 echo done
+fi
+
 ## identify consecutive set of regions targeting the same gene as regulatory domains (`date`).. "
 >&2 echo -n "Identify consecutive set of regions targeting the same gene as regulatory domains (`date`).. "
 cat <(echo -e "chr_domain\tstart_start\tend_domain\ttarget_genes\ttotal_interaction_score\tstrand\ttarget_genes_count") <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 5- | sortBed -i stdin | groupBy -i stdin -g 5 -c 1,2,3,4,5 -o distinct,collapse,collapse,sum,distinct | perl -ane '$F[2]=~s/\,.*//g; $F[3]=~s/^.*\,//g; print "$F[1]\t$F[2]\t$F[3]\t$F[5]\t$F[4]\t.\n";' | mergeBed -i stdin -c 4,5,6,4 -o distinct,sum,distinct,count_distinct) > $OUTDIR/${TMP}.domains
@@ -141,8 +165,8 @@ if [ -s ${ENHANCER_FILE} ]; then
         if($F[4]=~/^\.$/) { $F[4]=0; $F[6]="NA"; }
         print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\n";' | sortBed -i stdin | perl -ane '$F[7]=~s/^.*\-//g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | bedtools groupby -i stdin -g 1-4 -c 5,6,7,8,10 -o collapse,distinct,distinct,collapse,distinct 2>/dev/null | perl -ane '%seen=(); @bait=split(/\,/,$F[7]); @score=split(/\,/,$F[4]); $score=0; for($i=0; $i<scalar(@bait); $i++) { if(!$seen{$bait[$i]}) { $score+=$score[$i]; $seen{$bait[$i]}=1; } } $F[4]=$score; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $OUTDIR/${TMP}.enhancers 
 
-    cat <(echo -e "chr_dhs\tstart_dhs\tend_dhs\tname_dhs\tinteraction_score\tstrand\ttarget_gene\ttarget_bait\tinteraction_class\tclosest_gene_tss") <(closestBed -a $OUTDIR/${TMP}.enhancers -b <(grep -w protein_coding ${TSS_FILE} | cut -f 1-6) -d -t first | cut -f 1-9,13) > $OUTDIR/${TMP}
-    mv $OUTDIR/${TMP} $OUTDIR/${TMP}.enhancers
+    cat <(echo -e "chr_dhs\tstart_dhs\tend_dhs\tname_dhs\tinteraction_score\tstrand\ttarget_gene\ttarget_bait\tinteraction_class\tclosest_gene_tss") <(closestBed -a $OUTDIR/${TMP}.enhancers -b <(grep -w protein_coding ${TSS_FILE} | cut -f 1-6) -d -t first | cut -f 1-9,13) > ${TMP}.tmp
+    mv ${TMP}.tmp $OUTDIR/${TMP}.enhancers
     
     >&2 echo done
     >&2 echo "Created output file $OUTDIR/${TMP}.enhancers (`date`)"
