@@ -122,8 +122,8 @@ cat <(echo -e "chr_bait\tstart_bait\tend_bait\tid_bait\tchr_interaction\tstart_i
 ## annotate loops using CTCF file
 if [ -s "${CTCF_FILE}" ]; then
     >&2 echo -n "Annotate loops using CTCF file (`date`).. "
-    echo -e "$(grep start $OUTDIR/${TMP}.ibed)\tCTCF_bait\tCTCF_interaction" > ${TMP}.tmp
-    paste <(grep -v start $OUTDIR/${TMP}.ibed) <(intersectBed -a <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 1-3) -b <(tabEdit -i ${CTCF_FILE} -D) -c | perl -ane 'chomp($_); $class="non-ctcf"; if($F[3]>0) { $class="ctcf"; } print "$class\n";') <(intersectBed -a <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 5-7) -b <(tabEdit -i ${CTCF_FILE} -D) -c | perl -ane 'chomp($_); $class="non-ctcf"; if($F[3]>0) { $class="ctcf"; } print "$class\n";') >> ${TMP}.tmp
+    echo -e "$(grep start $OUTDIR/${TMP}.ibed)\tloop_class_CTCF" > ${TMP}.tmp
+    paste <(grep -v start $OUTDIR/${TMP}.ibed) <(intersectBed -a <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 1-3) -b <(tabEdit -i ${CTCF_FILE} -D) -c | perl -ane 'chomp($_); $class="non-ctcf"; if($F[3]>0) { $class="ctcf"; } print "$class\n";') <(intersectBed -a <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 5-7) -b <(tabEdit -i ${CTCF_FILE} -D) -c | perl -ane 'chomp($_); $class="non-ctcf"; if($F[3]>0) { $class="ctcf"; } print "$class\n";') | perl -ane 'foreach(@F[0..scalar(@F)-3]) { print "$_\t"; } print "$F[scalar(@F)-2]"."_"."$F[scalar(@F)-1]\n";' >> ${TMP}.tmp
     mv ${TMP}.tmp $OUTDIR/${TMP}.ibed
     >&2 echo done
 fi
@@ -131,8 +131,8 @@ fi
 ## annotate loops using TXN file
 if [ -s "${TXN_FILE}" ]; then
     >&2 echo -n "Annotate loops using TXN file (`date`).. "
-    echo -e "$(grep start $OUTDIR/${TMP}.ibed)\tTXN_bait\tTXN_interaction" > ${TMP}.tmp
-    paste <(grep -v start $OUTDIR/${TMP}.ibed) <(intersectBed -a <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 1-3) -b <(tabEdit -i ${TXN_FILE} -D) -c | perl -ane 'chomp($_); $class="non-txn"; if($F[3]>0) { $class="txn"; } print "$class\n";') <(intersectBed -a <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 5-7) -b <(tabEdit -i ${TXN_FILE} -D) -c | perl -ane 'chomp($_); $class="non-txn"; if($F[3]>0) { $class="txn"; } print "$class\n";') >> ${TMP}.tmp
+    echo -e "$(grep start $OUTDIR/${TMP}.ibed)\tloop_class_TXN" > ${TMP}.tmp
+    paste <(grep -v start $OUTDIR/${TMP}.ibed) <(intersectBed -a <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 1-3) -b <(tabEdit -i ${TXN_FILE} -D) -c | perl -ane 'chomp($_); $class="non-txn"; if($F[3]>0) { $class="txn"; } print "$class\n";') <(intersectBed -a <(grep -v start $OUTDIR/${TMP}.ibed | cut -f 5-7) -b <(tabEdit -i ${TXN_FILE} -D) -c | perl -ane 'chomp($_); $class="non-txn"; if($F[3]>0) { $class="txn"; } print "$class\n";') | perl -ane 'foreach(@F[0..scalar(@F)-3]) { print "$_\t"; } print "$F[scalar(@F)-2]"."_"."$F[scalar(@F)-1]\n";' >> ${TMP}.tmp
     mv ${TMP}.tmp $OUTDIR/${TMP}.ibed
     >&2 echo done
 fi
