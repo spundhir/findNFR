@@ -160,18 +160,26 @@ if [ -s ${ENHANCER_FILE} ]; then
         else {
             print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[10]\t.\t$F[11]\t$F[9]\t".$F[scalar(@F)-1]."\tnonHiC\n"; 
         }' > $OUTDIR/${TMP}.raw
+
+    ## identify distance to the hic interacting gene
+    join -1 7 -2 2 <(less $OUTDIR/${TMP}.raw | sort -k 7,7) <(intersectBed -a <(grep -w protein_coding ${TSS_FILE}) -b <(less $OUTDIR/${TMP}.ibed | grep -v start | cut -f 1-4 | sort | uniq) -u | bed2longestRegion -i stdin | cut -f 2,4 | sort -k 2,2) | perl -ane '$dist=abs($F[2]-$F[scalar(@F)-1]); print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[0]\t$dist\t$F[7]\t$F[8]\t$F[9]\n";' | sortBed -i stdin > ${TMP}.tmp
+    mv ${TMP}.tmp $OUTDIR/${TMP}.raw
+
+    ## identify distance to the closest gene
+    cat <(echo -e "chr_dhs\tstart_dhs\tend_dhs\tname_dhs\tinteraction_score\tstrand\thic_gene\tdist_to_hic_gene_tss\thic_description\tdist_to_interacting_region\tinteraction_class\tclosest_gene\tdist_to_closest_gene_tss") <(closestBed -a $OUTDIR/${TMP}.raw -b <(grep -w protein_coding ${TSS_FILE} | cut -f 1-6 | sortBed -i stdin) -d -t first | cut -f 1-11,15,18) > ${TMP}.tmp
+    mv ${TMP}.tmp $OUTDIR/${TMP}.raw
     >&2 echo done
 
     ## find all 10 or more consecutive stretches of enhancers linked to the same target gene. If 2 or more interactions in this stretch are supported by pcHiC. Mark all the remaining non-pcHiC supported enhancers as HiC_neighbor and link them to the target gene)
     >&2 echo -n "Find all ${STRETCH_LEN} or more consecutive stretches of enhancers linked to the same target gene. If ${MIN_HIC_INTER} or more interactions in this stretch are supported by pcHiC. Mark all the remaining non-pcHiC supported enhancers as HiC_neighbor and link them to the target gene (`date`).. "
-    join -1 4 -2 1 -a 1 <(sort -k 4,4 $OUTDIR/${TMP}.raw) <(less $OUTDIR/${TMP}.raw | bedtools groupby -i stdin -g 1-4 -c 5,6,7,10 -o mean,distinct,distinct,distinct 2>/dev/null | groupBy -i stdin -g 7 -c 4,4,8 -o distinct,count_distinct,collapse | sort -k 3rn,3 | perl -ane '@t=split(/\,/, $F[3]); $sig=0; foreach(@t) { if($_=~/^HiC$/) { $sig++; } } if($sig>='${MIN_HIC_INTER}' && $F[2]>'${STRETCH_LEN}') { print $_; }' | cut -f 2 | sed -E 's/\,/\n/g' | sort | perl -ane 'chomp($_); print "$_\tHiC_neighbor\n";') | perl -ane '
-        if($F[9]=~/nonHiC/ && $F[10]=~/HiC_neighbor/) {
-            $F[9]="HiC_neighbor";
+    join -1 4 -2 1 -a 1 <(sort -k 4,4 $OUTDIR/${TMP}.raw | grep -v start) <(grep -v start $OUTDIR/${TMP}.raw | bedtools groupby -i stdin -g 1-4 -c 5,6,7,11 -o mean,distinct,distinct,distinct 2>/dev/null | groupBy -i stdin -g 7 -c 4,4,8 -o distinct,count_distinct,collapse | sort -k 3rn,3 | perl -ane '@t=split(/\,/, $F[3]); $sig=0; foreach(@t) { if($_=~/^HiC$/) { $sig++; } } if($sig>='${MIN_HIC_INTER}' && $F[2]>'${STRETCH_LEN}') { print $_; }' | cut -f 2 | sed -E 's/\,/\n/g' | sort | perl -ane 'chomp($_); print "$_\tHiC_neighbor\n";')  | perl -ane '
+        if($F[10]=~/nonHiC/ && $F[13]=~/HiC_neighbor/) {
+            $F[10]="HiC_neighbor";
         }
         if($F[4]=~/^\.$/) { $F[4]=0; $F[6]="NA"; }
-        print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\n";' | sortBed -i stdin | perl -ane '$F[7]=~s/^.*\-//g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | bedtools groupby -i stdin -g 1-4 -c 5,6,7,8,10 -o collapse,distinct,distinct,collapse,distinct 2>/dev/null | perl -ane '%seen=(); @bait=split(/\,/,$F[7]); @score=split(/\,/,$F[4]); $score=0; for($i=0; $i<scalar(@bait); $i++) { if(!$seen{$bait[$i]}) { $score+=$score[$i]; $seen{$bait[$i]}=1; } } $F[4]=$score; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $OUTDIR/${TMP}.enhancers 
+        print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$F[10]\t$F[11]\t$F[12]\n";' | perl -ane '$F[8]=~s/^.*\-//g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | bedtools groupby -i stdin -g 1-4 -c 5,6,7,8,9,11,12,13 -o collapse,distinct,distinct,collapse,collapse,distinct,distinct,distinct 2>/dev/null | perl -ane '%seen=(); @bait=split(/\,/,$F[8]); @score=split(/\,/,$F[4]); $score=0; for($i=0; $i<scalar(@bait); $i++) { if(!$seen{$bait[$i]}) { $score+=$score[$i]; $seen{$bait[$i]}=1; } } $F[4]=$score; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $OUTDIR/${TMP}.enhancers
 
-    cat <(echo -e "chr_dhs\tstart_dhs\tend_dhs\tname_dhs\tinteraction_score\tstrand\ttarget_gene\ttarget_bait\tinteraction_class\tclosest_gene_tss") <(closestBed -a $OUTDIR/${TMP}.enhancers -b <(grep -w protein_coding ${TSS_FILE} | cut -f 1-6) -d -t first | cut -f 1-9,13) > ${TMP}.tmp
+    cat <(echo -e "chr_dhs\tstart_dhs\tend_dhs\tname_dhs\tinteraction_score\tstrand\thic_gene\tdist_to_hic_gene_tss\thic_bait\tinteraction_class\tclosest_gene\tdist_closest_gene_tss") <(cat $OUTDIR/${TMP}.enhancers) > ${TMP}.tmp
     mv ${TMP}.tmp $OUTDIR/${TMP}.enhancers
     
     >&2 echo done
