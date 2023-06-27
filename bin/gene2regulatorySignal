@@ -14,8 +14,8 @@ usage() {
 	echo "Options:"
 	echo " -i <file>   [input gene coordinates in BED format (eg. gene2promoter)]"
     echo "             [format: chr start end name score strand (..)]"
-	echo " -j <file>   [input CRE coordinates in BED format (can be stdin)]"
-    echo "             [format: output from linkDHS2genes]"
+	echo " -j <file>   [input enhancer coordinates in BED format (can be stdin)]"
+    echo "             [format: chr start end name score strand + two columns - target_gene and dist_to_target_gene_tss]"
     echo " -k <file>   [configuration file containing list of BAM/BED files used to compute regulatory signal]"
     echo "             [<id> <bamfile> (eg. RP h3k27me3_esc_Rep1.bam)]"
     echo "             [<id> <bedfile> (eg. RP h3k4me3_esc_Rep1.bed)]"
@@ -23,7 +23,7 @@ usage() {
     echo "[OPTIONS]"
     echo " -g <string> [genome (default: mm10)]"
     echo " -f <string> [filter bam files from configuration file based on input indentifier (default: RP)]"
-    echo " -r          [output raw read counts (default: TPKM at promoter and TPM at CRE)]"
+    echo " -r          [output raw read counts (default: TPKM at promoter and TPM at enhancer)]"
     echo " -b          [use class information to compute TF binding or class present information]"
 	echo " -h          [help]"
     echo "[OUTPUT]"
@@ -42,7 +42,7 @@ usage() {
 while getopts i:j:k:o:g:f:rbh ARG; do
     case "$ARG" in
     i) PROMOTER_FILE=$OPTARG;;
-    j) CRE_FILE=$OPTARG;;
+    j) ENHANCER_FILE=$OPTARG;;
     k) CONFIG_FILE=$OPTARG;;
     o) OUTDIR=$OPTARG;;
     g) GENOME=$OPTARG;;
@@ -54,7 +54,7 @@ while getopts i:j:k:o:g:f:rbh ARG; do
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ ! -f "$PROMOTER_FILE" -o -z "$CRE_FILE" -o -z "$CONFIG_FILE" -o -z "$OUTDIR" -o "$HELP" ]; then
+if [ ! -f "$PROMOTER_FILE" -o -z "$ENHANCER_FILE" -o -z "$CONFIG_FILE" -o -z "$OUTDIR" -o "$HELP" ]; then
 	usage
 fi
 
@@ -128,14 +128,14 @@ fi
 #####################################
 ## organize peaks file
 #####################################
-if [ ! -s "$OUTDIR/CRE.BED" ]; then
-    if [ "$CRE_FILE" == "stdin" ]; then
+if [ ! -s "$OUTDIR/ENHANCER.BED" ]; then
+    if [ "$ENHANCER_FILE" == "stdin" ]; then
         while read LINE; do
             echo -e "${LINE}"
         done
     else
-        zless $CRE_FILE 
-    fi | grep -v 'chr.*start.*end\|seqnames.*start.*end' | bed2window -i stdin -w 250 > $OUTDIR/CRE.BED
+        zless $ENHANCER_FILE 
+    fi | grep -v 'chr.*start.*end\|seqnames.*start.*end' | bed2window -i stdin -w 250 > $OUTDIR/ENHANCER.BED
 fi
 
 #####################################
@@ -172,36 +172,36 @@ if [ "$(grep 'chr.*start.*end\|seqnames.*start.*end' $OUTDIR/PROMOTER.BED.tpm | 
 fi
 
 #####################################
-## compute signal at CRE using BAM and BED files
+## compute signal at ENHANCER using BAM and BED files
 #####################################
-if [ ! -s "$OUTDIR/CRE.BED.tpm" ]; then
+if [ ! -s "$OUTDIR/ENHANCER.BED.tpm" ]; then
     ARG=""
     if [ -z "$RAW" ]; then
         ARG="-m";
     fi
 
     ## tags per million mapped reads (TPM) unless 'RAW' is defined
-    bed2expr -i $OUTDIR/CRE.BED -j $CONFIG_FILE -d -n -g $GENOME -f $CONFIG_FILTER -N $ARG > $OUTDIR/CRE.BED.tpm
+    bed2expr -i $OUTDIR/ENHANCER.BED -j $CONFIG_FILE -d -n -g $GENOME -f $CONFIG_FILTER -N $ARG > $OUTDIR/ENHANCER.BED.tpm
 
     if [ "${#BEDFILES[@]}" -gt 0 ]; then
         for (( i=0; i<${#BEDFILES[@]}; i++ )); do
-            NCOL=$(head -n 1 $OUTDIR/CRE.BED.tpm | perl -ane 'print scalar(@F);')
-            intersectBed -a $OUTDIR/CRE.BED.tpm -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | grep -v 'chr.*start.*end\|seqnames.*start.*end' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $((NCOL+5)) -o sum -n $NCOL > $OUTDIR/CRE.BED.tpm.tmp
-            mv $OUTDIR/CRE.BED.tpm.tmp $OUTDIR/CRE.BED.tpm
+            NCOL=$(head -n 1 $OUTDIR/ENHANCER.BED.tpm | perl -ane 'print scalar(@F);')
+            intersectBed -a $OUTDIR/ENHANCER.BED.tpm -b <(zless ${BEDFILES[$i]} | perl -ane 'if($_!~/^#/) { print $_; }' | grep -v 'chr.*start.*end\|seqnames.*start.*end' | perl -ane '$j++; if($F[4]!~/^[0-9\.]+$/ || $F[4]<=0) { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t1\t.\n"; } else { print "$F[0]\t$F[1]\t$F[2]\tpeak_$j\t$F[4]\t.\n"; }') -wao | intersectBed2uniq -i stdin -c $((NCOL+5)) -o sum -n $NCOL > $OUTDIR/ENHANCER.BED.tpm.tmp
+            mv $OUTDIR/ENHANCER.BED.tpm.tmp $OUTDIR/ENHANCER.BED.tpm
         done
     fi
 fi
 
 ## organize file header
-if [ "$(grep 'chr.*start.*end\|seqnames.*start.*end' $OUTDIR/CRE.BED.tpm | wc -l)" -eq 0 ]; then
-    HEADER_DISTAL=$(tabEdit -i $CRE_FILE -d)
+if [ "$(grep 'chr.*start.*end\|seqnames.*start.*end' $OUTDIR/ENHANCER.BED.tpm | wc -l)" -eq 0 ]; then
+    HEADER_DISTAL=$(tabEdit -i $ENHANCER_FILE -d)
     HEADER_DISTAL="$HEADER_DISTAL $(zless $CONFIG_FILE | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; $F[1]=~s/[\-\.]+/\_/g; print "$F[1]\t";')"
     for(( i=0; i<${#BEDFILES[@]}; i++ )); do
         HEADER_DISTAL="$HEADER_DISTAL $(echo ${BEDFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bed$/_peak/g; $_=~s/[\-\.]+/\_/g; print $_;')"
     done
 
-    cat <(echo "$HEADER_DISTAL" | tabEdit -i stdin -t | perl -ane 'print lc $_;') $OUTDIR/CRE.BED.tpm > $OUTDIR/CRE.BED.tpm.tmp
-    mv $OUTDIR/CRE.BED.tpm.tmp $OUTDIR/CRE.BED.tpm
+    cat <(echo "$HEADER_DISTAL" | tabEdit -i stdin -t | perl -ane 'print lc $_;') $OUTDIR/ENHANCER.BED.tpm > $OUTDIR/ENHANCER.BED.tpm.tmp
+    mv $OUTDIR/ENHANCER.BED.tpm.tmp $OUTDIR/ENHANCER.BED.tpm
 fi
 exit
 
@@ -209,11 +209,11 @@ exit
 ## compute regulatory signal at promoters and distal elements of genes
 #####################################
 if [ ! -s "$OUTDIR/GENES.DistalSignal" ]; then
-    NCOL_CRE_FILE=$(head -n 1 $CRE_FILE | perl -ane 'print scalar(@F);')
+    NCOL_ENHANCER_FILE=$(head -n 1 $ENHANCER_FILE | perl -ane 'print scalar(@F);')
     DIST_COL=2
     HIC_SCORE_COL=3
     SEGMENT_COL=4
-    SIGNAL_SCORE_COL=$(zless $OUTDIR/CRE.BED.tpm | grep -v start | head -n 1 | perl -ane '$j=5; for($i='$((NCOL_CRE_FILE+1))'; $i<=scalar(@F); $i++) { $col.="$j,"; $j++; } $col=~s/\,$//g; print $col;')
+    SIGNAL_SCORE_COL=$(zless $OUTDIR/ENHANCER.BED.tpm | grep -v start | head -n 1 | perl -ane '$j=5; for($i='$((NCOL_ENHANCER_FILE+1))'; $i<=scalar(@F); $i++) { $col.="$j,"; $j++; } $col=~s/\,$//g; print $col;')
 
     ## define header for DistalSignal file
     HEADER_SIGNAL="HiC_score $(zless $CONFIG_FILE | perl -ane '$F[1]=~s/^.*\///g; $F[1]=~s/\.bam$//g; print "$F[1]\t";')"
@@ -223,18 +223,18 @@ if [ ! -s "$OUTDIR/GENES.DistalSignal" ]; then
     HEADER_SIGNAL=$(echo "$HEADER_SIGNAL" | perl -ane '$tds=""; $wds=""; foreach(@F) { $_=~s/[\-\.]+/\_/g; $tds.="TDS_$_\t"; $wds.="WDS_$_\t"; } END { $tds=~s/\s+$//g; $wds=~s/\s+$//g; print "$tds"; }')
     HEADER_SIGNAL=$(echo -e "$HEADER_SIGNAL" | sed -E 's/TDS\_//g' | tr '\t+' ',' | perl -ane 'print lc $_;')
 
-    ## select CRE not overlapping with promoter; select hic gene as target, if defined; compute total (tds) and weighted (wds) distal signal for each gene.
+    ## select ENHANCER not overlapping with promoter; select hic gene as target, if defined; compute total (tds) and weighted (wds) distal signal for each gene.
     #echo -e "$DIST_COL\n$HIC_SCORE_COL\n$SEGMENT_COL\n$SIGNAL_SCORE_COL\n$HEADER_SIGNAL"; exit
     #bed2weightedSignal.R -i t -s 3,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34 -d 2 -t 4 -r hic_score,cebpa_dox_rep1_filtered,cebpa_dox_rep2_filtered,cebpa_dox_rep3_filtered,h3k27ac_dox_rep1_filtered,h3k27ac_dox_rep2_filtered,h3k27ac_dox_rep3_filtered,h3k27me3_dox_rep1_filtered,h3k27me3_dox_rep2_filtered,h3k27me3_dox_rep3_filtered,h3k4me1_dox_rep1_filtered,h3k4me1_dox_rep2_filtered,h3k4me1_dox_rep3_filtered,h3k4me3_dox_rep1_filtered,h3k4me3_dox_rep2_filtered,h3k4me3_dox_rep3_filtered,h3k79me2_dox_rep1_filtered,h3k79me2_dox_rep2_filtered,h3k79me2_dox_rep3_filtered,mll1_dox_rep1_batch2_filtered,mll1_dox_rep2_batch2_filtered,mll1_dox_rep3_batch2_filtered,atac_dox_rep1_filtered,atac_dox_rep2_filtered,atac_dox_rep3_filtered,mll1_dox_rep1_batch2_filtered_peak,mll1_dox_rep2_batch2_filtered_peak,mll1_dox_rep3_batch2_filtered_peak,cebpa_dox_rep1_filtered_peak,cebpa_dox_rep2_filtered_peak,cebpa_dox_rep3_filtered_peak
     if [ "$(initialize_genome -g $GENOME -t)" ]; then
         TSS_FILE=$(initialize_genome -g $GENOME -t)
-        intersectBed -a <(grep -v start $OUTDIR/CRE.BED.tpm) -b <(grep -v start $TSS_FILE | grep 'protein_coding\|gene' | bed2window -i stdin -w 500 -x) -v | perl -ane '$gene=$F[7]; $dist=$F[8]; if($F[13]!~/noHiCinteraction/) { $gene=$F[9]; $dist=$F[10]; } $hic_score=1; if($F[11]!~/^\.$/ && $F[11]!~/^NA$/) { $hic_score=$F[11]; } print "$gene\t$dist\t$hic_score"; foreach(@F[13..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sort -k 1,1 | perl -ane 'if($F[0]!~/^\.$/) { print $_; }' | groupBy -g 1 -c $DIST_COL,$HIC_SCORE_COL,$SEGMENT_COL,$SIGNAL_SCORE_COL -o collapse | bed2weightedSignal.R -i stdin -s $HIC_SCORE_COL,$SIGNAL_SCORE_COL -d $DIST_COL -t $SEGMENT_COL -r $HEADER_SIGNAL | cut -f 1,3- | sed -E 's/^V1\t/name\t/' > $OUTDIR/GENES.DistalSignal
+        intersectBed -a <(grep -v start $OUTDIR/ENHANCER.BED.tpm) -b <(grep -v start $TSS_FILE | grep 'protein_coding\|gene' | bed2window -i stdin -w 500 -x) -v | perl -ane '$gene=$F[7]; $dist=$F[8]; if($F[13]!~/noHiCinteraction/) { $gene=$F[9]; $dist=$F[10]; } $hic_score=1; if($F[11]!~/^\.$/ && $F[11]!~/^NA$/) { $hic_score=$F[11]; } print "$gene\t$dist\t$hic_score"; foreach(@F[13..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sort -k 1,1 | perl -ane 'if($F[0]!~/^\.$/) { print $_; }' | groupBy -g 1 -c $DIST_COL,$HIC_SCORE_COL,$SEGMENT_COL,$SIGNAL_SCORE_COL -o collapse | bed2weightedSignal.R -i stdin -s $HIC_SCORE_COL,$SIGNAL_SCORE_COL -d $DIST_COL -t $SEGMENT_COL -r $HEADER_SIGNAL | cut -f 1,3- | sed -E 's/^V1\t/name\t/' > $OUTDIR/GENES.DistalSignal
         
-        cat <(grep -w start $OUTDIR/CRE.BED.tpm | sed -E 's/closest_/target_/g') <(intersectBed -a <(grep -v start $OUTDIR/CRE.BED.tpm) -b <(grep -v start $TSS_FILE | grep 'protein_coding\|gene' | bed2window -i stdin -w 500 -x) -v | perl -ane '$gene=$F[7]; $dist=$F[8]; if($F[13]!~/noHiCinteraction/) { $F[7]=$F[9]; $F[8]=$F[10]; } if($F[11]=~/^\.$/ && $F[11]=~/^NA$/) { $F[11]=1; } print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sortBed -i stdin) > $OUTDIR/ENHANCERS.BED.tpm
+        cat <(grep -w start $OUTDIR/ENHANCER.BED.tpm | sed -E 's/closest_/target_/g') <(intersectBed -a <(grep -v start $OUTDIR/ENHANCER.BED.tpm) -b <(grep -v start $TSS_FILE | grep 'protein_coding\|gene' | bed2window -i stdin -w 500 -x) -v | perl -ane '$gene=$F[7]; $dist=$F[8]; if($F[13]!~/noHiCinteraction/) { $F[7]=$F[9]; $F[8]=$F[10]; } if($F[11]=~/^\.$/ && $F[11]=~/^NA$/) { $F[11]=1; } print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sortBed -i stdin) > $OUTDIR/ENHANCERS.BED.tpm
     else
-        intersectBed -a <(grep -v start $OUTDIR/CRE.BED.tpm) -b <(grep -v start $OUTDIR/PROMOTER.BED) -v | perl -ane '$gene=$F[7]; $dist=$F[8]; if($F[13]!~/noHiCinteraction/) { $gene=$F[9]; $dist=$F[10]; } $hic_score=1; if($F[11]!~/^\.$/ && $F[11]!~/^NA$/) { $hic_score=$F[11]; } print "$gene\t$dist\t$hic_score"; foreach(@F[13..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sort -k 1,1 | perl -ane 'if($F[0]!~/^\.$/) { print $_; }' | groupBy -g 1 -c $DIST_COL,$HIC_SCORE_COL,$SEGMENT_COL,$SIGNAL_SCORE_COL -o collapse | bed2weightedSignal.R -i stdin -s $HIC_SCORE_COL,$SIGNAL_SCORE_COL -d $DIST_COL -t $SEGMENT_COL -r $HEADER_SIGNAL | cut -f 1,3- | sed -E 's/^V1\t/name\t/' > $OUTDIR/GENES.DistalSignal
+        intersectBed -a <(grep -v start $OUTDIR/ENHANCER.BED.tpm) -b <(grep -v start $OUTDIR/PROMOTER.BED) -v | perl -ane '$gene=$F[7]; $dist=$F[8]; if($F[13]!~/noHiCinteraction/) { $gene=$F[9]; $dist=$F[10]; } $hic_score=1; if($F[11]!~/^\.$/ && $F[11]!~/^NA$/) { $hic_score=$F[11]; } print "$gene\t$dist\t$hic_score"; foreach(@F[13..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sort -k 1,1 | perl -ane 'if($F[0]!~/^\.$/) { print $_; }' | groupBy -g 1 -c $DIST_COL,$HIC_SCORE_COL,$SEGMENT_COL,$SIGNAL_SCORE_COL -o collapse | bed2weightedSignal.R -i stdin -s $HIC_SCORE_COL,$SIGNAL_SCORE_COL -d $DIST_COL -t $SEGMENT_COL -r $HEADER_SIGNAL | cut -f 1,3- | sed -E 's/^V1\t/name\t/' > $OUTDIR/GENES.DistalSignal
         
-        cat <(grep -w start $OUTDIR/CRE.BED.tpm | sed -E 's/closest_/target_/g') <(intersectBed -a <(grep -v start $OUTDIR/CRE.BED.tpm) -b <(grep -v start $OUTDIR/PROMOTER.BED) -v | perl -ane '$gene=$F[7]; $dist=$F[8]; if($F[13]!~/noHiCinteraction/) { $F[7]=$F[9]; $F[8]=$F[10]; } if($F[11]=~/^\.$/ && $F[11]=~/^NA$/) { $F[11]=1; } print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sortBed -i stdin) > $OUTDIR/ENHANCERS.BED.tpm
+        cat <(grep -w start $OUTDIR/ENHANCER.BED.tpm | sed -E 's/closest_/target_/g') <(intersectBed -a <(grep -v start $OUTDIR/ENHANCER.BED.tpm) -b <(grep -v start $OUTDIR/PROMOTER.BED) -v | perl -ane '$gene=$F[7]; $dist=$F[8]; if($F[13]!~/noHiCinteraction/) { $F[7]=$F[9]; $F[8]=$F[10]; } if($F[11]=~/^\.$/ && $F[11]=~/^NA$/) { $F[11]=1; } print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sortBed -i stdin) > $OUTDIR/ENHANCERS.BED.tpm
     fi
 fi
 
