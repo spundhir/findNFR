@@ -203,7 +203,6 @@ if [ "$(grep 'chr.*start.*end\|seqnames.*start.*end' $OUTDIR/CRE.BED.tpm | wc -l
     cat <(echo "$HEADER_DISTAL" | tabEdit -i stdin -t | perl -ane 'print lc $_;') $OUTDIR/CRE.BED.tpm > $OUTDIR/CRE.BED.tpm.tmp
     mv $OUTDIR/CRE.BED.tpm.tmp $OUTDIR/CRE.BED.tpm
 fi
-exit
 
 #####################################
 ## compute regulatory signal at promoters and distal elements of genes
