@@ -179,7 +179,7 @@ if [ -s ${ENHANCER_FILE} ]; then
             $F[10]="HiC_neighbor";
         }
         if($F[4]=~/^\.$/) { $F[4]=0; $F[6]="NA"; }
-        print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$F[10]\t$F[11]\t$F[12]\n";' | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | bedtools groupby -i stdin -g 1-4 -c 5,6,7,8,9,11,12,13 -o collapse,distinct,distinct,collapse,collapse,distinct,distinct,distinct 2>/dev/null | perl -ane '%seen=(); @bait=split(/\,/,$F[8]); @score=split(/\,/,$F[4]); $score=0; for($i=0; $i<scalar(@bait); $i++) { if(!$seen{$bait[$i]}) { $score+=$score[$i]; $seen{$bait[$i]}=1; } } $F[4]=$score; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' > $OUTDIR/${TMP}.enhancers
+        print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[8]\t$F[9]\t$F[10]\t$F[11]\t$F[12]\n";' | perl -ane 'print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | bedtools groupby -i stdin -g 1-4 -c 5,6,7,8,9,11,12,13 -o collapse,distinct,distinct,collapse,collapse,distinct,distinct,distinct 2>/dev/null | perl -ane '%seen=(); @bait=split(/\,/,$F[8]); @score=split(/\,/,$F[4]); $score=0; for($i=0; $i<scalar(@bait); $i++) { if(!$seen{$bait[$i]}) { $score+=$score[$i]; $seen{$bait[$i]}=1; } } $F[4]=$score; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 > $OUTDIR/${TMP}.enhancers
 
     cat <(echo -e "chr_dhs\tstart_dhs\tend_dhs\tname_dhs\tinteraction_score\tstrand\thic_gene\tdist_to_hic_gene_tss\tloop_info\tinteraction_class\tclosest_gene\tdist_closest_gene_tss") <(cat $OUTDIR/${TMP}.enhancers) > ${TMP}.tmp
     mv ${TMP}.tmp $OUTDIR/${TMP}.enhancers
