@@ -123,7 +123,7 @@ if [ "$FILTER_FILES" -eq 1 ]; then
         filterFilesByName -i $INPUTBAMFILES -F $EXCLUDE_FILTER -e bam -M | tr '\,' '\n'
     else
         cat $INPUTBAMFILES
-    fi | grep -v "^$" | perl -ane 'chomp($_); if(scalar(@F)==1) { print "tpm\t$_\n"; } else { print "$_\n"; }' > ${TMP}.bamConfig
+    fi | grep -v "^$" | grep bam | perl -ane 'chomp($_); if(scalar(@F)==1) { print "tpm\t$_\n"; } else { print "$_\n"; }' > ${TMP}.bamConfig
     INPUTBAMFILES=${TMP}.bamConfig
     
     if [ "$(cat $INPUTBAMFILES | perl -ane 'print scalar(@F)."\n";' | sort | uniq | wc -l)" -gt 1 -o "$(cat $INPUTBAMFILES | wc -l)" -eq 0 ]; then
@@ -232,7 +232,7 @@ BEDFILE=${TMP}.bed
 ## organize file header
 HEADER=$(tabEdit -i ${TMP} -d)
 for(( i=0; i<${#BAMFILES[@]}; i++ )); do
-    HEADER="$HEADER $(echo ${BAMFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bam$//g; print $_;')"
+    HEADER="$HEADER $(echo ${BAMFILES[$i]} | perl -ane '$_=~s/^.*\///g; $_=~s/\.bam$//g; $_=~s/[\-\.]+/\_/g; print lc $_;')"
 done
 
 ## compute coverage using control sample
