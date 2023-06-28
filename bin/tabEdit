@@ -10,7 +10,7 @@ usage() {
 	echo "Usage: tabEdit -i <file> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input tab delimited file (can be stdin)]"
-    echo " -c          [count number of columns (default)]"
+    echo " -s <string> [identify column number for given column name]"
     echo " -r          [remove empty columns]"
     echo " -t          [convert spaces to tab]"
     echo " -m          [convert comma to tab]"
@@ -19,6 +19,7 @@ usage() {
     echo "             [format: 1,5,6 OR 1,5,6,count OR 1-4,count OR all]"
     echo " -F <string> [filter given rows from the input file (comma separated, if multiple)]"
     echo "             [format: 1,5,6 OR 1,5,6,count OR 1-4,count OR all]"
+    echo " -R          [select columns in the order specified in -f argument]"
     echo " -d          [extract from file - header]"
     echo " -D          [extract from file - everything except header]"
     echo " -h          [help]"
@@ -27,16 +28,17 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:crtmn:f:F:dDh ARG; do
+while getopts i:s:rtmn:f:F:RdDh ARG; do
     case "$ARG" in
     i) INFILE=$OPTARG;;
-    c) COUNT=1;;
+    s) COL_NAME=$OPTARG;;
     r) REMOVE=1;;
     t) TAB=1;;
     m) COMMA=1;;
     n) NCOL=$OPTARG;;
     f) FILTER_COL=$OPTARG;;
     F) FILTER_ROW=$OPTARG;;
+    R) KEEP_ORDER=1;;
     d) HEADER=1;;
     D) NOHEADER=1;;
     h) HELP=1;;
@@ -59,7 +61,9 @@ if [ "$INFILE" == "stdin" ]; then
 fi
 
 ## perform operations on the input file
-if [ ! -z "$TAB" ]; then
+if [ ! -z "$COL_NAME" ]; then
+    zless $INFILE | perl -ane 'for($i=0; $i<scalar(@F); $i++) { if($F[$i]=~/'$COL_NAME'/) { print $i+1; } }'
+elif [ ! -z "$TAB" ]; then
     zless $INFILE | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
 elif [ ! -z "$COMMA" ]; then
     zless $INFILE | perl -an -F'/\,/' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
@@ -81,7 +85,11 @@ elif [ ! -z "$FILTER_COL" ]; then
             fi
         done)
         FILTER_COL=$(echo $FILTER_COL | perl -ane '$_=~s/\,$//g; print $_;')
-        zless $INFILE | tabEdit -i stdin -t | cut -f $FILTER_COL
+        if [ ! -z "$KEEP_ORDER" ]; then
+            zless $INFILE | tabEdit -i stdin -t | tabEdit.R -i stdin -f $FILTER_COL
+        else
+            zless $INFILE | tabEdit -i stdin -t | cut -f $FILTER_COL
+        fi
     fi
 elif [ ! -z "$FILTER_ROW" ]; then
     if [ "$FILTER_ROW" == "all" ]; then

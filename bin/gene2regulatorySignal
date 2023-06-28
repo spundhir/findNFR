@@ -203,16 +203,23 @@ if [ "$(grep 'chr.*start.*end\|seqnames.*start.*end' $OUTDIR/ENHANCER.BED.tpm | 
     cat <(echo "$HEADER_DISTAL" | tabEdit -i stdin -t | perl -ane 'print lc $_;') $OUTDIR/ENHANCER.BED.tpm > $OUTDIR/ENHANCER.BED.tpm.tmp
     mv $OUTDIR/ENHANCER.BED.tpm.tmp $OUTDIR/ENHANCER.BED.tpm
 fi
-exit
 
 #####################################
 ## compute regulatory signal at promoters and distal elements of genes
 #####################################
 if [ ! -s "$OUTDIR/GENES.DistalSignal" ]; then
     NCOL_ENHANCER_FILE=$(head -n 1 $ENHANCER_FILE | perl -ane 'print scalar(@F);')
-    DIST_COL=2
-    HIC_SCORE_COL=3
-    SEGMENT_COL=4
+    DIST_COL=3
+    HIC_SCORE_COL=4
+    if [ -z $(head -n 1 $OUTDIR/ENHANCER.BED.tpm | tabEdit -i stdin -s target_gene) -o -z $(head -n 1 $OUTDIR/ENHANCER.BED.tpm | tabEdit -i stdin -s dist_to_target_gene_tss) ]; then
+        >&2 echo
+        >&2 echo "ERROR: target_gene or dist_to_target_gene_tss column not found in the $ENHANCER_FILE"
+        usage
+    fi
+    if [ ! -z $(head -n 1 $OUTDIR/ENHANCER.BED.tpm | tabEdit -i stdin -s interaction_class) ]; then
+        
+        SEGMENT_COL=$(head -n 1 $OUTDIR/ENHANCER.BED.tpm | tabEdit -i stdin -s interaction_class)
+    fi
     SIGNAL_SCORE_COL=$(zless $OUTDIR/ENHANCER.BED.tpm | grep -v start | head -n 1 | perl -ane '$j=5; for($i='$((NCOL_ENHANCER_FILE+1))'; $i<=scalar(@F); $i++) { $col.="$j,"; $j++; } $col=~s/\,$//g; print $col;')
 
     ## define header for DistalSignal file
