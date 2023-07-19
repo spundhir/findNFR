@@ -56,13 +56,14 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
     echo "             [exact regions that were used as input.                                                                               ]"
     echo " -l <string> [name of motifs that must be included in the final output]"
     echo "             [if multiple, separate them by a comma]"
+    echo " -G          [also perform GIGGLE enrichment analysis]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:s:g:r:c:t:u:v:w:p:y:z:n:b:x:d:l:h ARG; do
+while getopts i:o:s:g:r:c:t:u:v:w:p:y:z:n:b:x:d:l:Gh ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -82,6 +83,7 @@ while getopts i:o:s:g:r:c:t:u:v:w:p:y:z:n:b:x:d:l:h ARG; do
         x) MIN_N_CLASS=$OPTARG;;
         d) SIZE=$OPTARG;;
         l) MUST_INCLUDE_MOTIF=$OPTARG;;
+        G) GIGGLE=1;;
 		h) HELP=1;;
 	esac
 done
@@ -119,6 +121,8 @@ if [ "$GENOME" == "mm9" ]; then
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
     fi
+    GTRD_DIR=""
+    UNIBIND_DIR=""
 elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg19.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
@@ -126,6 +130,8 @@ elif [ "$GENOME" == "hg19" ]; then
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoHuman_eukaryote.homer"
     fi
+    GTRD_DIR=""
+    UNIBIND_DIR=""
 elif [ "$GENOME" == "mm10" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm10.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
@@ -133,6 +139,8 @@ elif [ "$GENOME" == "mm10" ]; then
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
     fi
+    GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/mm10/giggle/"
+    UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/mm10/giggle/"
 elif [ "$GENOME" == "hg38" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg38.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
@@ -140,6 +148,8 @@ elif [ "$GENOME" == "hg38" ]; then
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoHuman_eukaryote.homer"
     fi
+    GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/hg38/giggle/"
+    UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/hg38/giggle/"
 elif [ "$GENOME" == "danRer7" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"   
@@ -148,6 +158,8 @@ elif [ "$GENOME" == "danRer7" ]; then
         TFBS_FILE="NA"
         usage
     fi
+    GTRD_DIR=""
+    UNIBIND_DIR=""
 else
     echo "Presently the program only support analysis for mm9, mm10, hg19, hg38 or danRer7"
     echo
@@ -198,10 +210,15 @@ for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$
 
 <<"COMMENT"
 COMMENT
+    ARGS=""
+    if [ ! -z "$GIGGLE" -a -d "$GTRD_DIR" -a -d "$UNIBIND_DIR" ]; then
+        ARGS="$ARGS -G"
+    fi
+
     if [ -z "$BKG_FILE" ]; then
-        motifAna -i $OUTDIR/enhancer_$ID.bed -o $MOTIFDIR -m 1 -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x $PVALUE -y $MIN_P_T -n $S -g $GENOME -p $PROCESSOR -s $TFBS_FILE -d $SIZE &>$MOTIFDIR/$ID.log &
+        motifAna -i $OUTDIR/enhancer_$ID.bed -o $MOTIFDIR -m 1 -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x $PVALUE -y $MIN_P_T -n $S -g $GENOME -p $PROCESSOR -s $TFBS_FILE -d $SIZE $ARGS &>$MOTIFDIR/$ID.log &
     else
-        motifAna -i $OUTDIR/enhancer_$ID.bed -o $MOTIFDIR -m 1 -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x $PVALUE -y $MIN_P_T -n $S -g $GENOME -p $PROCESSOR -s $TFBS_FILE -b $BKG_FILE -d $SIZE &>$MOTIFDIR/$ID.log &
+        motifAna -i $OUTDIR/enhancer_$ID.bed -o $MOTIFDIR -m 1 -t $LENGTH -u $REDUCE_THRESHOLD -v $INFO -x $PVALUE -y $MIN_P_T -n $S -g $GENOME -p $PROCESSOR -s $TFBS_FILE -b $BKG_FILE -d $SIZE $ARGS &>$MOTIFDIR/$ID.log &
     fi
 
     CLASS_COUNT=$((CLASS_COUNT+1))
@@ -215,6 +232,10 @@ if [ "$CLASS_COUNT" -gt 1 ]; then
         extractMotifs -i $TFBS_FILE -j $MUST_INCLUDE_MOTIF -g $GENOME > $OUTDIR/MUST_INCLUDE.MOTIFS
         ARGS="$ARGS -l $MUST_INCLUDE_MOTIF"
         ARGS="$ARGS -M $OUTDIR/MUST_INCLUDE.MOTIFS"
+    fi
+
+    if [ ! -z "$GIGGLE" -a -d "$GTRD_DIR" -a -d "$UNIBIND_DIR" ]; then
+        ARGS="$ARGS -G"
     fi
 
     MOTIFDIR_ALL=$(echo $MOTIFDIR_ALL | perl -ane '$_=~s/^\,//g; print $_;')

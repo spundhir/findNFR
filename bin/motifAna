@@ -65,14 +65,15 @@ usage() {
     echo "             [regions will be based off the center of the peaks.  If you prefer an offset, you can specify '-d -300,100' to     ]"
     echo "             [search a region of size 400 that is centered 100 bp upstream of the peak center (useful if doing motif finding on    ]"
     echo "             [putative TSS regions).  If you have variable length regions, use the option '-d given' and HOMER will use the     ]"
-    echo "             [exact regions that were used as input.]"
+    echo "             [exact regions that were used as input]"
+    echo " -G          [also perform GIGGLE enrichment analysis]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fD:g:p:d:h ARG; do
+while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fD:g:p:d:Gh ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -94,6 +95,7 @@ while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fD:g:p:d:h ARG; do
         g) GENOME=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
         d) SIZE=$OPTARG;;
+        G) GIGGLE=1;;
 		h) HELP=1;;
 	esac
 done
@@ -131,6 +133,8 @@ if [ "$GENOME" == "mm9" ]; then
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
     fi
+    GTRD_DIR=""
+    UNIBIND_DIR=""
 elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg19.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
@@ -138,6 +142,8 @@ elif [ "$GENOME" == "hg19" ]; then
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoHuman_eukaryote.homer"
     fi
+    GTRD_DIR=""
+    UNIBIND_DIR=""
 elif [ "$GENOME" == "mm10" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm10.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
@@ -145,6 +151,8 @@ elif [ "$GENOME" == "mm10" ]; then
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
     fi
+    GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/mm10/giggle/"
+    UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/mm10/giggle/"
 elif [ "$GENOME" == "hg38" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg38.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
@@ -152,6 +160,8 @@ elif [ "$GENOME" == "hg38" ]; then
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoHuman_eukaryote.homer"
     fi
+    GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/hg38/giggle/"
+    UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/hg38/giggle/"
 elif [ "$GENOME" == "danRer7" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"
@@ -160,6 +170,8 @@ elif [ "$GENOME" == "danRer7" ]; then
         TFBS_FILE="NA"
         usage
     fi
+    GTRD_DIR=""
+    UNIBIND_DIR=""
 else
     echo "Presently the program only support analysis for mm9, mm10, hg19, hg38 or danRer7"
     echo
@@ -189,6 +201,14 @@ fi
 zless $OUTDIR/REGIONS_INTEREST.bed.tmp | perl -ane 'BEGIN { $counter=1; } if($F[5]!~/^\+$/ && $F[5]!~/^\-$/) { $F[5]="."; } if('$KEEP_ID') { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t1\t$F[5]"; } else { print "$F[0]\t$F[1]\t$F[2]\tREGION$counter\t1\t$F[5]"; } print "\n"; $counter++;' > $OUTDIR/REGIONS_INTEREST.bed
 rm $OUTDIR/REGIONS_INTEREST.bed.tmp
 echo "done"
+
+## perform giggle enrichment analysis
+if [ ! -z "$GIGGLE" -a -d "$GTRD_DIR" -a -d "$UNIBIND_DIR" ]; then
+    cat $OUTDIR/REGIONS_INTEREST.bed | bgzip > $OUTDIR/REGIONS_INTEREST.bed.gz
+    giggle search -i $GTRD_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s > $OUTDIR/gtrdResults.txt
+    giggle search -i $UNIBIND_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s > $OUTDIR/unibindResults.txt
+    rm $OUTDIR/REGIONS_INTEREST.bed.gz
+fi
 
 ## determine motifs at input genomic regions
 if [ "$MODE" -eq 1 ]; then

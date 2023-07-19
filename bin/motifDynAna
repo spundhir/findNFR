@@ -51,13 +51,14 @@ usage() {
     echo " -l <string> [name of motifs that must be included in the final output]"
     echo "             [if multiple, separate them by a comma]"
     echo " -M <file>   [file containing TF motifs which must be included in the output]"
+    echo " -G          [also perform GIGGLE enrichment analysis]"
     echo " -h          [help]"
     echo
     exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:d:l:M:h ARG; do
+while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:d:l:M:Gh ARG; do
 	case "$ARG" in
 		i) INDIR=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -76,6 +77,7 @@ while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:d:l:M:h ARG; do
         d) SIZE=$OPTARG;;
         l) MUST_INCLUDE_MOTIF=$OPTARG;;
         M) MUST_INCLUDE_MOTIF_FILE=$OPTARG;;
+        G) GIGGLE=1;;
         h) HELP=1;;
 	esac
 done
@@ -143,8 +145,26 @@ IFS=","
 INDIRS=($INDIR)
 IFS=$oIFS
 
+## perform giggle enrichment analysis
+if [ ! -z "$GIGGLE" ]; then
+    for CLASS in GTRD UNIBIND; do 
+        for (( i=0; i<${#INDIRS[@]}; i++)); do
+            ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
+            if [ -f "${INDIRS[$i]}/${CLASS,,}Results.txt" ]; then
+                if [ "$i" -eq 0 ]; then
+                    grep odds_ratio ${INDIRS[$i]}/${CLASS,,}Results.txt | perl -ane 'chomp($_); $_=~s/\#//g; print "id\t$_\n";'
+                fi
+
+                grep -v odds_ratio ${INDIRS[$i]}/${CLASS,,}Results.txt | perl -ane 'chomp($_); print "'$ID'\t$_\n";'
+            fi
+        done > $OUTDIR/${CLASS}_TF_ENRICHMENT_DYNAMICS.TXT 
+    done
+    motifDynAna.R -i $OUTDIR/"$CLASS"_TF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_motif_dynamics.pdf
+fi
+
 <<"COMMENT"
 COMMENT
+## perform motif enrichment analysis
 for CLASS in DENOVO KNOWN; do 
     echo -n "Parse through each input directory to create a list of all $CLASS motifs found at any motifAna run (`date`).. "
     for (( i=0; i<${#INDIRS[@]}; i++)); do
