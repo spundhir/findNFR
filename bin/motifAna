@@ -204,9 +204,10 @@ echo "done"
 
 ## perform giggle enrichment analysis
 if [ ! -z "$GIGGLE" -a -d "$GTRD_DIR" -a -d "$UNIBIND_DIR" ]; then
+    TARGET_TOTAL=$(cat $OUTDIR/REGIONS_INTEREST.bed | wc -l)
     cat $OUTDIR/REGIONS_INTEREST.bed | bgzip > $OUTDIR/REGIONS_INTEREST.bed.gz
-    giggle search -i $GTRD_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s > $OUTDIR/gtrdResults.txt
-    giggle search -i $UNIBIND_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s > $OUTDIR/unibindResults.txt
+    giggle search -i $GTRD_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/gtrdResults.txt
+    giggle search -i $UNIBIND_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/unibindResults.txt
     rm $OUTDIR/REGIONS_INTEREST.bed.gz
 fi
 
