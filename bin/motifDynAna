@@ -159,7 +159,7 @@ if [ ! -z "$GIGGLE" ]; then
             fi
         done > $OUTDIR/${CLASS}_TF_ENRICHMENT_DYNAMICS.TXT 
     done
-    motifDynAna.R -i $OUTDIR/"$CLASS"_TF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_motif_dynamics.pdf
+    giggleDynAna.R -i $OUTDIR/"$CLASS"_TF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_motif_dynamics.rds
 fi
 
 <<"COMMENT"
