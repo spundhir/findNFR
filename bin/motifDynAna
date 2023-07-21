@@ -158,8 +158,8 @@ if [ ! -z "$GIGGLE" ]; then
                 grep -v odds_ratio ${INDIRS[$i]}/${CLASS,,}Results.txt | perl -ane 'chomp($_); print "'$ID'\t$_\n";'
             fi
         done > $OUTDIR/${CLASS}_TF_ENRICHMENT_DYNAMICS.TXT 
+        giggleDynAna.R -i $OUTDIR/"$CLASS"_TF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_tf_dynamics.rds
     done
-    giggleDynAna.R -i $OUTDIR/"$CLASS"_TF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_motif_dynamics.rds
 fi
 
 <<"COMMENT"
