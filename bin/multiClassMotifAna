@@ -236,6 +236,13 @@ if [ "$CLASS_COUNT" -gt 1 ]; then
 
     if [ ! -z "$GIGGLE" -a -d "$GTRD_DIR" -a -d "$UNIBIND_DIR" ]; then
         ARGS="$ARGS -G"
+        if [ ! -z "${BKG_FILE}" ]; then
+            TARGET_TOTAL=$(cat ${BKG_FILE} | wc -l)
+            cat ${BKG_FILE} | bgzip > ${BKG_FILE}.gz
+            giggle search -i $GTRD_DIR -q ${BKG_FILE} -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/gtrdResults.txt
+            giggle search -i $UNIBIND_DIR -q ${BKG_FILE} -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/unibindResults.txt
+            rm ${BKG_FILE}.gz
+        fi
     fi
 
     MOTIFDIR_ALL=$(echo $MOTIFDIR_ALL | perl -ane '$_=~s/^\,//g; print $_;')

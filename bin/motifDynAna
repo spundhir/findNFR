@@ -157,7 +157,14 @@ if [ ! -z "$GIGGLE" ]; then
 
                 grep -v odds_ratio ${INDIRS[$i]}/${CLASS,,}Results.txt | perl -ane 'chomp($_); print "'$ID'\t$_\n";'
             fi
-        done > $OUTDIR/${CLASS}_TF_ENRICHMENT_DYNAMICS.TXT 
+        done > $OUTDIR/${CLASS}_TF_ENRICHMENT_DYNAMICS.TXT
+
+        if [ ! -z "${BKG_FILE}" ]; then
+            ID=$(cat ${BKG_FILE} | cut -f 7 | sort | uniq)
+            DIRNAME=$(dirname ${BKG_FILE})
+            grep -v odds_ratio ${DIRNAME}/${CLASS,,}Results.txt | perl -ane 'chomp($_); print "'$ID'\t$_\n";'
+        fi >> $OUTDIR/${CLASS}_TF_ENRICHMENT_DYNAMICS.TXT
+
         giggleDynAna.R -i $OUTDIR/"$CLASS"_TF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_tf_dynamics.rds
     done
 fi
