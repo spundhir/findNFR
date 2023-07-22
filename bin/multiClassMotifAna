@@ -238,10 +238,10 @@ if [ "$CLASS_COUNT" -gt 1 ]; then
         ARGS="$ARGS -G"
         if [ ! -z "${BKG_FILE}" ]; then
             TARGET_TOTAL=$(cat ${BKG_FILE} | wc -l)
-            cat ${BKG_FILE} | bgzip > ${BKG_FILE}.gz
-            giggle search -i $GTRD_DIR -q ${BKG_FILE} -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/gtrdResults.txt
-            giggle search -i $UNIBIND_DIR -q ${BKG_FILE} -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/unibindResults.txt
-            rm ${BKG_FILE}.gz
+            cat ${BKG_FILE} | bgzip > ${BKG_FILE}.bed.gz
+            giggle search -i $GTRD_DIR -q ${BKG_FILE}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/gtrdResults.txt
+            giggle search -i $UNIBIND_DIR -q ${BKG_FILE}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/unibindResults.txt
+            rm ${BKG_FILE}.bed.gz
         fi
     fi
 

@@ -212,102 +212,102 @@ if [ ! -z "$GIGGLE" -a -d "$GTRD_DIR" -a -d "$UNIBIND_DIR" ]; then
 fi
 
 ## determine motifs at input genomic regions
-if [ "$MODE" -eq 1 ]; then
-    ADDITIONAL_ARGUMENT=""
-    echo -n "Determine all TFBS motifs enriched in the input regions... "
-    #if [ ! -z "$INFO" ]; then
-    #    ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -info $INFO"
-    #fi
-    #if [ ! -z "$MIN_T" ]; then
-    #    ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -minT $MIN_T"
-    #fi
-
-<<"COMMENT"
-COMMENT
-    if [ -z "$BKG_FILE" ]; then
-        #findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS_FILE -mknown $TFBS_FILE -p $PROCESSOR -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -dumpFasta -S $S $ADDITIONAL_ARGUMENT -size $SIZE &> $OUTDIR/findMotifs.log
-        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS_FILE -mknown $TFBS_FILE -p $PROCESSOR -len $LENGTH -dumpFasta -S $S $ADDITIONAL_ARGUMENT -size $SIZE -seqlogo &> $OUTDIR/findMotifs.log
-    else
-        if [ ! -f "$BKG_FILE" ]; then
-            TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-            zless $OUTDIR/REGIONS_INTEREST.bed | grep -vw $BKG_FILE > $OUTDIR/$TMP.target
-            zless $OUTDIR/REGIONS_INTEREST.bed | grep -w $BKG_FILE > $OUTDIR/$TMP.background
-            mv $OUTDIR/$TMP.target $OUTDIR/REGIONS_INTEREST.bed
-            BKG_FILE="$OUTDIR/$TMP.background"
-        fi
-
-        #findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS_FILE -mknown $TFBS_FILE -p $PROCESSOR -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -dumpFasta -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE &> $OUTDIR/findMotifs.log
-        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS_FILE -mknown $TFBS_FILE -p $PROCESSOR -len $LENGTH -dumpFasta -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE -seqlogo &> $OUTDIR/findMotifs.log
-    fi
-    echo "done"
-
-    echo -n "Create final output files (DENOVO_MOTIFS.TXT, KNOWN_MOTIFS.TXT)... "
-    REGIONS_INTEREST_COUNT=$(cat $OUTDIR/REGIONS_INTEREST.bed | wc -l)
-    ## debug: REGIONS_INTEREST_COUNT=100; PVALUE="1e-15"; MIN_P_T=3; B=100;
-    if [ -f "$OUTDIR/homerResults.html" ]; then
-        grep png $OUTDIR/homerResults.html | grep -vE ">\*<" | perl -ane '$_=~s/<tr><td>//gi; $_=~s/<\/td><td>/\t/gi; $_=~s/<\/td><\/tr>//gi; $_=~s/^[0-9]*\s+//g; print $_;' | perl -an -F'/\t/' -e '$F[0]=~s/^.*\=\"//g; $F[0]=~s/\".*//g; $F[0]=~s/\.logo.*//g; $F[6]=~s/\<BR.*//g; print "$F[6]\t$F[1]\t$F[3]\t$F[4]\t'$OUTDIR/'$F[0].motif\t'$REGIONS_INTEREST_COUNT'\n";' | perl -ane '$pval=sprintf("%0.20f", $F[1]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[2]=~s/\%//g; $F[3]=~s/\%//g; if($pval < $my_pval && $F[2]>='$MIN_P_T' && $F[3]<='$B') { print "$_"; }' > $OUTDIR/DENOVO_MOTIFS.TXT
-    else
-        touch $OUTDIR/DENOVO_MOTIFS.TXT
-    fi
-    if [ -f "$OUTDIR/knownResults.html" ]; then
-        grep png $OUTDIR/knownResults.html | grep -vE ">\*<" | perl -ane '$_=~s/<tr><td>//gi; $_=~s/<\/td><td>/\t/gi; $_=~s/<\/td><\/tr>//gi; $_=~s/^[0-9]*\s+//g; print $_;' | perl -an -F'/\t/' -e '$F[0]=~s/^.*\=\"//g; $F[0]=~s/\".*//g; $F[0]=~s/\.logo.*//g; print "$F[1]\t$F[2]\t$F[6]\t$F[8]\t'$OUTDIR/'$F[0].motif\t'$REGIONS_INTEREST_COUNT'\n";' | perl -ane '$pval=sprintf("%0.20f", $F[1]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[2]=~s/\%//g; $F[3]=~s/\%//g; if($pval < $my_pval && $F[2]>='$MIN_P_T' && $F[3]<='$B') { print "$_"; }' > $OUTDIR/KNOWN_MOTIFS.TXT
-    else
-        touch $OUTDIR/KNOWN_MOTIFS.TXT
-    fi
-    if [ -f "$OUTDIR/DENOVO_MOTIFS.TXT" -a -f "$OUTDIR/KNOWN_MOTIFS.TXT" ]; then
-        cat $OUTDIR/DENOVO_MOTIFS.TXT $OUTDIR/KNOWN_MOTIFS.TXT | perl -ane '$F[0]=~s/\(.*//g; if(!$seen{$F[0]}) { print $_; $seen{$F[0]}=1; }' > $OUTDIR/UNIQ_MOTIFS.TXT
-    fi
-    echo "done"
-elif [ ! -z "$LIST" ]; then
-    oIFS=$IFS
-    IFS=","
-    FILE=($LIST)
-    IFS=$oIFS
-
-    PWM=""
-    for (( i=0; i<${#FILE[@]}; i++ )); do
-        PWM="$PWM ${FILE[$i]}"
-    done
-
-    if [ ! -z "$MOTIF_NAME" ];
-    then
-        echo -n "Create motif file depending upon input motifs of interest.. "
-        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-        zless $PWM | extractMotifs -i stdin -j $MOTIF_NAME > $TMP
-        echo "done"
-        PWM=$TMP
-    fi
-
-    echo -n "Analyze the enrichment of specific TFBS motifs in the input regions.. "
-    ## parameter histNorm added on Nov 12, 2015 for Janus project
-    if [ "$SIZE_HIST" == "given" ]; then
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE_HIST -hist 500 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
-    else
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE_HIST -hist 10 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
-    fi
-
-    if [ -z "$FORMAT_HIST" ]; then
-        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -find $PWM -size $SIZE -seqlogo > $OUTDIR/REGIONS_INTEREST.find
-
-        ## filter only highest scoring motif postion for each region
-        cat <(grep -w Offset $OUTDIR/REGIONS_INTEREST.find) <(grep -wv Offset $OUTDIR/REGIONS_INTEREST.find | sort -k 4,4 -k 1,1 -k 6rg,6 | perl -ane 'if(!$seen{$F[3]}{$F[0]}) { print $_; $seen{$F[3]}{$F[0]}=1; }') > $OUTDIR/REGIONS_INTEREST.find.unique
-        #mv $OUTDIR/REGIONS_INTEREST.find.unique $OUTDIR/REGIONS_INTEREST.find
-
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -annStats $OUTDIR/REGIONS_INTEREST.annoStats -size $SIZE -mbed $OUTDIR/REGIONS_INTEREST.annoBed > $OUTDIR/REGIONS_INTEREST.anno
-
-        TOTAL=$(cat $OUTDIR/REGIONS_INTEREST.bed | wc -l)
-        MAPPED=$(grep -v Offset $OUTDIR/REGIONS_INTEREST.find | wc -l)
-        PER=$(perl -e '$per=('$MAPPED'*100)/'$TOTAL'; printf("%0.2f", $per);')
-        echo
-        echo
-        echo "$MAPPED out of $TOTAL ($PER) input sequences contain the input motifs" >> $OUTDIR/REGIONS_INTEREST.annoStats
-        echo "$MAPPED out of $TOTAL ($PER) input sequences contain the input motifs"
-
-    fi
-    echo "done"
-else
-    usage
-fi
+#if [ "$MODE" -eq 1 ]; then
+#    ADDITIONAL_ARGUMENT=""
+#    echo -n "Determine all TFBS motifs enriched in the input regions... "
+#    #if [ ! -z "$INFO" ]; then
+#    #    ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -info $INFO"
+#    #fi
+#    #if [ ! -z "$MIN_T" ]; then
+#    #    ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -minT $MIN_T"
+#    #fi
+#
+#<<"COMMENT"
+#COMMENT
+#    if [ -z "$BKG_FILE" ]; then
+#        #findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS_FILE -mknown $TFBS_FILE -p $PROCESSOR -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -dumpFasta -S $S $ADDITIONAL_ARGUMENT -size $SIZE &> $OUTDIR/findMotifs.log
+#        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS_FILE -mknown $TFBS_FILE -p $PROCESSOR -len $LENGTH -dumpFasta -S $S $ADDITIONAL_ARGUMENT -size $SIZE -seqlogo &> $OUTDIR/findMotifs.log
+#    else
+#        if [ ! -f "$BKG_FILE" ]; then
+#            TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+#            zless $OUTDIR/REGIONS_INTEREST.bed | grep -vw $BKG_FILE > $OUTDIR/$TMP.target
+#            zless $OUTDIR/REGIONS_INTEREST.bed | grep -w $BKG_FILE > $OUTDIR/$TMP.background
+#            mv $OUTDIR/$TMP.target $OUTDIR/REGIONS_INTEREST.bed
+#            BKG_FILE="$OUTDIR/$TMP.background"
+#        fi
+#
+#        #findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS_FILE -mknown $TFBS_FILE -p $PROCESSOR -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -dumpFasta -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE &> $OUTDIR/findMotifs.log
+#        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -mcheck $TFBS_FILE -mknown $TFBS_FILE -p $PROCESSOR -len $LENGTH -dumpFasta -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE -seqlogo &> $OUTDIR/findMotifs.log
+#    fi
+#    echo "done"
+#
+#    echo -n "Create final output files (DENOVO_MOTIFS.TXT, KNOWN_MOTIFS.TXT)... "
+#    REGIONS_INTEREST_COUNT=$(cat $OUTDIR/REGIONS_INTEREST.bed | wc -l)
+#    ## debug: REGIONS_INTEREST_COUNT=100; PVALUE="1e-15"; MIN_P_T=3; B=100;
+#    if [ -f "$OUTDIR/homerResults.html" ]; then
+#        grep png $OUTDIR/homerResults.html | grep -vE ">\*<" | perl -ane '$_=~s/<tr><td>//gi; $_=~s/<\/td><td>/\t/gi; $_=~s/<\/td><\/tr>//gi; $_=~s/^[0-9]*\s+//g; print $_;' | perl -an -F'/\t/' -e '$F[0]=~s/^.*\=\"//g; $F[0]=~s/\".*//g; $F[0]=~s/\.logo.*//g; $F[6]=~s/\<BR.*//g; print "$F[6]\t$F[1]\t$F[3]\t$F[4]\t'$OUTDIR/'$F[0].motif\t'$REGIONS_INTEREST_COUNT'\n";' | perl -ane '$pval=sprintf("%0.20f", $F[1]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[2]=~s/\%//g; $F[3]=~s/\%//g; if($pval < $my_pval && $F[2]>='$MIN_P_T' && $F[3]<='$B') { print "$_"; }' > $OUTDIR/DENOVO_MOTIFS.TXT
+#    else
+#        touch $OUTDIR/DENOVO_MOTIFS.TXT
+#    fi
+#    if [ -f "$OUTDIR/knownResults.html" ]; then
+#        grep png $OUTDIR/knownResults.html | grep -vE ">\*<" | perl -ane '$_=~s/<tr><td>//gi; $_=~s/<\/td><td>/\t/gi; $_=~s/<\/td><\/tr>//gi; $_=~s/^[0-9]*\s+//g; print $_;' | perl -an -F'/\t/' -e '$F[0]=~s/^.*\=\"//g; $F[0]=~s/\".*//g; $F[0]=~s/\.logo.*//g; print "$F[1]\t$F[2]\t$F[6]\t$F[8]\t'$OUTDIR/'$F[0].motif\t'$REGIONS_INTEREST_COUNT'\n";' | perl -ane '$pval=sprintf("%0.20f", $F[1]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[2]=~s/\%//g; $F[3]=~s/\%//g; if($pval < $my_pval && $F[2]>='$MIN_P_T' && $F[3]<='$B') { print "$_"; }' > $OUTDIR/KNOWN_MOTIFS.TXT
+#    else
+#        touch $OUTDIR/KNOWN_MOTIFS.TXT
+#    fi
+#    if [ -f "$OUTDIR/DENOVO_MOTIFS.TXT" -a -f "$OUTDIR/KNOWN_MOTIFS.TXT" ]; then
+#        cat $OUTDIR/DENOVO_MOTIFS.TXT $OUTDIR/KNOWN_MOTIFS.TXT | perl -ane '$F[0]=~s/\(.*//g; if(!$seen{$F[0]}) { print $_; $seen{$F[0]}=1; }' > $OUTDIR/UNIQ_MOTIFS.TXT
+#    fi
+#    echo "done"
+#elif [ ! -z "$LIST" ]; then
+#    oIFS=$IFS
+#    IFS=","
+#    FILE=($LIST)
+#    IFS=$oIFS
+#
+#    PWM=""
+#    for (( i=0; i<${#FILE[@]}; i++ )); do
+#        PWM="$PWM ${FILE[$i]}"
+#    done
+#
+#    if [ ! -z "$MOTIF_NAME" ];
+#    then
+#        echo -n "Create motif file depending upon input motifs of interest.. "
+#        TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+#        zless $PWM | extractMotifs -i stdin -j $MOTIF_NAME > $TMP
+#        echo "done"
+#        PWM=$TMP
+#    fi
+#
+#    echo -n "Analyze the enrichment of specific TFBS motifs in the input regions.. "
+#    ## parameter histNorm added on Nov 12, 2015 for Janus project
+#    if [ "$SIZE_HIST" == "given" ]; then
+#        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE_HIST -hist 500 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
+#    else
+#        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE_HIST -hist 10 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
+#    fi
+#
+#    if [ -z "$FORMAT_HIST" ]; then
+#        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -find $PWM -size $SIZE -seqlogo > $OUTDIR/REGIONS_INTEREST.find
+#
+#        ## filter only highest scoring motif postion for each region
+#        cat <(grep -w Offset $OUTDIR/REGIONS_INTEREST.find) <(grep -wv Offset $OUTDIR/REGIONS_INTEREST.find | sort -k 4,4 -k 1,1 -k 6rg,6 | perl -ane 'if(!$seen{$F[3]}{$F[0]}) { print $_; $seen{$F[3]}{$F[0]}=1; }') > $OUTDIR/REGIONS_INTEREST.find.unique
+#        #mv $OUTDIR/REGIONS_INTEREST.find.unique $OUTDIR/REGIONS_INTEREST.find
+#
+#        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -annStats $OUTDIR/REGIONS_INTEREST.annoStats -size $SIZE -mbed $OUTDIR/REGIONS_INTEREST.annoBed > $OUTDIR/REGIONS_INTEREST.anno
+#
+#        TOTAL=$(cat $OUTDIR/REGIONS_INTEREST.bed | wc -l)
+#        MAPPED=$(grep -v Offset $OUTDIR/REGIONS_INTEREST.find | wc -l)
+#        PER=$(perl -e '$per=('$MAPPED'*100)/'$TOTAL'; printf("%0.2f", $per);')
+#        echo
+#        echo
+#        echo "$MAPPED out of $TOTAL ($PER) input sequences contain the input motifs" >> $OUTDIR/REGIONS_INTEREST.annoStats
+#        echo "$MAPPED out of $TOTAL ($PER) input sequences contain the input motifs"
+#
+#    fi
+#    echo "done"
+#else
+#    usage
+#fi
 
 if [ ! -z "$TMP" ]; then
     rm $TMP
