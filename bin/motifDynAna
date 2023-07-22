@@ -172,101 +172,101 @@ fi
 <<"COMMENT"
 COMMENT
 ## perform motif enrichment analysis
-#for CLASS in DENOVO KNOWN; do 
-#    echo -n "Parse through each input directory to create a list of all $CLASS motifs found at any motifAna run (`date`).. "
-#    for (( i=0; i<${#INDIRS[@]}; i++)); do
-#        ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
-#        head -n ${NMOTIFS} ${INDIRS[$i]}/"$CLASS"_MOTIFS.TXT | perl -ane 'print "'$ID'\t$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n";'
-#    #done > $OUTDIR/"$CLASS"_MOTIFS.TXT
-#    done | perl -ane '$id=$F[1]; $id=~s/^.*BestGuess\://g; $id=~s/\s+.*//g; $score=$id; $score=~s/^.*\(//g; $score=~s/\)//g; $id=~s/\(.*//g; if(defined($seen{$id}) && $score > $seen{$id}{'score'}) { $seen{$id}{'score'}=$score; $seen{$id}{'entry'}=$_; } elsif(!defined($seen{$id})) { $seen{$id}{'score'}=$score; $seen{$id}{'entry'}=$_; } END { foreach(keys(%seen)) { print "$seen{$_}{'entry'}"; } }' > $OUTDIR/"$CLASS"_MOTIFS.TXT
-#
-#    for MOTIF_FILE in $(cut -f 6 $OUTDIR/"$CLASS"_MOTIFS.TXT); do
-#        cat $MOTIF_FILE
-#    done > $OUTDIR/"$CLASS"_MOTIFS.MOTIFS
-#    echo "done"
-#
-#    ## check, if any "must include" motifs are provided
-#    if [ ! -z "$MUST_INCLUDE_MOTIF" -a -s "$MUST_INCLUDE_MOTIF_FILE" ]; then
-#        zless $MUST_INCLUDE_MOTIF_FILE >> $OUTDIR/"$CLASS"_MOTIFS.MOTIFS
-#    fi
-#
-#    INPUT=$OUTDIR/"$CLASS"_MOTIFS.MOTIFS;
-#    if [ -s "$INPUT" ]; then
-#        echo -n "Parse through each input directory to compute enrichment of motifs (`date`).. "
-#        ADDITIONAL_ARGUMENT=""
-#        echo -n "Determine all TFBS motifs enriched in the input regions... "
-#        #if [ ! -z "$INFO" ]; then
-#        #    ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -info $INFO"
-#        #fi
-#        #if [ ! -z "$MIN_T" ]; then
-#        #    ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -minT $MIN_T"
-#        #fi
-#
-#        for (( i=0; i<${#INDIRS[@]}; i++)); do
-#            ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
-#            if [ ! -d "${INDIRS[$i]}/$CLASS'_motifDynAna'" ]; then
-#                mkdir -p ${INDIRS[$i]}/$CLASS"_motifDynAna"
-#            fi
-#<<"COMMENT"
-#COMMENT
-#            if [ -z "$BKG_FILE" ]; then
-#                #findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -size $SIZE
-#                findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -size $SIZE -seqlogo &> ${INDIRS[$i]}/$CLASS"_motifDynAna"/findMotifs.log
-#                echo findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -size $SIZE -seqlogo >> ${INDIRS[$i]}/$CLASS"_motifDynAna"/findMotifs.log 
-#            else
-#                #findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE
-#                findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE -seqlogo &> ${INDIRS[$i]}/$CLASS"_motifDynAna"/findMotifs.log
-#                echo findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE -seqlogo >> ${INDIRS[$i]}/$CLASS"_motifDynAna"/findMotifs.log
-#            fi
-#
-#            if [ -z "$BKG_FILE" ]; then
-#                TARGET_TOTAL=$(grep "^>" ${INDIRS[$i]}/target.fa | wc -l)
-#                BKG_TOTAL=$(grep "^>" ${INDIRS[$i]}/background.fa | wc -l)
-#            else
-#                TARGET_TOTAL=$(cat ${INDIRS[$i]}/REGIONS_INTEREST.bed | wc -l)
-#                BKG_TOTAL=$(cat $BKG_FILE | wc -l)
-#            fi
-#
-#            if [ -f "${INDIRS[$i]}/knownResults.html" ]; then
-#                #grep -v Name ${INDIRS[$i]}/$CLASS"_motifDynAna"/knownResults.txt | perl -ane '$pval=sprintf("%0.20f", $F[2]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[6]=~s/\%//g; $F[8]=~s/\%//g; if($pval < $my_pval && $F[6]>='$MIN_P_T' && $F[8]<='$B') { chomp($_); $_=~s/\%//g; print "'$ID'\t$_\t'$TARGET_TOTAL'\t'$BKG_TOTAL'\n"; }'
-#                ## we want to include all motifs irrespective of their p-values
-#                grep -v Name ${INDIRS[$i]}/$CLASS"_motifDynAna"/knownResults.txt | perl -ane 'chomp($_); $_=~s/\%//g; print "'$ID'\t$_\t'$TARGET_TOTAL'\t'$BKG_TOTAL'\n";'
-#            fi
-#        done | sort -k 1,1 -k 2,2 > $OUTDIR/"$CLASS"_MOTIF_ENRICHMENT_DYNAMICS.TXT
-#        echo "done"
-#
-#        echo -n "Plot motif dynamics (`date`).. "
-#        if [ ! -z "$MUST_INCLUDE_MOTIF" -a -s "$MUST_INCLUDE_MOTIF_FILE" ]; then
-#            motifDynAna.R -i $OUTDIR/"$CLASS"_MOTIF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_motif_dynamics.pdf -l $MUST_INCLUDE_MOTIF
-#        else
-#            motifDynAna.R -i $OUTDIR/"$CLASS"_MOTIF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_motif_dynamics.pdf
-#        fi
-#        echo "done"
-#
-#        echo -n "Plot logo for significant motifs (`date`).. "
-#        for motifInfo in $(cut -f 1,2,6 $OUTDIR/"$CLASS"_MOTIFS.TXT | perl -ane '$F[0]=~s/[^a-zA-Z0-9]+/_/g; $F[1]=~s/\(.*//g; $F[1]=~s/[^a-zA-Z0-9]+/_/g; $key="$F[0]_$F[1]"; if(!$seen{$key}) { print "$key#$F[2]\n"; $seen{$key}=1; }'); do
-#            logoFile=$(echo $motifInfo | sed -E 's/\#.*//g');
-#            motifFile=$(echo $motifInfo | sed -E 's/^.*\#//g');
-#            motif2Logo.pl $motifFile -pdf -o $OUTDIR/motifs_logo/$logoFile;
-#        done
-#
-#        if [ ! -z "$MUST_INCLUDE_MOTIF" -a -s "$MUST_INCLUDE_MOTIF_FILE" ]; then
-#            oIFS=$IFS
-#            IFS=","
-#            MUST_INCLUDE_MOTIFS=($MUST_INCLUDE_MOTIF)
-#            IFS=$oIFS
-#
-#            for (( i=0; i<${#MUST_INCLUDE_MOTIFS[@]}; i++)); do
-#                extractMotifs -i $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -j ${MUST_INCLUDE_MOTIFS[$i]} | motif2Logo.pl - -pdf -o $OUTDIR/motifs_logo/${MUST_INCLUDE_MOTIFS[$i]}
-#            done
-#        fi
-#        echo "done"
-#    else
-#        echo
-#        echo -n "ABORT, no $CLASS motif found (`date`) .. "
-#        echo
-#    fi
-#done
+for CLASS in DENOVO KNOWN; do 
+    echo -n "Parse through each input directory to create a list of all $CLASS motifs found at any motifAna run (`date`).. "
+    for (( i=0; i<${#INDIRS[@]}; i++)); do
+        ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
+        head -n ${NMOTIFS} ${INDIRS[$i]}/"$CLASS"_MOTIFS.TXT | perl -ane 'print "'$ID'\t$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\n";'
+    #done > $OUTDIR/"$CLASS"_MOTIFS.TXT
+    done | perl -ane '$id=$F[1]; $id=~s/^.*BestGuess\://g; $id=~s/\s+.*//g; $score=$id; $score=~s/^.*\(//g; $score=~s/\)//g; $id=~s/\(.*//g; if(defined($seen{$id}) && $score > $seen{$id}{'score'}) { $seen{$id}{'score'}=$score; $seen{$id}{'entry'}=$_; } elsif(!defined($seen{$id})) { $seen{$id}{'score'}=$score; $seen{$id}{'entry'}=$_; } END { foreach(keys(%seen)) { print "$seen{$_}{'entry'}"; } }' > $OUTDIR/"$CLASS"_MOTIFS.TXT
+
+    for MOTIF_FILE in $(cut -f 6 $OUTDIR/"$CLASS"_MOTIFS.TXT); do
+        cat $MOTIF_FILE
+    done > $OUTDIR/"$CLASS"_MOTIFS.MOTIFS
+    echo "done"
+
+    ## check, if any "must include" motifs are provided
+    if [ ! -z "$MUST_INCLUDE_MOTIF" -a -s "$MUST_INCLUDE_MOTIF_FILE" ]; then
+        zless $MUST_INCLUDE_MOTIF_FILE >> $OUTDIR/"$CLASS"_MOTIFS.MOTIFS
+    fi
+
+    INPUT=$OUTDIR/"$CLASS"_MOTIFS.MOTIFS;
+    if [ -s "$INPUT" ]; then
+        echo -n "Parse through each input directory to compute enrichment of motifs (`date`).. "
+        ADDITIONAL_ARGUMENT=""
+        echo -n "Determine all TFBS motifs enriched in the input regions... "
+        #if [ ! -z "$INFO" ]; then
+        #    ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -info $INFO"
+        #fi
+        #if [ ! -z "$MIN_T" ]; then
+        #    ADDITIONAL_ARGUMENT="$ADDITIONAL_ARGUMENT -minT $MIN_T"
+        #fi
+
+        for (( i=0; i<${#INDIRS[@]}; i++)); do
+            ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
+            if [ ! -d "${INDIRS[$i]}/$CLASS'_motifDynAna'" ]; then
+                mkdir -p ${INDIRS[$i]}/$CLASS"_motifDynAna"
+            fi
+<<"COMMENT"
+COMMENT
+            if [ -z "$BKG_FILE" ]; then
+                #findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -size $SIZE
+                findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -size $SIZE -seqlogo &> ${INDIRS[$i]}/$CLASS"_motifDynAna"/findMotifs.log
+                echo findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -size $SIZE -seqlogo >> ${INDIRS[$i]}/$CLASS"_motifDynAna"/findMotifs.log 
+            else
+                #findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -reduceThresh $REDUCE_THRESHOLD -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE
+                findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE -seqlogo &> ${INDIRS[$i]}/$CLASS"_motifDynAna"/findMotifs.log
+                echo findMotifsGenome.pl ${INDIRS[$i]}/REGIONS_INTEREST.bed $GENOME_MOTIF ${INDIRS[$i]}/$CLASS"_motifDynAna" -mcheck $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -mknown $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -p $PROCESSOR -nomotif -len $LENGTH -S $S $ADDITIONAL_ARGUMENT -bg $BKG_FILE -size $SIZE -seqlogo >> ${INDIRS[$i]}/$CLASS"_motifDynAna"/findMotifs.log
+            fi
+
+            if [ -z "$BKG_FILE" ]; then
+                TARGET_TOTAL=$(grep "^>" ${INDIRS[$i]}/target.fa | wc -l)
+                BKG_TOTAL=$(grep "^>" ${INDIRS[$i]}/background.fa | wc -l)
+            else
+                TARGET_TOTAL=$(cat ${INDIRS[$i]}/REGIONS_INTEREST.bed | wc -l)
+                BKG_TOTAL=$(cat $BKG_FILE | wc -l)
+            fi
+
+            if [ -f "${INDIRS[$i]}/knownResults.html" ]; then
+                #grep -v Name ${INDIRS[$i]}/$CLASS"_motifDynAna"/knownResults.txt | perl -ane '$pval=sprintf("%0.20f", $F[2]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[6]=~s/\%//g; $F[8]=~s/\%//g; if($pval < $my_pval && $F[6]>='$MIN_P_T' && $F[8]<='$B') { chomp($_); $_=~s/\%//g; print "'$ID'\t$_\t'$TARGET_TOTAL'\t'$BKG_TOTAL'\n"; }'
+                ## we want to include all motifs irrespective of their p-values
+                grep -v Name ${INDIRS[$i]}/$CLASS"_motifDynAna"/knownResults.txt | perl -ane 'chomp($_); $_=~s/\%//g; print "'$ID'\t$_\t'$TARGET_TOTAL'\t'$BKG_TOTAL'\n";'
+            fi
+        done | sort -k 1,1 -k 2,2 > $OUTDIR/"$CLASS"_MOTIF_ENRICHMENT_DYNAMICS.TXT
+        echo "done"
+
+        echo -n "Plot motif dynamics (`date`).. "
+        if [ ! -z "$MUST_INCLUDE_MOTIF" -a -s "$MUST_INCLUDE_MOTIF_FILE" ]; then
+            motifDynAna.R -i $OUTDIR/"$CLASS"_MOTIF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_motif_dynamics.pdf -l $MUST_INCLUDE_MOTIF
+        else
+            motifDynAna.R -i $OUTDIR/"$CLASS"_MOTIF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_motif_dynamics.pdf
+        fi
+        echo "done"
+
+        echo -n "Plot logo for significant motifs (`date`).. "
+        for motifInfo in $(cut -f 1,2,6 $OUTDIR/"$CLASS"_MOTIFS.TXT | perl -ane '$F[0]=~s/[^a-zA-Z0-9]+/_/g; $F[1]=~s/\(.*//g; $F[1]=~s/[^a-zA-Z0-9]+/_/g; $key="$F[0]_$F[1]"; if(!$seen{$key}) { print "$key#$F[2]\n"; $seen{$key}=1; }'); do
+            logoFile=$(echo $motifInfo | sed -E 's/\#.*//g');
+            motifFile=$(echo $motifInfo | sed -E 's/^.*\#//g');
+            motif2Logo.pl $motifFile -pdf -o $OUTDIR/motifs_logo/$logoFile;
+        done
+
+        if [ ! -z "$MUST_INCLUDE_MOTIF" -a -s "$MUST_INCLUDE_MOTIF_FILE" ]; then
+            oIFS=$IFS
+            IFS=","
+            MUST_INCLUDE_MOTIFS=($MUST_INCLUDE_MOTIF)
+            IFS=$oIFS
+
+            for (( i=0; i<${#MUST_INCLUDE_MOTIFS[@]}; i++)); do
+                extractMotifs -i $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -j ${MUST_INCLUDE_MOTIFS[$i]} | motif2Logo.pl - -pdf -o $OUTDIR/motifs_logo/${MUST_INCLUDE_MOTIFS[$i]}
+            done
+        fi
+        echo "done"
+    else
+        echo
+        echo -n "ABORT, no $CLASS motif found (`date`) .. "
+        echo
+    fi
+done
 
 ## OLD
 <<"COMMENT"
