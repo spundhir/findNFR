@@ -88,7 +88,7 @@ wait
 #echo "bedtools multiinter -i $COMMAND_BED -names $COMMAND_NAME"; exit
 
 if [ ! -z "$NAME" ]; then
-    bedtools multiinter -i $COMMAND_BED -names $COMMAND_NAME | mergeBed -i stdin -c 4,5 -o max,distinct | perl -ane '@T=split(/\,/,$F[4]); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t"; %seen=(); foreach(sort @T) { print "$_," unless $seen{$_}++; } print "\n";' | sed -E 's/\,$//g'
+    bedtools multiinter -i $COMMAND_BED -names $COMMAND_NAME -header | mergeBed -i stdin -c 4,5 -o max,distinct | perl -ane '@T=split(/\,/,$F[4]); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t"; %seen=(); foreach(sort @T) { print "$_," unless $seen{$_}++; } print "\n";' | sed -E 's/\,$//g'
 
     ## was missing some coordinates (June 28, 2022)
     #bedtools multiinter -i $COMMAND_BED -names $COMMAND_NAME | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; } } elsif($last_coor!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
@@ -97,7 +97,7 @@ if [ ! -z "$NAME" ]; then
     #bedtools multiinter -i $COMMAND_BED -names $COMMAND_NAME | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; $last_counter=$F[3]; } } elsif($last_coor!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
     #bedtools multiinter -i $COMMAND_BED -names $COMMAND_NAME | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; $last_counter=$F[3]; } } elsif($last_counter!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
 else
-    bedtools multiinter -i $COMMAND_BED | mergeBed -i stdin -c 4,5 -o max,distinct | perl -ane '@T=split(/\,/,$F[4]); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t"; %seen=(); foreach(sort @T) { print "$_," unless $seen{$_}++; } print "\n";' | sed -E 's/\,$//g'
+    bedtools multiinter -i $COMMAND_BED -header | mergeBed -i stdin -c 4,5 -o max,distinct | perl -ane '@T=split(/\,/,$F[4]); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t"; %seen=(); foreach(sort @T) { print "$_," unless $seen{$_}++; } print "\n";' | sed -E 's/\,$//g'
 
     ## was missing some coordinates (June 28, 2022)
     #bedtools multiinter -i $COMMAND_BED | perl -ane 'if(defined($line)) { if($F[1]==$last_coor) { if($F[3]>$last_counter) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } else { $last_coor=$F[2]; } } elsif($last_coor!=$F[1]) { print "$line"; $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } } elsif(!defined($line)) { $line=$_; $last_coor=$F[2]; $last_counter=$F[3]; } END { print "$line"; }'
