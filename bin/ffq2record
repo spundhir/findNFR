@@ -42,7 +42,7 @@ else
         wget https://ftp.ncbi.nlm.nih.gov/geo/series/$(echo $ID | sed 's/...$/nnn/')/${ID}/matrix/${ID}_series_matrix.txt.gz
     fi
         
-    paste <(zless ${ID}_series_matrix.txt.gz | grep 'Sample_title\|Sample_relation' | grep -v BioSample | sed -E 's/\"//g' | sed -E 's/SRA://g' | tabEdit -i stdin -t | sed -E 's/https:\/\/www.ncbi.nlm.nih.gov\/sra\?term=//g' | head -n 1 | tr '\t' '\n') <(zless ${ID}_series_matrix.txt.gz | grep 'Sample_title\|Sample_relation' | grep -v BioSample | sed -E 's/\"//g' | sed -E 's/SRA://g' | tabEdit -i stdin -t | sed -E 's/https:\/\/www.ncbi.nlm.nih.gov\/sra\?term=//g' | tail -n 1 | tr '\t' '\n') | while read -a LINE; do
+    paste <(zless ${ID}_series_matrix.txt.gz | grep 'Sample_title\|Sample_relation' | grep -v BioSample | sed -E 's/\"//g' | sed -E 's/SRA://g' | sed -E 's/https:\/\/www.ncbi.nlm.nih.gov\/sra\?term=//g' | head -n 1 | tr '\t' '\n' | sed -E 's/["#()]+//g' | sed -E 's/\s+/_/g' | sed -E 's/[-_]+/_/g') <(zless ${ID}_series_matrix.txt.gz | grep 'Sample_title\|Sample_relation' | grep -v BioSample | sed -E 's/\"//g' | sed -E 's/SRA://g' | tabEdit -i stdin -t | sed -E 's/https:\/\/www.ncbi.nlm.nih.gov\/sra\?term=//g' | tail -n 1 | tr '\t' '\n') | while read -a LINE; do
         SRR_ID=$(wget -qO- "https://www.ncbi.nlm.nih.gov/sra?term=${LINE[1]}" | grep SRR | sed -E 's/.*>SRR/SRR/' | sed -E 's/<.*//';);
         echo -e "${LINE[1]}\t${LINE[0]}\t$SRR_ID"
     done
