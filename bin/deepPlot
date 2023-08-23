@@ -89,7 +89,8 @@ usage() {
     echo " -z <int>    [z-axis minimum value]"
     echo " -Z <int>    [Z-axis maximum value]"
     echo "[OPTIONS: misc]"
-    echo " -F          [plot profile (default: heatmap)]"
+    echo " -F          [plot profile same yscale in each plot (default: heatmap)]"
+    echo " -I          [plot profile different yscale in each plot (default: heatmap)]"
     echo " -x          [strand-specific coverage calculation]"
     echo " -g <string> [genome (default: mm9)]"
     echo " -X <int>    [number of processors to use (default: 1)"
@@ -106,7 +107,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:L:m:r:Q:z:Z:Fxg:X:UDOHK:h ARG; do
+while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:L:m:r:Q:z:Z:FIxg:X:UDOHK:h ARG; do
 	case "$ARG" in
 		i) REGIONFILE=$OPTARG;;
 		j) BWDIR=$OPTARG;;
@@ -147,6 +148,7 @@ while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:L:m:r:
         z) ZAXIS_MIN=$OPTARG;;
         Z) ZAXIS_MAX=$OPTARG;;
         F) PLOT_PROFILE=1;;
+        I) PLOT_PROFILE_DIFF_SCALE=1;;
         x) SS=1;;
         g) GENOME=$OPTARG;;
         X) PROCESSORS=$OPTARG;;
@@ -515,6 +517,8 @@ else
                 --plotTitle $PLOTTITLE --averageType $AVERAGE_TYPE \
                 --plotType $PLOT_TYPE \
                 $ARG $ARG_PROFILE
+        elif [ ! -z "$PLOT_PROFILE_DIFF_SCALE" ]; then
+            deepPlotCustom.R -i $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz -o $OUTDIR/$PLOTTITLE.pdf -j $REGION_LABEL 2>/dev/null 
         else
             plotHeatmap -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
                 -o $OUTDIR/$PLOTTITLE.pdf \
@@ -530,6 +534,8 @@ else
                 --plotTitle $PLOTTITLE --averageType $AVERAGE_TYPE \
                 --plotType $PLOT_TYPE \
                 $ARG $ARG_PROFILE --perGroup
+        elif [ ! -z "$PLOT_PROFILE_DIFF_SCALE" ]; then
+            deepPlotCustom.R -i $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz -o $OUTDIR/$PLOTTITLE.pdf -j $REGION_LABEL 2>/dev/null 
         else
             plotHeatmap -m $OUTDIR/$PLOTTITLE.deepToolsMatrix.gz \
                 -o $OUTDIR/$PLOTTITLE.pdf \
