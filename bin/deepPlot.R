@@ -5,7 +5,7 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 option_list <- list(
   make_option(c("-i", "--inputDeeptoolsMatrix"), help="input deepPlot matrix file"),
-  make_option(c("-j", "--sampleAnno"), help="sample annotation, aveage will be computed for samples with identical name (eg. wt,wt,ko,ko)"),
+  make_option(c("-j", "--sampleAnno"), help="sample annotation, average will be computed for samples with identical name (eg. wt,wt,ko,ko)"),
   make_option(c("-o", "--outputDeeptoolsMatrix"), help="output deepPlot matrix file (should be .gz)")
 )
 
