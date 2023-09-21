@@ -19,7 +19,7 @@ usage() {
     echo "             [format: 1,5,6 OR 1,5,6,count OR 1-4,count OR all]"
     echo " -F <string> [filter given rows from the input file (comma separated, if multiple)]"
     echo "             [format: 1,5,6 OR 1,5,6,count OR 1-4,count OR all]"
-    echo " -R          [select columns in the order specified in -f argument]"
+    echo " -R          [select columns in the order specified in -f argument + exact -f match]"
     echo " -d          [extract from file - header]"
     echo " -D          [extract from file - everything except header]"
     echo " -h          [help]"
@@ -77,17 +77,25 @@ elif [ ! -z "$FILTER_COL" ]; then
         zless $INFILE
     else
         COLS=($(echo $FILTER_COL | tr ',' ' '));
-        FILTER_COL=$(for COL in "${COLS[@]}"; do
-            if [ "$(echo $COL | perl -ane 'if($_=~/[a-zA-Z]+/) { print 1; } else { print 0;}')" -eq 1 ]; then
-                zless $INFILE | head -n 1 | perl -ane 'foreach(@F) { $i++; if($_=~/^'${COL}'/) { print "$i,"; } }';
-            else
-                echo -ne "$COL,"
-            fi
-        done)
-        FILTER_COL=$(echo $FILTER_COL | perl -ane '$_=~s/\,$//g; print $_;')
         if [ ! -z "$KEEP_ORDER" ]; then
+            FILTER_COL=$(for COL in "${COLS[@]}"; do
+                if [ "$(echo $COL | perl -ane 'if($_=~/[a-zA-Z]+/) { print 1; } else { print 0;}')" -eq 1 ]; then
+                    zless $INFILE | head -n 1 | perl -ane 'foreach(@F) { $i++; if($_=~/^'${COL}'$/) { print "$i,"; } }';
+                else
+                    echo -ne "$COL,"
+                fi
+            done)
+            FILTER_COL=$(echo $FILTER_COL | perl -ane '$_=~s/\,$//g; print $_;')
             zless $INFILE | tabEdit -i stdin -t | tabEdit.R -i stdin -f $FILTER_COL
         else
+            FILTER_COL=$(for COL in "${COLS[@]}"; do
+                if [ "$(echo $COL | perl -ane 'if($_=~/[a-zA-Z]+/) { print 1; } else { print 0;}')" -eq 1 ]; then
+                    zless $INFILE | head -n 1 | perl -ane 'foreach(@F) { $i++; if($_=~/^'${COL}'/) { print "$i,"; } }';
+                else
+                    echo -ne "$COL,"
+                fi
+            done)
+            FILTER_COL=$(echo $FILTER_COL | perl -ane '$_=~s/\,$//g; print $_;')
             zless $INFILE | tabEdit -i stdin -t | cut -f $FILTER_COL
         fi
     fi
