@@ -118,7 +118,11 @@ done | sortBed -i stdin | mergeBed -i stdin -c 4,5 -o collapse,collapse | perl -
 COMMENT
 ## annotate reproducible set of interacting regions with their target gene information
 >&2 echo -n "Annotate reproducible set of interacting regions with their target gene information (`date`).. "
-cat <(echo -e "chr_bait\tstart_bait\tend_bait\tid_bait\tchr_interaction\tstart_interaction\tend_interaction\tscore_interaction\tgene_bait") <(intersectBed -a <(join -1 4 -2 4 <(cat $(echo $INFILE | sed -e 's/\,/ /g') | grep -v start | perl -ane 'if($F[7]=~/^\.$/) { print $_; }' | cut -f 1-4 | sort -k 4,4 | uniq) <(grep -wv NA $OUTDIR/${TMP} | cut -f 1-3,6,7) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\n";' | sortBed -i stdin) -b <(grep -w protein_coding ${TSS_FILE}) -wo | cut -f 1-8,12 | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 5,5 -k 6n,6 -k 7n,7 -k 8g,8 -k 9,9 | uniq | perl -ane 'if($F[0]=~/^$F[4]$/) { print $_; }') > $OUTDIR/${TMP}.ibed
+#cat <(echo -e "chr_bait\tstart_bait\tend_bait\tid_bait\tchr_interaction\tstart_interaction\tend_interaction\tscore_interaction\tgene_bait") <(intersectBed -a <(join -1 4 -2 4 <(cat $(echo $INFILE | sed -e 's/\,/ /g') | grep -v start | perl -ane 'if($F[7]=~/^\.$/) { print $_; }' | cut -f 1-4 | sort -k 4,4 | uniq) <(grep -wv NA $OUTDIR/${TMP} | cut -f 1-3,6,7) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\n";' | sortBed -i stdin) -b <(grep -w protein_coding ${TSS_FILE}) -wo | cut -f 1-8,12 | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 5,5 -k 6n,6 -k 7n,7 -k 8g,8 -k 9,9 | uniq | perl -ane 'if($F[0]=~/^$F[4]$/) { print $_; }') > $OUTDIR/${TMP}.ibed
+intersectBed -a <(join -1 4 -2 4 <(cat $(echo $INFILE | sed -e 's/\,/ /g') | grep -v start | perl -ane 'if($F[7]=~/^\.$/) { print $_; }' | cut -f 1-4 | sort -k 4,4 | uniq) <(grep -wv NA $OUTDIR/${TMP} | cut -f 1-3,6,7) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\n";' | sortBed -i stdin) -b <(grep -w protein_coding ${TSS_FILE}) -wo | cut -f 1-8,12 | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 5,5 -k 6n,6 -k 7n,7 -k 8g,8 -k 9,9 | uniq | perl -ane 'if($F[0]=~/^$F[4]$/) { print $_; }' > ${TMP}.tmp
+
+cat <(echo -e "chr_bait\tstart_bait\tend_bait\tid_bait\tchr_interaction\tstart_interaction\tend_interaction\tscore_interaction\tgene_bait\tgene_interaction") > $OUTDIR/${TMP}.ibed
+paste <(grep -v start ${TMP}.tmp | sort -k 5,5 -k 6n,6 -k 7n,7) <(closestBed -a <(grep -v start ${TMP}.tmp | sort -k 5,5 -k 6n,6 -k 7n,7 | cut -f 5-7) -b <(grep -w protein_coding ${TSS_FILE}) -d -t first | cut -f 7,14) | perl -ane 'if($F[scalar(@F)-1] < 1000) { print "$F[0]"; foreach(@F[1..scalar(@F)-2]) { print "\t$_"; } print "\n"; } else { print "$F[0]"; foreach(@F[1..scalar(@F)-3]) { print "\t$_"; } print "\tNA\n"; }' | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 5,5 -k 6n,6 -k 7n,7 -k 8g,8 -k 9,9 >> $OUTDIR/${TMP}.ibed
 >&2 echo done
 >&2 echo "Created output file $OUTDIR/${TMP}.ibed (`date`)"
 >&2 echo
@@ -158,7 +162,7 @@ cat <(echo -e "chr_domain\tstart_start\tend_domain\ttarget_genes\ttotal_interact
 if [ -s ${ENHANCER_FILE} ]; then
     ## link enhancer to target gene if it is on the same chromosome as target gene AND within 10000 bp to the region interacting with bait/target gene
     >&2 echo -n "Link enhancer to target gene if it is on the same chromosome as target gene AND within ${WINDOW_SIZE} bp to the region interacting with bait/target gene (`date`).. "
-    closestBed -a <(less ${ENHANCER_FILE} | cut -f 1-6 | grep -v start | sortBed -i stdin) -b <(less $OUTDIR/${TMP}.ibed | perl -ane 'if($F[0]=~/^$F[4]$/) { print $_; }' | cut -f 4- | grep -v start | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[1]_$F[2]_$F[3]_$F[4]#$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sortBed -i stdin | uniq) -d -t all | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 11rg,11 | perl -ane '
+    closestBed -a <(less ${ENHANCER_FILE} | cut -f 1-6 | grep -v start | sortBed -i stdin) -b <(less $OUTDIR/${TMP}.ibed | perl -ane 'if($F[0]=~/^$F[4]$/) { print $_; }' | cut -f 4- | grep -v start | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[1]_$F[2]_$F[3]_$F[4]#$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";' | sortBed -i stdin | uniq) -d -t all | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 12rg,12 | perl -ane '
         if($F[11]!~/^$/ && $F[11]!~/^\.$/ && $F[scalar(@F)-1]<'${WINDOW_SIZE}') {
             print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t$F[10]\t.\t$F[11]\t$F[9]\t".$F[scalar(@F)-1]."\tHiC\n";
         }
@@ -191,10 +195,6 @@ if [ -s ${ENHANCER_FILE} ]; then
     >&2 echo "Created output file $OUTDIR/${TMP}.enhancers (`date`)"
     >&2 echo
 fi
-
-## identify promoter-promoter (P-P) interactions
-echo -e "$(grep start $OUTDIR/${TMP}.ibed)\tgene_interaction" > $OUTDIR/${TMP}.ibed.promoters
-paste <(grep -v start $OUTDIR/${TMP}.ibed | sort -k 5,5 -k 6n,6 -k 7n,7) <(closestBed -a <(grep -v start $OUTDIR/${TMP}.ibed | sort -k 5,5 -k 6n,6 -k 7n,7 | cut -f 5-7) -b <(grep -w protein_coding ${TSS_FILE}) -d -t first | cut -f 7,14) | perl -ane 'if($F[scalar(@F)-1] < 1000) { print $_; }' | awk 'NF{NF-=1};1' | tabEdit -i stdin -t >> $OUTDIR/${TMP}.ibed.promoters
 
 ## remove temporary file, if exists
 if [ -s $OUTDIR/${TMP} ]; then
