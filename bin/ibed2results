@@ -193,8 +193,8 @@ if [ -s ${ENHANCER_FILE} ]; then
 fi
 
 ## identify promoter-promoter (P-P) interactions
-echo -e "$(grep start $OUTDIR/${TMP}.ibed)\tgene_interaction" > $OUTDIR/${TMP}.promoters
-paste <(grep -v start $OUTDIR/${TMP}.ibed | sort -k 5,5 -k 6n,6 -k 7n,7) <(closestBed -a <(grep -v start $OUTDIR/${TMP}.ibed | sort -k 5,5 -k 6n,6 -k 7n,7 | cut -f 5-7) -b <(grep -w protein_coding ${TSS_FILE}) -d -t first | cut -f 7,14) | perl -ane 'if($F[scalar(@F)-1] < 1000) { print $_; }' | awk 'NF{NF-=1};1' | tabEdit -i stdin -t >> $OUTDIR/${TMP}.promoters
+echo -e "$(grep start $OUTDIR/${TMP}.ibed)\tgene_interaction" > $OUTDIR/${TMP}.ibed.promoters
+paste <(grep -v start $OUTDIR/${TMP}.ibed | sort -k 5,5 -k 6n,6 -k 7n,7) <(closestBed -a <(grep -v start $OUTDIR/${TMP}.ibed | sort -k 5,5 -k 6n,6 -k 7n,7 | cut -f 5-7) -b <(grep -w protein_coding ${TSS_FILE}) -d -t first | cut -f 7,14) | perl -ane 'if($F[scalar(@F)-1] < 1000) { print $_; }' | awk 'NF{NF-=1};1' | tabEdit -i stdin -t >> $OUTDIR/${TMP}.ibed.promoters
 
 ## remove temporary file, if exists
 if [ -s $OUTDIR/${TMP} ]; then
