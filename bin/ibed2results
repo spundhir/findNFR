@@ -115,6 +115,7 @@ done | sortBed -i stdin | mergeBed -i stdin -c 4,5 -o collapse,collapse | perl -
 >&2 echo
 
 <<"COMMENT"
+COMMENT
 ## annotate reproducible set of interacting regions with their target gene information
 >&2 echo -n "Annotate reproducible set of interacting regions with their target gene information (`date`).. "
 cat <(echo -e "chr_bait\tstart_bait\tend_bait\tid_bait\tchr_interaction\tstart_interaction\tend_interaction\tscore_interaction\tgene_bait") <(intersectBed -a <(join -1 4 -2 4 <(cat $(echo $INFILE | sed -e 's/\,/ /g') | grep -v start | perl -ane 'if($F[7]=~/^\.$/) { print $_; }' | cut -f 1-4 | sort -k 4,4 | uniq) <(grep -wv NA $OUTDIR/${TMP} | cut -f 1-3,6,7) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\n";' | sortBed -i stdin) -b <(grep -w protein_coding ${TSS_FILE}) -wo | cut -f 1-8,12 | sort -k 1,1 -k 2n,2 -k 3n,3 -k 4,4 -k 5,5 -k 6n,6 -k 7n,7 -k 8g,8 -k 9,9 | uniq | perl -ane 'if($F[0]=~/^$F[4]$/) { print $_; }') > $OUTDIR/${TMP}.ibed
@@ -190,7 +191,6 @@ if [ -s ${ENHANCER_FILE} ]; then
     >&2 echo "Created output file $OUTDIR/${TMP}.enhancers (`date`)"
     >&2 echo
 fi
-COMMENT
 
 ## identify promoter-promoter (P-P) interactions
 echo -e "$(grep start $OUTDIR/${TMP}.ibed)\tgene_interaction" > $OUTDIR/${TMP}.promoters
