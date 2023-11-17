@@ -273,8 +273,9 @@ elif [ ! -z "$LIST" ]; then
     then
         echo -n "Create motif file depending upon input motifs of interest.. "
         TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-        #MOTIF_NAME="\"${MOTIF_NAME}\""
-        zless $PWM | extractMotifs -i stdin -j $MOTIF_NAME > $TMP
+        #zless $PWM | extractMotifs -i stdin -j $MOTIF_NAME > $TMP
+        COMMAND="zless $PWM | extractMotifs -i stdin -j \"$MOTIF_NAME\" > $TMP"
+        eval ${COMMAND}
         echo "done"
         PWM=$TMP
     fi
