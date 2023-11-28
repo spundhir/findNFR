@@ -50,6 +50,7 @@ usage() {
     echo "             [exact regions that were used as input.]"
     echo " -l <string> [name of motifs that must be included in the final output]"
     echo "             [if multiple, separate them by a comma]"
+    echo "             [if motif name has ',', replace it with '&']"
     echo " -M <file>   [file containing TF motifs which must be included in the output]"
     echo " -G          [also perform GIGGLE enrichment analysis]"
     echo " -h          [help]"
@@ -257,7 +258,7 @@ COMMENT
             IFS=$oIFS
 
             for (( i=0; i<${#MUST_INCLUDE_MOTIFS[@]}; i++)); do
-                extractMotifs -i $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -j ${MUST_INCLUDE_MOTIFS[$i]} | motif2Logo.pl - -pdf -o $OUTDIR/motifs_logo/${MUST_INCLUDE_MOTIFS[$i]}
+                extractMotifs -i $OUTDIR/"$CLASS"_MOTIFS.MOTIFS -j \"${MUST_INCLUDE_MOTIFS[$i]}\" | motif2Logo.pl - -pdf -o $OUTDIR/motifs_logo/${MUST_INCLUDE_MOTIFS[$i]}
             done
         fi
         echo "done"

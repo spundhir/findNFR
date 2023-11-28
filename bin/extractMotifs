@@ -13,6 +13,7 @@ usage() {
 	echo " -i <file>   [input file containing motifs (or stdin)]"
 	echo " -j <string> [name of motifs needs to be extracted]"
     echo "             [if multiple, separate them by a comma]"
+    echo "             [if motif name has ',', replace it with '&']"
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (default: mm9)]"
 	echo " -h          [help]"
@@ -79,6 +80,7 @@ MOTIFS=($MOTIF)
 IFS=$oIFS
 
 for (( i=0; i<${#MOTIFS[@]}; i++ )); do
+    MOTIFS[$i]=$(echo ${MOTIFS[$i]} | perl -ane 's/\&/,/g; print $_;')
     MOTIFS[$i]=$(echo ${MOTIFS[$i]} | perl -ane 's/\//\\\//g; print $_;')
     zless $MOTIFFILE | perl -ane '
         @t=split(/\s+/,$_);

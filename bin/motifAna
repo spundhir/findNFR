@@ -51,6 +51,7 @@ usage() {
     echo "                          [if multiple, separate them by a comma]"
     echo "              -j <string> [name of motifs that are of interest (id before a '/', eg. E2F1_MOUSE.H10MO.A in E2F1_MOUSE.H10MO.A/hocomoco)]"
     echo "                          [if multiple separate them by a comma]"
+    echo "                          [if motif name has ',', replace it with '&']"
     echo "                          [If not provided analysis will be done using all motifs]"
     echo "              -f          [output histogram file only (default: histogram + annotation)]"
     echo "              -D <int>    [size of region for histogram (default: 1000 bp)]"

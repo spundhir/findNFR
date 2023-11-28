@@ -56,6 +56,7 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
     echo "             [exact regions that were used as input.                                                                               ]"
     echo " -l <string> [name of motifs that must be included in the final output]"
     echo "             [if multiple, separate them by a comma]"
+    echo "             [if motif name has ',', replace it with '&']"
     echo " -G          [also perform GIGGLE enrichment analysis]"
 	echo " -h          [help]"
 	echo
@@ -229,7 +230,7 @@ wait
 if [ "$CLASS_COUNT" -gt 1 ]; then
     ARGS=""
     if [ ! -z "$MUST_INCLUDE_MOTIF" ]; then
-        extractMotifs -i $TFBS_FILE -j $MUST_INCLUDE_MOTIF -g $GENOME > $OUTDIR/MUST_INCLUDE.MOTIFS
+        extractMotifs -i $TFBS_FILE -j \"$MUST_INCLUDE_MOTIF\" -g $GENOME > $OUTDIR/MUST_INCLUDE.MOTIFS
         ARGS="$ARGS -l $MUST_INCLUDE_MOTIF"
         ARGS="$ARGS -M $OUTDIR/MUST_INCLUDE.MOTIFS"
     fi
