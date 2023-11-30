@@ -121,7 +121,7 @@ if [ "$FILTER_FILES" -eq 1 ]; then
         filterFilesByName -i $INPUTBAMFILES -f $INCLUDE_FILTER -e bam -M | tr '\,' '\n'
     elif [ ! -z "$EXCLUDE_FILTER" ]; then
         filterFilesByName -i $INPUTBAMFILES -F $EXCLUDE_FILTER -e bam -M | tr '\,' '\n'
-    if [ -d "$INPUTBAMFILES" -a -z "$INCLUDE_FILTER" -a -z "$EXCLUDE_FILTER" ]; then
+    elif [ -d "$INPUTBAMFILES" -a -z "$INCLUDE_FILTER" -a -z "$EXCLUDE_FILTER" ]; then
         filterFilesByName -i $INPUTBAMFILES -e bam | tr '\,' '\n'
     else
         cat $INPUTBAMFILES
