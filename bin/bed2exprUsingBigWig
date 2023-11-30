@@ -74,7 +74,7 @@ fi
 
 ## check if input is BigWig files or configuration file or directory containing BigWig file information
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-TMP="0CcMdodnWGmAG7cPYOVsL59gdHDr7jGK"
+#TMP="0CcMdodnWGmAG7cPYOVsL59gdHDr7jGK"
 FILTER_FILES=0
 if [ -d "$INPUTBWFILES" ]; then
     FILTER_FILES=1
@@ -91,6 +91,8 @@ if [ "$FILTER_FILES" -eq 1 ]; then
         filterFilesByName -i $INPUTBWFILES -f $INCLUDE_FILTER -e bw -M | tr '\,' '\n'
     elif [ ! -z "$EXCLUDE_FILTER" ]; then
         filterFilesByName -i $INPUTBWFILES -F $EXCLUDE_FILTER -e bw -M | tr '\,' '\n'
+    elif [ -d "$INPUTBWFILES" -a -z "$INCLUDE_FILTER" -a -z "$EXCLUDE_FILTER" ]; then
+        filterFilesByName -i $INPUTBWFILES -e bw | tr '\,' '\n'
     else
         cat $INPUTBWFILES
     fi | grep -v "^$" | perl -ane 'chomp($_); if(scalar(@F)==1) { print "tpm\t$_\n"; } else { print "$_\n"; }' > ${TMP}.bwConfig
