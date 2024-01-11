@@ -20,7 +20,7 @@ MIN_P_T=0 ## recommended 3 (Andersson et al. 2014)
 B=100 ## recommended 30 (Andersson et al. 2014)
 S=25 ## recommended 100 (Andersson et al. 2014)
 SIZE=200
-SIZE_HIST=1000
+BIN_SIZE_HIST=10
 
 #### usage ####
 usage() {
@@ -54,7 +54,7 @@ usage() {
     echo "                          [if motif name has ',', replace it with '&']"
     echo "                          [If not provided analysis will be done using all motifs]"
     echo "              -f          [output histogram file only (default: histogram + annotation)]"
-    echo "              -D <int>    [size of region for histogram (default: 1000 bp)]"
+    echo "              -D <int>    [bin size of region for histogram (default: 10 bp)]"
     echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
     echo " -d <int>    [size of region (default: 200 bp)]"
@@ -92,7 +92,7 @@ while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fD:g:p:d:Gh ARG; do
         l) LIST=$OPTARG;;
         j) MOTIF_NAME=$OPTARG;;
         f) FORMAT_HIST=1;;
-        D) SIZE_HIST=$OPTARG;;
+        D) BIN_SIZE_HIST=$OPTARG;;
         g) GENOME=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
         d) SIZE=$OPTARG;;
@@ -283,11 +283,7 @@ elif [ ! -z "$LIST" ]; then
 
     echo -n "Analyze the enrichment of specific TFBS motifs in the input regions.. "
     ## parameter histNorm added on Nov 12, 2015 for Janus project
-    if [ "$SIZE" == "given" ]; then
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE -hist 500 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
-    else
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE -hist 10 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
-    fi
+    annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE -hist $BIN_SIZE_HIST -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
 
     if [ -z "$FORMAT_HIST" ]; then
         findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -find $PWM -size $SIZE -seqlogo > $OUTDIR/REGIONS_INTEREST.find
