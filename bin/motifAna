@@ -283,10 +283,10 @@ elif [ ! -z "$LIST" ]; then
 
     echo -n "Analyze the enrichment of specific TFBS motifs in the input regions.. "
     ## parameter histNorm added on Nov 12, 2015 for Janus project
-    if [ "$SIZE_HIST" == "given" ]; then
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE_HIST -hist 500 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
+    if [ "$SIZE" == "given" ]; then
+        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE -hist 500 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
     else
-        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE_HIST -hist 10 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
+        annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE -hist 10 -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
     fi
 
     if [ -z "$FORMAT_HIST" ]; then
