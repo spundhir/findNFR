@@ -57,13 +57,18 @@ usage() {
     echo " -C          [normalize by spike-in scale and coverage (needs -G argument)]"
     echo " -G <string> [spike-in genome, if experiment include spike-in genome]"
     echo "             [assumes spike-in genome bam files are in the same folder as input bam files]"
+    echo " -s          [normalize by cutana spike-in scale (needs -Z argument)]"
+    echo " -c          [normalize by cutana spike-in scale and coverage (needs -Z argument)]"
+    echo " -Z <file>   [cutana statistics file created using cutana.sh]"
+    echo "             [<ID> <histone> <barcode> <read count>]"
+    echo "             [fastq/10_WT3_H3K4me3 h3k4me3 TAGTTCGCGACACCGTTCGTCG 93875"]
     echo " -Q          [plot quality plots using plotFingerprint (NOTE: uses non-normalized read counts from bam files)]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:f:F:Mp:I:BTAPDSCG:Qh ARG; do
+while getopts i:o:g:f:F:Mp:I:BTAPDSCG:scZ:Qh ARG; do
 	case "$ARG" in
         i) BAMFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -81,6 +86,9 @@ while getopts i:o:g:f:F:Mp:I:BTAPDSCG:Qh ARG; do
         S) SPIKEIN=1;;
         C) SPIKEIN_COV=1;;
         G) GENOME_SPIKEIN=$OPTARG;;
+        s) CUTANA_SPIKEIN=1;;
+        c) CUTANA_SPIKEIN_COV=1;;
+        Z) CUTANA_STAT_FILE=$OPTARG;;
         Q) QUALITY=1;;
 		h) HELP=1;;
 	esac
@@ -396,6 +404,61 @@ if [ ! -z "$SPIKEIN_COV" -a "${GENOME_SPIKEIN}" != "DUMMY" ]; then
             #echo -e "${BWFILES[i]}\t${OUTDIR}/macs2/${FILEID}_peaks.bed\t${SIF}\t${GENOME_SIZE}\t${COV}";
 
             bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | grep -v ${GENOME_SPIKEIN} | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3])/'${COV}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF_COV.bw -clip
+        fi
+    done
+    >&2 echo "done"
+fi
+
+#############################
+## normalize each bigWig file (cutana spike-in scale factor) : ARG -s
+#############################
+if [ ! -z "$CUTANA_SPIKEIN" -a -s "${CUTANA_STAT_FILE}" ]; then
+    >&2 echo -n "normalize each bigWig file by cutana spike-in factors (`date`).. "
+    BWFILES=($BWFILE)
+    IDS=($ID)
+
+    for(( i=0; i<${#BWFILES[@]}; i++ )); do
+        if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF.bw" ]; then
+            SIF=$(cat ${CUTANA_STAT_FILE} | grep ${IDS[i]} | cut -f 4 | perl -ane '$_=sprintf("%0.0f", $_/2); $sum+=$_; END { print "$sum"; }' | perl -ane 'printf("%0.6f", 1000000/$_);')
+
+            if [ -z "${SIF}" ]; then
+                echo "ERROR: cuatana scaling factor not found for ${IDS[i]}"
+                echo "ERROR: please check ${CUTANA_STAT_FILE} file"
+                usage
+            fi
+
+            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF.bw -clip
+        fi
+    done
+    >&2 echo "done"
+fi
+
+#############################
+## normalize each bigWig file (cutana spike-in scale factor as well as coverage) : ARG -c
+#############################
+if [ ! -z "$CUTANA_SPIKEIN_COV" -a -s "${CUTANA_STAT_FILE}" ]; then
+    >&2 echo -n "normalize each bigWig file by cutana spike-in scale factor as well as coverage (`date`).. "
+    BWFILES=($BWFILE)
+    IDS=($ID)
+
+    for(( i=0; i<${#BWFILES[@]}; i++ )); do
+        if [ ! -s "${OUTDIR}/${IDS[i]}_normBySIF_COV.bw" ]; then
+            SIF=$(cat ${CUTANA_STAT_FILE} | grep ${IDS[i]} | cut -f 4 | perl -ane '$_=sprintf("%0.0f", $_/2); $sum+=$_; END { print "$sum"; }' | perl -ane 'printf("%0.6f", 1000000/$_);')
+
+            if [ -z "${SIF}" ]; then
+                echo "ERROR: cuatana scaling factor not found for ${IDS[i]}"
+                echo "ERROR: please check ${CUTANA_STAT_FILE} file"
+                usage
+            fi
+
+            if [ "$(initialize_genome -g $GENOME -B)" -a ! -z "$USE_BLACKLISTED" ]; then
+                COV=$(intersectBed -a <(bigWigToWig ${BWFILES[i]} stdout) -b $(initialize_genome -g $GENOME -B) | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
+            else
+                COV=$(intersectBed -a <(bigWigToWig ${BWFILES[i]} stdout) -b ${OUTDIR}/macs2/${FILEID}_peaks.bed -v | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | perl -ane 'if($_=~/^\#/) { next; } else { $sum+=$F[3]; $len+=$F[2]-$F[1]; } END { printf("%0.4f", $sum/'${GENOME_SIZE}'); }')
+            fi
+            #echo -e "${BWFILES[i]}\t${OUTDIR}/macs2/${FILEID}_peaks.bed\t${SIF}\t${GENOME_SIZE}\t${COV}";
+
+            bigWigToWig ${BWFILES[i]} stdout | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", $F[3]*'${SIF}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | perl -ane 'if($_=~/^\#/) { print $_; } else { $F[3]=sprintf("%0.4f", ($F[3])/'${COV}'); print "$F[0]\t$F[1]\t$F[2]\t$F[3]\n"; }' | wigToBigWig stdin ${GENOME_FILE} ${OUTDIR}/${IDS[i]}_normBySIF_COV.bw -clip
         fi
     done
     >&2 echo "done"
