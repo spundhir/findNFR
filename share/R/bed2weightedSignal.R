@@ -54,6 +54,8 @@ compute_total_signal <- function(signal) {
 #############################################
 ## function to compute weighted signal
 ## Idea source: https://www.ncbi.nlm.nih.gov/pubmed/27626379
+## Similar ideas: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3610570/
+## Simialr ideas: https://academic.oup.com/nar/article/52/D1/D61/7424438 
 ## e <- exp(1);
 ## mu <- 2;
 ## plot(unlist(lapply(1:50000, function(dist) { dist <- dist/(10*1000); (2*(e^(-mu*dist)))/(1+((e^(-mu*dist)))); })), xlab="dist_to_tss", ylab="weight", ylim=c(0,1))
