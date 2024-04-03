@@ -1,0 +1,103 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm10"
+WINDOW=250000
+
+#### usage ####
+usage() {
+	echo Program: "gene2regulatoryFootprint (compute regulatory footprint of input CRE on genes)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: gene2regulatoryFootprint -i <file> -j <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input coordinates of gene TSS in BED format (can be stdin)]"
+    echo "             [format: chr start end name score strand (..)]"
+	echo " -j <file>   [input CRE coordinates in BED format (can be stdin)]"
+    echo "             [format: chr start end name score strand (..)]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome (default: mm10)]"
+    echo " -w <int>    [window flanking TSS in bp (default: ${WINDOW})]"
+	echo " -h          [help]"
+    echo "[OUTPUT]"
+    echo "             [chr start end gene_name score strand (..) weighted_signal cre_count]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:w:h ARG; do
+    case "$ARG" in
+    i) TSS_FILE=$OPTARG;;
+    j) PEAK_FILE=$OPTARG;;
+    g) GENOME=$OPTARG;;
+    w) WINDOW=$OPTARG;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$TSS_FILE" -o -z "$PEAK_FILE" -o "$HELP" ]; then
+	usage
+fi
+
+## populating files based on input genome
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+if [ ! -f "$GENOME_FILE" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+
+#####################################
+## create temporary BED file if input is from stdin
+#####################################
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+#TMP="xajcIXJtLKpFbP72GH1SZk4MEzxAjVyN"
+if [ "$TSS_FILE" == "stdin" ]; then
+    while read LINE; do
+        echo -e "${LINE}"
+    done > ${TMP}
+    TSS_FILE=${TMP}
+fi
+
+#####################################
+## organize gene TSS file
+#####################################
+NCOL_TSS_FILE=$(head -n 1 $TSS_FILE | perl -ane 'print scalar(@F);')
+if [ "$(grep 'chr.*start.*end\|seqnames.*start.*end' ${TSS_FILE} | wc -l)" -eq 1 ]; then
+    HEADER_TSS_FILE=$(tabEdit -i $TSS_FILE -d)
+else
+    HEADER_TSS_FILE=$(bed2header -i $TSS_FILE -r)    
+fi
+if [ ! -s "${TMP}.tss" ]; then
+    tabEdit -i ${TSS_FILE} -D | bed2window -i stdin -w ${WINDOW} -x > ${TMP}.tss
+fi
+
+#####################################
+## compute weighted signal for each gene
+#####################################
+if [ ! -s "${TMP}.ws" ]; then
+    intersectBed -a ${TMP}.tss -b <(zless ${PEAK_FILE} | cut -f 1-6) -wao | sort -k 4,4 | groupBy -i stdin -g 4 -c $((NCOL_TSS_FILE+5)),$((NCOL_TSS_FILE+7)) -o collapse,collapse | gene2regulatoryFootprint.R -i stdin -s 2 -d 3 -w 2024 > ${TMP}.ws
+fi
+HEADER_WS_FILE=$(head -n 1 ${TMP}.ws | cut -f 2-)
+
+#####################################
+## arrange final output
+#####################################
+## problem with chrMT
+echo -e "${HEADER_TSS_FILE}\t${HEADER_WS_FILE}"
+join -1 4 -2 1 <(sort -k 4,4 ${TMP}.tss) <(sort -k 1,1 ${TMP}.ws) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";'
+
+## remove temporary files
+if [ -f "$TMP" ]; then
+    rm $TMP
+fi
+rm ${TMP}.tss ${TMP}.ws
+
