@@ -6,7 +6,7 @@ option_list <- list(
 	make_option(c("-i", "--inFile"), help="input BED file created using multiIntersectBed (can be stdin; 5th col: id_1,id_2)"),
 	make_option(c("-o", "--outFile"), help="output pdf file"),
 	make_option(c("-l", "--list"), help="input file contains list (format: id condition; eg. ENSG00000001617 WT)", action="store_true"),
-	make_option(c("-t", "--type"), default="ellipses", help="type of plot; ellipses or ChowRuskey. (default: %default)"),
+	make_option(c("-t", "--type"), default="ellipses", help="type of plot; ellipses, ChowRuskey or ggvenn. (default: %default)"),
 	make_option(c("-s", "--gs"), default="21000", help="genome size meaning total number of genes as background to compute p-values (default: %default)")
 )
 
@@ -30,6 +30,8 @@ suppressPackageStartupMessages(library("RColorBrewer"))
 suppressPackageStartupMessages(library(GeneOverlap))
 suppressPackageStartupMessages(library(session))
 suppressPackageStartupMessages(library(pheatmap))
+suppressPackageStartupMessages(library(ggvenn))
+suppressPackageStartupMessages(library(ggplot2))
 
 if(opt$inFile=="stdin") {
     data <- read.table(file("stdin"))
@@ -71,7 +73,10 @@ col <- col[1:length(vec)]
 #gom.obj <- newGOM(lst, lst, opt$gs)
 #mat <- getMatrix(gom.obj, name="pval")
 
-if(length(names(lst)) <= 3 & opt$type=="ellipses") {
+if(opt$type=="ggvenn") {
+    p1 <- ggvenn(lst)
+    ggsave(opt$outFile, p1)
+} else if(length(names(lst)) <= 3 & opt$type=="ellipses") {
     #venn.plot <- venn.diagram(lst, fill=col, NULL)
     #pdf(opt$outFile)
     #grid.draw(venn.plot)
