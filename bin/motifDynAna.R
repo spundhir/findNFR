@@ -19,6 +19,7 @@ option_list <- list(
     make_option(c("-l", "--mustIncludeMotif"), help="name of motifs that must be included in the final output (if multiple, separate them by a comma)"),
     make_option(c("-R", "--clusterRows"), default=F, help="cluster rows in the heatmap (default=%default)"),
     make_option(c("-C", "--clusterCols"), default=T, help="cluster columns in the heatmap (default=%default)"),
+    make_option(c("-M", "--clusterColsMeasure"), default="euclidean", help="cluster columns in the heatmap using (default=%default)"),
     make_option(c("-W", "--plotWidth"), default=5, help="width of the heatmap (default=%default)"),
     make_option(c("-H", "--plotHeight"), default=5, help="height of the heatmap (default=%default)")
 )
@@ -142,12 +143,12 @@ if(length(sig_rows)>2) {
         #}
         myCol <- rev(colorRampPalette(brewer.pal(11, opt$color), bias=as.numeric(opt$colorBias))(length(breaks)-1))
         #heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1, breaks=breaks)
-        pheatmap(mat[sig_rows,], col=myCol, border_color = NA, cluster_rows=opt$clusterRows, cluster_cols=opt$clusterCols, breaks=breaks)
+        pheatmap(mat[sig_rows,], col=myCol, border_color = NA, cluster_rows=opt$clusterRows, cluster_cols=opt$clusterCols, breaks=breaks, clustering_distance_cols=opt$clusterColsMeasure)
     } else {
         myCol <- rev(colorRampPalette(brewer.pal(11, opt$color), bias=as.numeric(opt$colorBias))(256))
         #myCol <- rev(brewer.pal(11, opt$color))
         #heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1)
-        pheatmap(mat[sig_rows,], col=myCol, border_color = NA, cluster_rows=opt$clusterRows, cluster_cols=opt$clusterCols)
+        pheatmap(mat[sig_rows,], col=myCol, border_color = NA, cluster_rows=opt$clusterRows, cluster_cols=opt$clusterCols, clustering_distance_cols=opt$clusterColsMeasure)
         #heatmap.2(mat, trace="none", col=myCol, margins=c(15,20), cexCol=1, cexRow=1)
     }
     dev.off()
