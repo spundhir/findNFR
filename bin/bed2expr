@@ -120,6 +120,7 @@ if [ "$FILTER_FILES" -eq 1 ]; then
     if [ -z "${INCLUDE_FILTER_ALL}" ]; then
         ARG="-M"
     fi
+    #echo "filterFilesByName -i $INPUTBAMFILES -F $EXCLUDE_FILTER -e bam ${ARG}"; exit
     ## filter bam files based on input filters (include and/or exclude)
     if [ ! -z "$INCLUDE_FILTER" -a ! -z "$EXCLUDE_FILTER" ]; then
         filterFilesByName -i $INPUTBAMFILES -f $INCLUDE_FILTER -F $EXCLUDE_FILTER -e bam ${ARG} | tr '\,' '\n'

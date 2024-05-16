@@ -53,7 +53,7 @@ EXCLUDE_FILTERS=($EXCLUDE_FILTER)
 IFS=$oIFS
 
 MIN_MATCH=${#INCLUDE_FILTERS[@]}
-if [ ! -z "$MATCH" ]; then
+if [ ! -z "$MATCH" -a "${#INCLUDE_FILTERS[@]}" -gt 0  ]; then
     MIN_MATCH=1
 fi
 
@@ -73,7 +73,8 @@ if [ -f "$INPUT" ]; then
             #echo "${EXCLUDE_FILTERS[$i]} $file $FOUND $i"
             NOMATCH_COUNT=$(($NOMATCH_COUNT + $FOUND))
         done
-        
+       
+        #echo -e "$file\t$MATCH_COUNT\t$NOMATCH_COUNT"
         TITLE=`echo $file | sed 's/^.*\///g;' | sed 's/\..*//g' | perl -ane 'chomp($_); print "$_";'`;
         if [ "$MATCH_COUNT" -ge $MIN_MATCH -a "$NOMATCH_COUNT" -eq 0 ]; then
             #echo -e "$TITLE\t$file"
@@ -95,7 +96,8 @@ elif [ -d "$INPUT" ]; then
             #echo "${EXCLUDE_FILTERS[$i]} $file $FOUND $i"
             NOMATCH_COUNT=$(($NOMATCH_COUNT + $FOUND))
         done
-        
+       
+        #echo -e "$file\t$MATCH_COUNT\t$NOMATCH_COUNT\t$MIN_MATCH"
         TITLE=`echo $file | sed 's/^.*\///g;' | sed 's/\..*//g' | perl -ane 'chomp($_); print "$_";'`;
         if [ "$MATCH_COUNT" -ge $MIN_MATCH -a "$NOMATCH_COUNT" -eq 0 ]; then
             #echo -e "$TITLE\t$file"
