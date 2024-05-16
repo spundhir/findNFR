@@ -38,6 +38,7 @@ usage() {
     echo "             [if multiple seperate them by a comma]"
     echo " -F <string> [exclude bam files matching identifiers]"
     echo "             [if multiple seperate them by a comma]"
+    echo " -X          [file should match all matching identifiers (default: atleast one)]"
     echo " -c <file>   [input mapped reads in BAM format for control sample]"
     echo " -M <int>    [minimum MAPQ score of reads to consider as mapped (default: 10)]"
     echo "             [for counting multimapping reads, consider setting it to 0]"
@@ -58,7 +59,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:s:mkde:v:rRng:f:F:c:M:ANh ARG; do
+while getopts i:j:s:mkde:v:rRng:f:F:Xc:M:ANh ARG; do
 	case "$ARG" in
 		i) INPUTBEDFILE=$OPTARG;;
         j) INPUTBAMFILES=$OPTARG;;
@@ -74,6 +75,7 @@ while getopts i:j:s:mkde:v:rRng:f:F:c:M:ANh ARG; do
         g) GENOME=$OPTARG;;
         f) INCLUDE_FILTER=$OPTARG;;
         F) EXCLUDE_FILTER=$OPTARG;;
+        X) INCLUDE_FILTER_ALL=1;;
         c) INPUTBAMCONTROL=$OPTARG;;
         M) MAPQ=$OPTARG;;
         A) APPEND=1;;
@@ -114,13 +116,17 @@ fi
 
 ## filter BAM files for analysis
 if [ "$FILTER_FILES" -eq 1 ]; then
+    ARG=""
+    if [ -z "${INCLUDE_FILTER_ALL}" ]; then
+        ARG="-M"
+    fi
     ## filter bam files based on input filters (include and/or exclude)
     if [ ! -z "$INCLUDE_FILTER" -a ! -z "$EXCLUDE_FILTER" ]; then
-        filterFilesByName -i $INPUTBAMFILES -f $INCLUDE_FILTER -F $EXCLUDE_FILTER -e bam -M | tr '\,' '\n'
+        filterFilesByName -i $INPUTBAMFILES -f $INCLUDE_FILTER -F $EXCLUDE_FILTER -e bam ${ARG} | tr '\,' '\n'
     elif [ ! -z "$INCLUDE_FILTER" ]; then
-        filterFilesByName -i $INPUTBAMFILES -f $INCLUDE_FILTER -e bam -M | tr '\,' '\n'
+        filterFilesByName -i $INPUTBAMFILES -f $INCLUDE_FILTER -e bam ${ARG} | tr '\,' '\n'
     elif [ ! -z "$EXCLUDE_FILTER" ]; then
-        filterFilesByName -i $INPUTBAMFILES -F $EXCLUDE_FILTER -e bam -M | tr '\,' '\n'
+        filterFilesByName -i $INPUTBAMFILES -F $EXCLUDE_FILTER -e bam ${ARG} | tr '\,' '\n'
     elif [ -d "$INPUTBAMFILES" -a -z "$INCLUDE_FILTER" -a -z "$EXCLUDE_FILTER" ]; then
         filterFilesByName -i $INPUTBAMFILES -e bam | tr '\,' '\n'
     else
