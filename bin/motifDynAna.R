@@ -83,7 +83,7 @@ if(length(which( !is.na(dataRaw$V15), arr.ind=TRUE))>0) {
 if(!is.null(opt$mustIncludeMotif)) {
     data <- rbind(data, dataRaw[grep(paste(unlist(strsplit(as.character(opt$mustInclude),",")),collapse="\\/|"), dataRaw$V2),])
     data <- data[order(data$V1, data$V2),]
-    data[is.na(data$V15),]$V15 <- 0
+    #data[is.na(data$V15),]$V15 <- 0
     data <- unique(data)
 }
 
