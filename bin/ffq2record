@@ -30,20 +30,22 @@ fi
 
 ## retrieve JSON file corresponding to GEO id
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-if [ ! -s "${ID}.json" ]; then
-    ffq $ID -t GSE > $ID.json
-fi
+#if [ ! -s "${ID}.json" ]; then
+#    ffq $ID -t GSE > $ID.json
+#fi
 
-if [ -s "${ID}.json" ]; then
+if [ -s "${ID}.json" -a $? -eq 0 ]; then
     ffq2record.R -i $ID.json
 else
-    rm $ID.json
+    #rm $ID.json
     if [ ! -s "${ID}_series_matrix.txt.gz" ]; then
         wget https://ftp.ncbi.nlm.nih.gov/geo/series/$(echo $ID | sed 's/...$/nnn/')/${ID}/matrix/${ID}_series_matrix.txt.gz
     fi
-        
-    paste <(zless ${ID}_series_matrix.txt.gz | grep 'Sample_title\|Sample_relation' | grep -v BioSample | sed -E 's/\"//g' | sed -E 's/SRA://g' | sed -E 's/https:\/\/www.ncbi.nlm.nih.gov\/sra\?term=//g' | head -n 1 | tr '\t' '\n' | sed -E 's/["#()]+//g' | sed -E 's/\s+/_/g' | sed -E 's/[-_]+/_/g') <(zless ${ID}_series_matrix.txt.gz | grep 'Sample_title\|Sample_relation' | grep -v BioSample | sed -E 's/\"//g' | sed -E 's/SRA://g' | tabEdit -i stdin -t | sed -E 's/https:\/\/www.ncbi.nlm.nih.gov\/sra\?term=//g' | tail -n 1 | tr '\t' '\n') | while read -a LINE; do
+ 
+    paste <(zless ${ID}_series_matrix.txt.gz | grep 'Sample_title\|Sample_relation' | grep -v BioSample | sed -E 's/\"//g' | sed -E 's/SRA://g' | sed -E 's/https:\/\/www.ncbi.nlm.nih.gov\/sra\?term=//g' | head -n 1 | tr '\t' '\n' | sed -E 's/["#()]+//g' | sed -E 's/\s+/_/g' | sed -E 's/[-_]+/_/g') <(zless ${ID}_series_matrix.txt.gz | grep 'Sample_title\|Sample_relation' | grep -v BioSample | sed -E 's/\"//g' | sed -E 's/SRA://g' | tabEdit -i stdin -t | sed -E 's/https:\/\/www.ncbi.nlm.nih.gov\/sra\?term=//g' | tail -n 1 | tr '\t' '\n') | grep -v title | while read -a LINE; do
         SRR_ID=$(wget -qO- "https://www.ncbi.nlm.nih.gov/sra?term=${LINE[1]}" | grep SRR | sed -E 's/.*>SRR/SRR/' | sed -E 's/<.*//';);
         echo -e "${LINE[1]}\t${LINE[0]}\t$SRR_ID"
     done
 fi
+
+#cat GSE110900.ffq | cut -f 3 | sort | uniq | grep -v name | cut -f 1 | parallel -j 1 'fastq-dump {} --split-files -O fastq'
