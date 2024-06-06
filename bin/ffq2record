@@ -30,14 +30,14 @@ fi
 
 ## retrieve JSON file corresponding to GEO id
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-#if [ ! -s "${ID}.json" ]; then
-#    ffq $ID -t GSE > $ID.json
-#fi
+if [ ! -s "${ID}.json" ]; then
+    ffq $ID -t GSE > $ID.json
+fi
 
 if [ -s "${ID}.json" -a $? -eq 0 ]; then
     ffq2record.R -i $ID.json
 else
-    #rm $ID.json
+    rm $ID.json
     if [ ! -s "${ID}_series_matrix.txt.gz" ]; then
         wget https://ftp.ncbi.nlm.nih.gov/geo/series/$(echo $ID | sed 's/...$/nnn/')/${ID}/matrix/${ID}_series_matrix.txt.gz
     fi
