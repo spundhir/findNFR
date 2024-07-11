@@ -5,7 +5,6 @@ GENOME="mm10"
 NHITS=50
 PVALUE="0.01"
 MIN_OVERLAP=50
-SIZE=200
 
 #### usage ####
 usage() {
@@ -26,15 +25,13 @@ usage() {
     echo " -c <int>    [number of top hits to analyze from each sample (default: 50)]"
     echo " -x <float>  [p-value cutoff (default: 0.01)]"
     echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
-    echo " -b <file>   [custom background file]"
-    echo " -d <int>    [size of region (default: 200bp)]"
     echo " -h          [help]"
     echo
     exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:c:x:y:b:d:h ARG; do
+while getopts i:o:g:c:x:y:h ARG; do
 	case "$ARG" in
 		i) INDIR=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -42,8 +39,6 @@ while getopts i:o:g:c:x:y:b:d:h ARG; do
         c) NHITS=$OPTARG;;
         x) PVALUE=$OPTARG;;
         y) MIN_OVERLAP=$OPTARG;;
-        b) BKG_FILE=$OPTARG;;
-        d) SIZE=$OPTARG;;
         h) HELP=1;;
 	esac
 done
@@ -111,13 +106,7 @@ for CLASS in ATAC JASPAR GTRD UNIBIND; do
 
             grep -v odds_ratio ${INDIRS[$i]}/giggleResults${CLASS,,}.txt | perl -ane 'chomp($_); print "'$ID'\t$_\n";'
         fi
-    done > $OUTDIR/${CLASS}_TF_ENRICHMENT_DYNAMICS.TXT
+    done > $OUTDIR/${CLASS}_ENRICHMENT_DYNAMICS.TXT
 
-    if [ ! -z "${BKG_FILE}" ]; then
-        ID=$(cat ${BKG_FILE} | cut -f 7 | sort | uniq)
-        DIRNAME=$(dirname ${BKG_FILE})
-        grep -v odds_ratio ${DIRNAME}/giggleResults${CLASS,,}.txt | perl -ane 'chomp($_); print "'$ID'\t$_\n";'
-    fi >> $OUTDIR/${CLASS}_TF_ENRICHMENT_DYNAMICS.TXT
-
-    giggleDynAna.R -i $OUTDIR/"$CLASS"_TF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_tf_dynamics.rds
+    giggleDynAna.R -i $OUTDIR/"$CLASS"_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_tf_dynamics.rds
 done
