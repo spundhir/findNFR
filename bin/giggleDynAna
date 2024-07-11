@@ -1,0 +1,123 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm10"
+NHITS=50
+PVALUE="0.01"
+MIN_OVERLAP=50
+SIZE=200
+
+#### usage ####
+usage() {
+
+#### usage ####
+usage() {
+	echo Program: "giggleDynAna (compute dynamics in the enrichment of giggle database across multiple samples)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: giggleDynAna -i <dir> -o <dir> [OPTIONS]"
+	echo "Options:"
+    echo " -i <dir>    [directory containing result from prior run of giggleAna script]"
+    echo "             [if multiple, seperate them by a comma]"
+    echo " -o <dir>    [output directory]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
+    echo " -c <int>    [number of top hits to analyze from each sample (default: 50)]"
+    echo " -x <float>  [p-value cutoff (default: 0.01)]"
+    echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
+    echo " -b <file>   [custom background file]"
+    echo " -d <int>    [size of region (default: 200bp)]"
+    echo " -h          [help]"
+    echo
+    exit 0
+}
+
+#### parse options ####
+while getopts i:o:g:c:x:y:b:d:h ARG; do
+	case "$ARG" in
+		i) INDIR=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        c) NHITS=$OPTARG;;
+        x) PVALUE=$OPTARG;;
+        y) MIN_OVERLAP=$OPTARG;;
+        b) BKG_FILE=$OPTARG;;
+        d) SIZE=$OPTARG;;
+        h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INDIR" -o -z "$OUTDIR" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+<<"COMMENT1"
+COMMENT1
+
+echo -n "Create directory structure... "
+if [ ! -d "$OUTDIR" ]; then
+    mkdir -p $OUTDIR
+fi
+echo "done"
+
+echo -n "Populating files based on input genome, $GENOME (`date`).. "
+if [ "$GENOME" == "mm10" ]; then
+    GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm10.genome"
+    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
+    GENOME_MOTIF="mm10r"
+elif [ "$GENOME" == "hg38" ]; then
+    GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg38.genome"
+    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
+    GENOME_MOTIF="hg38r"
+elif [ "$GENOME" == "danRer7" ]; then
+    GENOME_FILE="/scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome"
+    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"
+    GENOME_MOTIF="danRer7r"
+else
+    echo "Presently the program only support analysis for mm9, hg19 or danRer7"
+    echo
+    usage
+fi
+echo done
+
+## parse input directories
+oIFS=$IFS
+IFS=","
+INDIRS=($INDIR)
+IFS=$oIFS
+
+## perform giggle enrichment analysis
+for CLASS in ATAC JASPAR GTRD UNIBIND; do 
+    for (( i=0; i<${#INDIRS[@]}; i++)); do
+        ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
+        if [ -f "${INDIRS[$i]}/giggleResults${CLASS}.txt" ]; then
+            if [ "$i" -eq 0 ]; then
+                grep odds_ratio ${INDIRS[$i]}/giggleResults${CLASS,,}.txt | perl -ane 'chomp($_); $_=~s/\#//g; print "id\t$_\n";'
+            fi
+
+            grep -v odds_ratio ${INDIRS[$i]}/giggleResults${CLASS,,}.txt | perl -ane 'chomp($_); print "'$ID'\t$_\n";'
+        fi
+    done > $OUTDIR/${CLASS}_TF_ENRICHMENT_DYNAMICS.TXT
+
+    if [ ! -z "${BKG_FILE}" ]; then
+        ID=$(cat ${BKG_FILE} | cut -f 7 | sort | uniq)
+        DIRNAME=$(dirname ${BKG_FILE})
+        grep -v odds_ratio ${DIRNAME}/giggleResults${CLASS,,}.txt | perl -ane 'chomp($_); print "'$ID'\t$_\n";'
+    fi >> $OUTDIR/${CLASS}_TF_ENRICHMENT_DYNAMICS.TXT
+
+    giggleDynAna.R -i $OUTDIR/"$CLASS"_TF_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_tf_dynamics.rds
+done
