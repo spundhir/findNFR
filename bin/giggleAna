@@ -2,6 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 GENOME="mm10";
+DATABASE="unibind"
 
 #### usage ####
 usage() {
@@ -15,17 +16,19 @@ usage() {
     echo " -o <dir>    [output directory to store results]"
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
+    echo " -d <string> [database to query (atac, jaspar, gtrd, unibind; default: unibind)]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:h ARG; do
+while getopts i:o:g:d:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         g) GENOME=$OPTARG;;
+        d) DATABASE=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -104,17 +107,17 @@ echo "done"
 ## perform giggle enrichment analysis
 TARGET_TOTAL=$(cat $OUTDIR/REGIONS_INTEREST.bed | wc -l)
 cat $OUTDIR/REGIONS_INTEREST.bed | bgzip > $OUTDIR/REGIONS_INTEREST.bed.gz
-if [ -d "$ATAC_DIR" ]; then
+if [ -d "$ATAC_DIR" -a "$DATABASE" == "atac" ]; then
     giggle search -i $ATAC_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsATAC.txt
-fi
-if [ -d "$JASPAR_DIR" ]; then
+elif [ -d "$JASPAR_DIR" -a "$DATABASE" == "jaspar" ]; then
     giggle search -i $JASPAR_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsJASPAR.txt
-fi
-if [ -d "$GTRD_DIR" ]; then
+elif [ -d "$GTRD_DIR" -a "$DATABASE" == "gtrd" ]; then
     giggle search -i $GTRD_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsGTRD.txt
-fi
-if [ -d "$UNIBIND_DIR" ]; then
+elif [ -d "$UNIBIND_DIR" -a "$DATABASE" == "unibind" ]; then
     giggle search -i $UNIBIND_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsUNIBIND.txt
+else
+    echo
+    usage
 fi
 
 rm $OUTDIR/REGIONS_INTEREST.bed.gz

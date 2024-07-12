@@ -2,6 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 GENOME="mm10"
+DATABASE="unibind"
 NHITS=50
 PVALUE="0.01"
 MIN_OVERLAP=50
@@ -21,6 +22,7 @@ echo Program: "multiClassGiggleAna (perform giggle analysis on genomic regions f
     echo " -o <dir>    [output directory]"
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
+    echo " -d <string> [database to query (atac, jaspar, gtrd, unibind; default: unibind)]"
     echo " -c <int>    [number of top hits to analyze from each sample (default: 50)]"
     echo " -x <float>  [p-value (default: 0.01)]"
     echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
@@ -31,11 +33,12 @@ echo Program: "multiClassGiggleAna (perform giggle analysis on genomic regions f
 }
 
 #### parse options ####
-while getopts i:o:g:c::x:y:n:h ARG; do
+while getopts i:o:g:d:c::x:y:n:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         g) GENOME=$OPTARG;;
+        d) DATABASE=$OPTARG;;
         c) NHITS=$OPTARG;;
         x) PVALUE=$OPTARG;;  
         y) MIN_OVERLAP=$OPTARG;;  
@@ -127,7 +130,7 @@ for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$
 
 <<"COMMENT"
 COMMENT
-    giggleAna -i $OUTDIR/enhancer_$ID.bed -o $GIGGLEDIR -g $GENOME &>$GIGGLEDIR/$ID.log &
+    giggleAna -i $OUTDIR/enhancer_$ID.bed -o $GIGGLEDIR -g $GENOME -d ${DATABASE} &>$GIGGLEDIR/$ID.log &
 
     CLASS_COUNT=$((CLASS_COUNT+1))
     GIGGLEDIR_ALL="$GIGGLEDIR_ALL,$GIGGLEDIR"
@@ -136,7 +139,7 @@ wait
 
 if [ "$CLASS_COUNT" -gt 1 ]; then
     GIGGLEDIR_ALL=$(echo $GIGGLEDIR_ALL | perl -ane '$_=~s/^\,//g; print $_;')
-    giggleDynAna -i $GIGGLEDIR_ALL -o $OUTDIR/giggleDynAna -g $GENOME -c $NHITS -x $PVALUE -y $MIN_OVERLAP &>$OUTDIR/giggleDynAna.log
+    giggleDynAna -i $GIGGLEDIR_ALL -o $OUTDIR/giggleDynAna -g $GENOME -d ${DATABASE} -c $NHITS -x $PVALUE -y $MIN_OVERLAP &>$OUTDIR/giggleDynAna.log
 else
     echo "Only one class is found. Not performing differential giggle enrichment analysis using giggleDynAna" 
 fi

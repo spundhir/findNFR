@@ -2,12 +2,10 @@
 #PBS -l nodes=1:ppn=4
 
 GENOME="mm10"
+DATABASE="unibind"
 NHITS=50
 PVALUE="0.01"
 MIN_OVERLAP=50
-
-#### usage ####
-usage() {
 
 #### usage ####
 usage() {
@@ -22,6 +20,7 @@ usage() {
     echo " -o <dir>    [output directory]"
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
+    echo " -d <string> [database to query (atac, jaspar, gtrd, unibind; default: unibind)]"
     echo " -c <int>    [number of top hits to analyze from each sample (default: 50)]"
     echo " -x <float>  [p-value cutoff (default: 0.01)]"
     echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
@@ -31,11 +30,12 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:g:c:x:y:h ARG; do
+while getopts i:o:g:d:c:x:y:h ARG; do
 	case "$ARG" in
 		i) INDIR=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         g) GENOME=$OPTARG;;
+        d) DATABASE=$OPTARG;;
         c) NHITS=$OPTARG;;
         x) PVALUE=$OPTARG;;
         y) MIN_OVERLAP=$OPTARG;;
@@ -96,17 +96,15 @@ INDIRS=($INDIR)
 IFS=$oIFS
 
 ## perform giggle enrichment analysis
-for CLASS in ATAC JASPAR GTRD UNIBIND; do 
-    for (( i=0; i<${#INDIRS[@]}; i++)); do
-        ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
-        if [ -f "${INDIRS[$i]}/giggleResults${CLASS}.txt" ]; then
-            if [ "$i" -eq 0 ]; then
-                grep odds_ratio ${INDIRS[$i]}/giggleResults${CLASS,,}.txt | perl -ane 'chomp($_); $_=~s/\#//g; print "id\t$_\n";'
-            fi
-
-            grep -v odds_ratio ${INDIRS[$i]}/giggleResults${CLASS,,}.txt | perl -ane 'chomp($_); print "'$ID'\t$_\n";'
+for (( i=0; i<${#INDIRS[@]}; i++)); do
+    ID=$(echo ${INDIRS[$i]} | perl -ane '$_=~s/\/$//g; $_=~s/^.*\///g; print $_;')
+    if [ -f "${INDIRS[$i]}/giggleResults${DATABASE^^}.txt" ]; then
+        if [ "$i" -eq 0 ]; then
+            grep odds_ratio ${INDIRS[$i]}/giggleResults${DATABASE^^}.txt | perl -ane 'chomp($_); $_=~s/\#//g; print "id\t$_\n";'
         fi
-    done > $OUTDIR/${CLASS}_ENRICHMENT_DYNAMICS.TXT
 
-    giggleDynAna.R -i $OUTDIR/"$CLASS"_ENRICHMENT_DYNAMICS.TXT -o $OUTDIR/"$CLASS"_tf_dynamics.rds
-done
+        grep -v odds_ratio ${INDIRS[$i]}/giggleResults${DATABASE^^}.txt | perl -ane 'chomp($_); print "'$ID'\t$_\n";'
+    fi
+done > $OUTDIR/GIGGLE_ENRICHMENT_${DATABASE^^}.TXT
+
+giggleDynAna.R -i $OUTDIR/GIGGLE_ENRICHMENT_"${DATABASE^^}".TXT -o $OUTDIR/giggleEnrichment_"${DATABASE^^}".rds
