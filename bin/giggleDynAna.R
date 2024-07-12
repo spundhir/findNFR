@@ -73,9 +73,9 @@ df <- lapply(c("overlaps", "odds_ratio", "combo_score", "fishers_two_tail"), fun
         })
 names(df) <- c("overlaps", "odds_ratio", "combo_score", "fishers_two_tail")
 
-#sig_rows <- which(rowMax(as.matrix(df[["odds_ratio"]])) > 400 & 
-#                    rowSds(as.matrix(df[["odds_ratio"]])) > 30 &
-#                    row.names(df[[1]]) %in% df_promoter[which(df_promoter$logCPM_expr>1),]$name)
+sig_rows <- which(rowMax(as.matrix(df[["odds_ratio"]])) > 400 & 
+                    rowSds(as.matrix(df[["odds_ratio"]])) > 30 &
+                    row.names(df[[1]]) %in% df_promoter[which(df_promoter$logCPM_expr>1),]$name)
 
 #cat(sprintf("%d out of %d motifs passed filter criteria..", length(sig_rows), nrow(df[["overlaps"]])))
 #cat("\n")
