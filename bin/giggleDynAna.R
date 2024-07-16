@@ -4,19 +4,14 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file containing tf enrichment dynamics (can be stdin)"),
-	make_option(c("-o", "--outFile"), help="output .rds file"),
-    make_option(c("-n", "--minFreq"), default="50", help="minimum frequency of target sequences in each class (defaut=%default)"),
-    make_option(c("-y", "--minOverlap"), default="100", help="minimum frequency of overlapping tf peaks (defaut=%default)"),
-    make_option(c("-p", "--minOddsRatio"), default="3", help="minimum odd ratio of at least one class (defaut=%default)"),
-    make_option(c("-d", "--diffFreq"), default="0", help="minimum difference in enrichment between categories (defaut=%default)"),
-    make_option(c("-f", "--onlyDiffFreq"), action="store_true", help="less stringent criteria. use only difference in frequency"),
-    make_option(c("-t", "--plotRange"), action="store_true", help="even less stringent criteria. plot motifs within a range of differential enrichment"),
-    make_option(c("-v", "--plotSim"), action="store_true", help="instead plot motifs similar in frequency"),
-    make_option(c("-r", "--rescale"), action="store_true", help="rescale color bar between min and max value"),
-    make_option(c("-k", "--breaks"), default="0.3", help="breaks for rescale color bar (default=%default)"),
+	make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
+    make_option(c("-c", "--topN"), default="10", help="number of top hits to analyze from each sample (defaut=%default)"),
+    make_option(c("-x", "--pVal"), default="1e-15", help="p-value cutoff (defaut=%default)"),
+    make_option(c("-y", "--minOverlap"), default="50", help="minimum frequency of overlaps in each class (defaut=%default)"),
+    make_option(c("-z", "--minOddsRatio"), default="8", help="minimum odds ratio (log) of at least one class (defaut=%default)"),
     make_option(c("-c", "--color"), default="RdBu", help="color palette (default=%default)"),
     make_option(c("-b", "--colorBias"), default="1", help="bias in color (default=%default)"),
-    make_option(c("-l", "--mustIncludeMotif"), help="name of motifs that must be included in the final output (if multiple, separate them by a comma)"),
+    make_option(c("-l", "--mustInclude"), help="name of element that must be included in the final output (if multiple, separate them by a comma)"),
     make_option(c("-R", "--clusterRows"), default=F, help="cluster rows in the heatmap (default=%default)"),
     make_option(c("-C", "--clusterCols"), default=T, help="cluster columns in the heatmap (default=%default)"),
     make_option(c("-W", "--plotWidth"), default=5, help="width of the heatmap (default=%default)"),
@@ -27,8 +22,8 @@ parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
 opt <- parse_args(parser)
 
 ## check, if all required arguments are given
-if(is.null(opt$inFile) | is.null(opt$outFile)) {
-	cat("\nProgram: giggleDynAna.R (R script to plot TF enrichment dynamics)\n")
+if(is.null(opt$inFile) | is.null(opt$outPdfFile)) {
+	cat("\nProgram: giggleDynAna.R (R script to plot giggle enrichment dynamics)\n")
 	cat("Author: BRIC, University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
 	cat("Contact: pundhir@binf.ku.dk\n");
@@ -73,76 +68,49 @@ df <- lapply(c("overlaps", "odds_ratio", "combo_score", "fishers_two_tail"), fun
         })
 names(df) <- c("overlaps", "odds_ratio", "combo_score", "fishers_two_tail")
 
-sig_rows <- which(rowMax(as.matrix(df[["odds_ratio"]])) > 400 & 
-                    rowSds(as.matrix(df[["odds_ratio"]])) > 30 &
-                    row.names(df[[1]]) %in% df_promoter[which(df_promoter$logCPM_expr>1),]$name)
+## identify significant overlaps
+sig_rows <- which(rowMin(as.matrix(df[["fishers_two_tail"]])) < opt$pVal &
+                    rowMin(as.matrix(df[["overlaps"]])) < opt$minOverlap &
+                    log(rowMax(round(as.matrix(df[["odds_ratio"]])))) >= opt$minOddsRatio &
+                    log(rowSds(as.matrix(df[["odds_ratio"]]))) > 4)
 
-#cat(sprintf("%d out of %d motifs passed filter criteria..", length(sig_rows), nrow(df[["overlaps"]])))
-#cat("\n")
+if(!is.null(opt$mustInclude) {
+    sig_rows = c(sig_rows, which(row.names(df$overlaps) %in% unlist(strsplit(opt$mustInclude, ","))))
+}
 
-saveRDS(df, file = opt$outFile)
+## filter top N overlaps ordered based on combo score
+sig_rows[sig_rows %in% which(row.names(df$combo_score) %in% unique(unlist(lapply(colnames(df$combo_score), function(x) head(row.names(df$combo_score[order(-df$combo_score[,x]),]), opt$topN)))))]
 
-#if(length(sig_rows)>2) {
-#    pdf(opt$outPdfFile, height=opt$plotHeight, width=opt$plotWidth)
-#    #breaks <- as.vector(summary(as.vector(mat[sig_rows,])))
-#    #len=2
-#    #breaks1 <- seq(breaks[1], breaks[2], length=len)
-#    #breaks2 <- seq(breaks[2], breaks[3], length=len)
-#    #breaks3 <- seq(breaks[3], breaks[4], length=len)
-#    #breaks4 <- seq(breaks[4], breaks[5], length=len)
-#    #breaks5 <- seq(breaks[5], breaks[6], length=len)
-#    #breaks <- c(breaks1[1:length(breaks1)], breaks2[2:length(breaks2)],
-#    #            breaks3[2:length(breaks3)], breaks4[2:length(breaks4)],
-#    #            breaks5[2:length(breaks5)])
-#    if(!is.null(opt$rescale)) {
-#        breaks <- seq(min(mat[sig_rows,]), max(mat[sig_rows,]), by=as.numeric(opt$breaks))
-#        #if(length(breaks)<=12) {
-#        #    myCol <- rev(brewer.pal(length(breaks)-1, "RdBu"))
-#        #} else {
-#        #    myCol <- colorRampPalette(c("dodgerblue4","grey97", "sienna3"))(length(breaks)-1)
-#        #    #myCol <- colorpanel(n=length(breaks)-1,low="blue",mid="#f7f7f7",high="red")
-#        #    #myCol <- colorpanel(n=length(breaks)-1,low="#2166ac",mid="#f7f7f7",high="#b2182b")
-#        #}
-#        myCol <- rev(colorRampPalette(brewer.pal(11, opt$color), bias=as.numeric(opt$colorBias))(length(breaks)-1))
-#        #heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1, breaks=breaks)
-#        pheatmap(mat[sig_rows,], col=myCol, border_color = NA, cluster_rows=opt$clusterRows, cluster_cols=opt$clusterCols, breaks=breaks)
-#    } else {
-#        myCol <- rev(colorRampPalette(brewer.pal(11, opt$color), bias=as.numeric(opt$colorBias))(256))
-#        #myCol <- rev(brewer.pal(11, opt$color))
-#        #heatmap.2(mat[sig_rows,], trace="none", col=myCol, margins=c(15,25), cexCol=1, cexRow=1)
-#        pheatmap(mat[sig_rows,], col=myCol, border_color = NA, cluster_rows=opt$clusterRows, cluster_cols=opt$clusterCols)
-#        #heatmap.2(mat, trace="none", col=myCol, margins=c(15,20), cexCol=1, cexRow=1)
-#    }
-#    dev.off()
-#
-#    txtFile=sprintf("%s.txt", opt$outPdfFile)
-#    mat_df <- as.data.frame(mat)
-#    colnames(mat_df) <- unlist(lapply(colnames(mat_df), function(x) sprintf("%s (freq_target/freq_bkg)", x)))
-#    mat_df$diff <- apply(mat_df, 1, function(x) max(x)-min(x))
-#    dat_df <- as.data.frame(dat)
-#    colnames(dat_df) <- unlist(lapply(colnames(dat_df), function(x) sprintf("%s (per_target)", x)))
-#    dat_df$class <- 0
-#    if(nrow(dat_df[which(apply(dat_df, 1, function(x) max(x)>5)==T),])>0) {
-#        dat_df[which(apply(dat_df, 1, function(x) max(x)>5)==T),]$class <- 1
-#    }
-#    if(nrow(dat_df[which(apply(dat_df, 1, function(x) max(x)>10)==T),])>0) {
-#        dat_df[which(apply(dat_df, 1, function(x) max(x)>10)==T),]$class <- 2
-#    }
-#    if(nrow(dat_df[which(apply(dat_df, 1, function(x) max(x)>20)==T),])>0) {
-#        dat_df[which(apply(dat_df, 1, function(x) max(x)>20)==T),]$class <- 3
-#    }
-#    mat_df <- merge(mat_df, dat_df, by=0)
-#    colnames(mat_df)[1] <- "motif"
-#    write.table(mat_df[order(-mat_df[,"diff"]),], txtFile, quote=F, append=F, sep="\t", col.names=T, row.names=F)
-#} else if(length(sig_rows)>=1) {
-#    txtFile=sprintf("%s.txt", opt$outPdfFile)
-#    cat("\nNumber of significant motifs are too low for a heatmap. Instead writing results to txtFile\n\n")
-#    if(length(sig_rows)==1) {
-#        write(rownames(mat)[sig_rows], file="motif_dynamics.txt", sep="\t")
-#        write.table(mat[sig_rows,], txtFile, quote=F, append=TRUE, sep="\t")
-#    } else {
-#        write.table(mat[sig_rows,], txtFile, quote=F, append=FALSE, sep="\t")
-#    }
-#} else {
-#    cat("\nNo significant motif is found\n")
-#}
+if(length(sig_rows)>2) {
+    df_sig <- cbind(df[["overlaps"]][sig_rows,] %>% mutate(name = row.names(df[["overlaps"]][sig_rows,])) %>% reshape2::melt(),
+                    df[["odds_ratio"]][sig_rows,] %>% mutate(name = row.names(df[["odds_ratio"]][sig_rows,])) %>% reshape2::melt() %>% pull(value),
+                    df[["fishers_two_tail"]][sig_rows,] %>% mutate(name = row.names(df[["fishers_two_tail"]][sig_rows,])) %>% reshape2::melt() %>% pull(value),
+                    df[["combo_score"]][sig_rows,] %>% mutate(name = row.names(df[["combo_score"]][sig_rows,])) %>% reshape2::melt() %>% pull(value))
+
+    colnames(df_sig) <- c("name", "class", "overlaps", "odds_ratio", "pvalue", "combo_score")
+    df_sig$odds_ratio <- log(df_sig$odds_ratio)
+    df_sig$pvalue <- -log10(df_sig$pvalue)
+
+    pdf(opt$outPdfFile, height=opt$plotHeight, width=opt$plotWidth)
+        ggplot(df_sig, aes(x = class, y = name)) +
+            geom_point(aes(colour=odds_ratio,size=combo_score)) +
+            #geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
+            #scale_colour_gradient(high="brown", low="yellow", name="p-value") +
+            #scale_colour_gradient(low="#00441b", high="#ccece6", name="p-value") +
+            scale_colour_gradient(high="#00441b", low="#99d8c9", name="log(odds_ratio") +
+            #breaks=c(1e-20, 1e-15, 1e-10, 1e-5, 0.01, 0.05)) +
+            #scale_size(range=c(1,10)) +
+            #scale_size(range=c((min(data_sig$GeneDensity)*100),(max(data_sig$GeneDensity*100))), breaks=waiver(), labels=waiver()) +
+            #scale_size_area(breaks=seq(0,100,by=10), max_size=20) +
+            theme(text=element_text(size=10), axis.text.x=element_text(angle=90)) +
+            theme_bw(base_size=15)
+
+        #ggarrange(matrix2Heatmap((t(df[["odds_ratio"]][sig_rows,])), scale="col", clusterRows = F, clusterCols = T))
+    dev.off()
+    df[["sig"]] <- df_sig
+} else {
+    cat("\nNo enrichment is found\n")
+    df[["sig"]] <- NA
+}
+
+#saveRDS(df, file = opt$outFile)

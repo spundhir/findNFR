@@ -3,9 +3,10 @@
 
 GENOME="mm10"
 DATABASE="unibind"
-NHITS=50
-PVALUE="0.01"
+NHITS=10
+PVALUE="1e-15"
 MIN_OVERLAP=50
+ODDS_RATIO=8
 MIN_N_CLASS=1
 
 #### usage ####
@@ -23,9 +24,10 @@ echo Program: "multiClassGiggleAna (perform giggle analysis on genomic regions f
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
     echo " -d <string> [database to query (atac, jaspar, gtrd, unibind; default: unibind)]"
-    echo " -c <int>    [number of top hits to analyze from each sample (default: 50)]"
-    echo " -x <float>  [p-value (default: 0.01)]"
+    echo " -c <int>    [number of top hits to analyze from each sample (default: 10)]"
+    echo " -x <float>  [p-value (default: 1e-15)]"
     echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
+    echo " -z <float>  [minimum odds ratio (log) (default: 8)]"
     echo " -n <int>    [minimum number of elements within each region class to plot (default: 1)]"
 	echo " -h          [help]"
 	echo
@@ -33,7 +35,7 @@ echo Program: "multiClassGiggleAna (perform giggle analysis on genomic regions f
 }
 
 #### parse options ####
-while getopts i:o:g:d:c::x:y:n:h ARG; do
+while getopts i:o:g:d:c::x:y:z:n:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -41,7 +43,8 @@ while getopts i:o:g:d:c::x:y:n:h ARG; do
         d) DATABASE=$OPTARG;;
         c) NHITS=$OPTARG;;
         x) PVALUE=$OPTARG;;  
-        y) MIN_OVERLAP=$OPTARG;;  
+        y) MIN_OVERLAP=$OPTARG;;
+        z) ODDS_RATIO=$OPTARG;;
         n) MIN_N_CLASS=$OPTARG;;
 		h) HELP=1;;
 	esac
@@ -139,7 +142,7 @@ wait
 
 if [ "$CLASS_COUNT" -gt 1 ]; then
     GIGGLEDIR_ALL=$(echo $GIGGLEDIR_ALL | perl -ane '$_=~s/^\,//g; print $_;')
-    giggleDynAna -i $GIGGLEDIR_ALL -o $OUTDIR/giggleDynAna -g $GENOME -d ${DATABASE} -c $NHITS -x $PVALUE -y $MIN_OVERLAP &>$OUTDIR/giggleDynAna.log
+    giggleDynAna -i $GIGGLEDIR_ALL -o $OUTDIR/giggleDynAna -g ${GENOME} -d ${DATABASE} -c ${NHITS} -x ${PVALUE} -y ${MIN_OVERLAP} -z ${ODDS_RATIO} &>$OUTDIR/giggleDynAna.log
 else
     echo "Only one class is found. Not performing differential giggle enrichment analysis using giggleDynAna" 
 fi

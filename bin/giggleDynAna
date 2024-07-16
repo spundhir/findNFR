@@ -3,9 +3,10 @@
 
 GENOME="mm10"
 DATABASE="unibind"
-NHITS=50
-PVALUE="0.01"
+NHITS=10
+PVALUE="1e-15"
 MIN_OVERLAP=50
+ODDS_RATIO=8
 
 #### usage ####
 usage() {
@@ -21,16 +22,17 @@ usage() {
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
     echo " -d <string> [database to query (atac, jaspar, gtrd, unibind; default: unibind)]"
-    echo " -c <int>    [number of top hits to analyze from each sample (default: 50)]"
-    echo " -x <float>  [p-value cutoff (default: 0.01)]"
+    echo " -c <int>    [number of top hits to analyze from each sample (default: 10)]"
+    echo " -x <float>  [p-value cutoff (default: 1e-15)]"
     echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
+    echo " -z <float>  [minimum odds ratio (log) (default: 8)]"
     echo " -h          [help]"
     echo
     exit 0
 }
 
 #### parse options ####
-while getopts i:o:g:d:c:x:y:h ARG; do
+while getopts i:o:g:d:c:x:y:z:h ARG; do
 	case "$ARG" in
 		i) INDIR=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -39,6 +41,7 @@ while getopts i:o:g:d:c:x:y:h ARG; do
         c) NHITS=$OPTARG;;
         x) PVALUE=$OPTARG;;
         y) MIN_OVERLAP=$OPTARG;;
+        z) ODDS_RATIO=$OPTARG;;
         h) HELP=1;;
 	esac
 done
@@ -107,4 +110,4 @@ for (( i=0; i<${#INDIRS[@]}; i++)); do
     fi
 done > $OUTDIR/GIGGLE_ENRICHMENT_${DATABASE^^}.TXT
 
-giggleDynAna.R -i $OUTDIR/GIGGLE_ENRICHMENT_"${DATABASE^^}".TXT -o $OUTDIR/giggleEnrichment_"${DATABASE^^}".rds
+giggleDynAna.R -i $OUTDIR/GIGGLE_ENRICHMENT_"${DATABASE^^}".TXT -o $OUTDIR/giggleEnrichment_"${DATABASE^^}".pdf -c ${NHITS} -x ${PVALUE} -y ${MIN_OVERLAP} -z ${ODDS_RATIO}
