@@ -117,8 +117,7 @@ if(identical(opt$inFile, "stdin")==T) {
 } else {
     data <- read.table(opt$inFile, header=T)
 }
-#data <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/analysis/multiClassGiggleAna/giggleDynAna/GIGGLE_ENRICHMENT_UNIBIND.TXT", header=T)
-#data <- data[grep("05", data$file),]
+#data <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/analysis/multiClassGiggleAna/giggleDynAna/GIGGLE_ENRICHMENT_JASPAR.TXT", header=T)
 
 no_rows=nrow(data)/length(unique(data$id))
 data$file <- gsub(".bed.gz", "", gsub("^.*/", "", data$file))
@@ -134,6 +133,9 @@ names(df) <- c("overlaps", "odds_ratio", "combo_score", "fishers_two_tail")
 ## identify significant overlaps based on top N ordered by combo score
 sig_rows <- which(row.names(df$combo_score) %in% unique(unlist(lapply(colnames(df$combo_score), function(x) head(row.names(df$combo_score[order(-df$combo_score[,x]),]), opt$topN)))))
 
+## filter out overlaps corresponding to which standard deviation is zero
+sig_rows <- sig_rows[sig_rows %in% which(log(rowSds(as.matrix(df[["odds_ratio"]]))) > 0)]
+
 ## filter out overlaps based on significance thresholds
 if(!is.null(opt$filterPval)) {
   ## identify significant overlaps
@@ -148,24 +150,28 @@ if(!is.null(opt$mustInclude)) {
   sig_rows = c(sig_rows, which(row.names(df$overlaps) %in% unlist(strsplit(opt$mustInclude, ","))))
 }
 
-## make the plot
-if(length(sig_rows)>2) {
-  if(is.null(opt$quaNorm)) {
-    df_sig <- cbind(df[["overlaps"]][sig_rows,] %>% mutate(name = row.names(df[["overlaps"]][sig_rows,])) %>% reshape2::melt(),
-                    df[["odds_ratio"]][sig_rows,] %>% mutate(name = row.names(df[["odds_ratio"]][sig_rows,])) %>% reshape2::melt() %>% pull(value),
-                    df[["fishers_two_tail"]][sig_rows,] %>% mutate(name = row.names(df[["fishers_two_tail"]][sig_rows,])) %>% reshape2::melt() %>% pull(value),
-                    df[["combo_score"]][sig_rows,] %>% mutate(name = row.names(df[["combo_score"]][sig_rows,])) %>% reshape2::melt() %>% pull(value))
-  } else {
-    df_sig <- cbind(df[["overlaps"]][sig_rows,] %>% mutate(name = row.names(df[["overlaps"]][sig_rows,])) %>% reshape2::melt(),
-                    df[["odds_ratio"]][sig_rows,] %>% as.matrix() %>% normalize.quantiles() %>% `colnames<-` (colnames(df[["combo_score"]][sig_rows,])) %>% `rownames<-` (row.names(df[["combo_score"]][sig_rows,])) %>% as.data.frame() %>% mutate(name = row.names(df[["odds_ratio"]][sig_rows,])) %>% reshape2::melt() %>% pull(value),
-                    df[["fishers_two_tail"]][sig_rows,] %>% mutate(name = row.names(df[["fishers_two_tail"]][sig_rows,])) %>% reshape2::melt() %>% pull(value),
-                    df[["combo_score"]][sig_rows,] %>% as.matrix() %>% normalize.quantiles() %>% `colnames<-` (colnames(df[["combo_score"]][sig_rows,])) %>% `rownames<-` (row.names(df[["combo_score"]][sig_rows,])) %>% as.data.frame() %>% mutate(name = row.names(df[["combo_score"]][sig_rows,])) %>% reshape2::melt() %>% pull(value))
-  }
+## quantile normalize the data
+if(!is.null(opt$quaNorm)) {
+  df_sig <- cbind(df[["overlaps"]][sig_rows,] %>% mutate(name = row.names(df[["overlaps"]][sig_rows,])) %>% reshape2::melt(),
+                  df[["odds_ratio"]][sig_rows,] %>% as.matrix() %>% normalize.quantiles() %>% `colnames<-` (colnames(df[["combo_score"]][sig_rows,])) %>% `rownames<-` (row.names(df[["combo_score"]][sig_rows,])) %>% as.data.frame() %>% mutate(name = row.names(df[["odds_ratio"]][sig_rows,])) %>% reshape2::melt() %>% pull(value),
+                  df[["fishers_two_tail"]][sig_rows,] %>% mutate(name = row.names(df[["fishers_two_tail"]][sig_rows,])) %>% reshape2::melt() %>% pull(value),
+                  df[["combo_score"]][sig_rows,] %>% as.matrix() %>% normalize.quantiles() %>% `colnames<-` (colnames(df[["combo_score"]][sig_rows,])) %>% `rownames<-` (row.names(df[["combo_score"]][sig_rows,])) %>% as.data.frame() %>% mutate(name = row.names(df[["combo_score"]][sig_rows,])) %>% reshape2::melt() %>% pull(value))
+} else {
+  df_sig <- cbind(df[["overlaps"]][sig_rows,] %>% mutate(name = row.names(df[["overlaps"]][sig_rows,])) %>% reshape2::melt(),
+                  df[["odds_ratio"]][sig_rows,] %>% mutate(name = row.names(df[["odds_ratio"]][sig_rows,])) %>% reshape2::melt() %>% pull(value),
+                  df[["fishers_two_tail"]][sig_rows,] %>% mutate(name = row.names(df[["fishers_two_tail"]][sig_rows,])) %>% reshape2::melt() %>% pull(value),
+                  df[["combo_score"]][sig_rows,] %>% mutate(name = row.names(df[["combo_score"]][sig_rows,])) %>% reshape2::melt() %>% pull(value))
+}
 
-  colnames(df_sig) <- c("name", "class", "overlaps", "odds_ratio", "pvalue", "combo_score")
-  df_sig$odds_ratio <- log(df_sig$odds_ratio)
-  df_sig$pvalue <- -log10(df_sig$pvalue)
-  
+colnames(df_sig) <- c("name", "class", "overlaps", "odds_ratio", "pvalue", "combo_score")
+df_sig$odds_ratio <- log(df_sig$odds_ratio)
+df_sig$pvalue <- -log10(df_sig$pvalue)
+
+## filter out overlaps corresponding to which standard deviation is zero
+df_sig <- df_sig[which(df_sig$name %in% row.names(as.data.frame(matrix(df_sig[,"odds_ratio"], nrow=length(unique(df_sig$name))) %>% as.data.frame() %>% `colnames<-` (unique(df_sig$class)) %>% `rownames<-` (unique(df_sig$name)))[which(rowSds(matrix(df_sig[,"odds_ratio"], nrow=length(unique(df_sig$name))))>0),])),]
+
+## make the plot
+if(nrow(df_sig)>2) {
   #ggboxplot(data, x="id", y="overlaps")
   
   p1 <- ggplot(df_sig, aes(x = class, y = name)) +

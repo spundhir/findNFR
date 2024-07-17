@@ -39,7 +39,7 @@ echo Program: "multiClassGiggleAna (perform giggle analysis on genomic regions f
 }
 
 #### parse options ####
-while getopts i:o:g:d:c:f:x:y:z:l:qn:h ARG; do
+while getopts i:o:g:d:c:fx:y:z:l:qn:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -160,7 +160,7 @@ fi
 
 if [ "$CLASS_COUNT" -gt 1 ]; then
     GIGGLEDIR_ALL=$(echo $GIGGLEDIR_ALL | perl -ane '$_=~s/^\,//g; print $_;')
-    giggleDynAna -i $GIGGLEDIR_ALL -o $OUTDIR/giggleDynAna -g ${GENOME} -d ${DATABASE} -c ${NHITS} -x ${PVALUE} -y ${MIN_OVERLAP} -z ${ODDS_RATIO} ${ADDITIONAL_ARGUMENT} &>$OUTDIR/giggleDynAna.log
+    giggleDynAna -i $GIGGLEDIR_ALL -o $OUTDIR/giggleDynAna -g ${GENOME} -d ${DATABASE} -c ${NHITS} -x ${PVALUE} -y ${MIN_OVERLAP} -z ${ODDS_RATIO} ${ADDITIONAL_ARGUMENT}
 else
     echo "Only one class is found. Not performing differential giggle enrichment analysis using giggleDynAna" 
 fi

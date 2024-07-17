@@ -108,7 +108,7 @@ echo "done"
 TARGET_TOTAL=$(cat $OUTDIR/REGIONS_INTEREST.bed | wc -l)
 cat $OUTDIR/REGIONS_INTEREST.bed | bgzip > $OUTDIR/REGIONS_INTEREST.bed.gz
 if [ -d "$ATAC_DIR" -a "$DATABASE" == "atac" ]; then
-    giggle search -i $ATAC_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsATAC.txt
+    giggle search -i $ATAC_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s -f 05 | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsATAC.txt
 elif [ -d "$JASPAR_DIR" -a "$DATABASE" == "jaspar" ]; then
     giggle search -i $JASPAR_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsJASPAR.txt
 elif [ -d "$GTRD_DIR" -a "$DATABASE" == "gtrd" ]; then
