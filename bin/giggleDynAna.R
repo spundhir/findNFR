@@ -5,15 +5,15 @@ suppressPackageStartupMessages(library("optparse"))
 option_list <- list(
   make_option(c("-i", "--inFile"), help="input file containing tf enrichment dynamics (can be stdin)"),
   make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
+  make_option(c("-c", "--topN"), default=10, help="number of top overlaps to analyze from each sample (defaut=%default)"),
+  make_option(c("-f", "--filterPval"), action="store_true", help="also filter based on -x, -y and -z (defaut=%default)"),
   make_option(c("-x", "--pVal"), default=1e-15, help="p-value cutoff (defaut=%default)"),
   make_option(c("-y", "--minOverlap"), default=50, help="minimum frequency of overlaps in each class (defaut=%default)"),
   make_option(c("-z", "--minOddsRatio"), default=8, help="minimum odds ratio (log) of at least one class (defaut=%default)"),
-  make_option(c("-c", "--topN"), default=10, help="number of top overlaps to analyze from each sample (defaut=%default)"),
-  make_option(c("-t", "--plotTopN"), action="store_true", help="plot only top N overlaps. Disregards -x, -y and -z (defaut=%default)"),
+  make_option(c("-l", "--mustInclude"), help="name of overlap(s) that must be included in the final output (if multiple, separate them by a comma)"),
   make_option(c("-q", "--quaNorm"), action="store_true", help="plot quantile normalized data (defaut=%default)"),
   make_option(c("-b", "--colorBias"), default=1, help="bias in color (default=%default)"),
-  make_option(c("-l", "--mustInclude"), help="name of element that must be included in the final output (if multiple, separate them by a comma)"),
-  make_option(c("-R", "--clusterRows"), default=F, help="cluster rows in the heatmap (default=%default)"),
+  make_option(c("-R", "--clusterRows"), default=T, help="cluster rows in the heatmap (default=%default)"),
   make_option(c("-C", "--clusterCols"), default=T, help="cluster columns in the heatmap (default=%default)"),
   make_option(c("-W", "--plotWidth"), default=15, help="width of the heatmap (default=%default)"),
   make_option(c("-H", "--plotHeight"), default=10, help="height of the heatmap (default=%default)")
@@ -117,8 +117,8 @@ if(identical(opt$inFile, "stdin")==T) {
 } else {
     data <- read.table(opt$inFile, header=T)
 }
-data <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/analysis/multiClassGiggleAna/giggleDynAna/GIGGLE_ENRICHMENT_ATAC.TXT", header=T)
-data <- data[grep("05", data$file),]
+#data <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/analysis/multiClassGiggleAna/giggleDynAna/GIGGLE_ENRICHMENT_UNIBIND.TXT", header=T)
+#data <- data[grep("05", data$file),]
 
 no_rows=nrow(data)/length(unique(data$id))
 data$file <- gsub(".bed.gz", "", gsub("^.*/", "", data$file))
@@ -131,23 +131,24 @@ df <- lapply(c("overlaps", "odds_ratio", "combo_score", "fishers_two_tail"), fun
         })
 names(df) <- c("overlaps", "odds_ratio", "combo_score", "fishers_two_tail")
 
-if(is.null(opt$plotTopN)) {
+## identify significant overlaps based on top N ordered by combo score
+sig_rows <- which(row.names(df$combo_score) %in% unique(unlist(lapply(colnames(df$combo_score), function(x) head(row.names(df$combo_score[order(-df$combo_score[,x]),]), opt$topN)))))
+
+## filter out overlaps based on significance thresholds
+if(!is.null(opt$filterPval)) {
   ## identify significant overlaps
-  sig_rows <- which(rowMin(as.matrix(df[["fishers_two_tail"]])) < opt$pVal &
-                      rowMin(as.matrix(df[["overlaps"]])) > opt$minOverlap &
-                      log(rowMax(round(as.matrix(df[["odds_ratio"]])))) >= opt$minOddsRatio &
-                      log(rowSds(as.matrix(df[["odds_ratio"]]))) > 4)
-  
-  if(!is.null(opt$mustInclude)) {
-    sig_rows = c(sig_rows, which(row.names(df$overlaps) %in% unlist(strsplit(opt$mustInclude, ","))))
-  }
-  
-  ## filter top N overlaps ordered based on combo score
-  sig_rows <- sig_rows[sig_rows %in% which(row.names(df$combo_score) %in% unique(unlist(lapply(colnames(df$combo_score), function(x) head(row.names(df$combo_score[order(-df$combo_score[,x]),]), opt$topN)))))]
-} else {
-  sig_rows <- which(row.names(df$combo_score) %in% unique(unlist(lapply(colnames(df$combo_score), function(x) head(row.names(df$combo_score[order(-df$combo_score[,x]),]), opt$topN)))))
+  sig_rows <- sig_rows[sig_rows %in% which(rowMin(as.matrix(df[["fishers_two_tail"]])) < opt$pVal &
+                                             rowMin(as.matrix(df[["overlaps"]])) > opt$minOverlap &
+                                             log(rowMax(round(as.matrix(df[["odds_ratio"]])))) >= opt$minOddsRatio &
+                                             log(rowSds(as.matrix(df[["odds_ratio"]]))) > 4)]
 }
 
+## add overlaps which must be included
+if(!is.null(opt$mustInclude)) {
+  sig_rows = c(sig_rows, which(row.names(df$overlaps) %in% unlist(strsplit(opt$mustInclude, ","))))
+}
+
+## make the plot
 if(length(sig_rows)>2) {
   if(is.null(opt$quaNorm)) {
     df_sig <- cbind(df[["overlaps"]][sig_rows,] %>% mutate(name = row.names(df[["overlaps"]][sig_rows,])) %>% reshape2::melt(),
@@ -165,12 +166,14 @@ if(length(sig_rows)>2) {
   df_sig$odds_ratio <- log(df_sig$odds_ratio)
   df_sig$pvalue <- -log10(df_sig$pvalue)
   
+  #ggboxplot(data, x="id", y="overlaps")
+  
   p1 <- ggplot(df_sig, aes(x = class, y = name)) +
-    geom_point(aes(colour=odds_ratio, size=combo_score)) +
+    geom_point(aes(colour=combo_score, size=odds_ratio)) +
     #geom_point(aes(colour=pvalue,size=GeneDensity*100)) +
     #scale_colour_gradient(high="brown", low="yellow", name="p-value") +
     #scale_colour_gradient(low="#00441b", high="#ccece6", name="p-value") +
-    scale_colour_gradient(high="#00441b", low="#99d8c9", name="log(odds_ratio)") +
+    scale_colour_gradient(high="#00441b", low="#99d8c9", name="log(combo_score)") +
     #breaks=c(1e-20, 1e-15, 1e-10, 1e-5, 0.01, 0.05)) +
     #scale_size(range=c(1,10)) +
     #scale_size(range=c((min(data_sig$GeneDensity)*100),(max(data_sig$GeneDensity*100))), breaks=waiver(), labels=waiver()) +
@@ -178,13 +181,9 @@ if(length(sig_rows)>2) {
     theme_bw(base_size=15) +
     theme(text=element_text(size=10), axis.text.x=element_text(angle=90, vjust = 0.5, hjust=1), legend.position = "bottom")
   
-  if(is.null(opt$quaNorm)) {
-    p2 <- matrix2Heatmap(df[["odds_ratio"]][sig_rows,], scale="row", clusterRows = opt$clusterRows, clusterCols = opt$clusterCols)
-  } else {
-    p2 <- matrix2Heatmap(((df[["odds_ratio"]][sig_rows,] %>% as.matrix() %>% normalize.quantiles() %>% `colnames<-` (colnames(df[["combo_score"]][sig_rows,])) %>% `rownames<-` (row.names(df[["combo_score"]][sig_rows,])))), 
-                         scale="row", clusterRows = opt$clusterRows, clusterCols = opt$clusterCols)
-  }
-  
+  p2 <- matrix2Heatmap(matrix(df_sig[,"odds_ratio"], nrow=length(unique(df_sig$name))) %>% as.data.frame() %>% `colnames<-` (unique(df_sig$class)) %>% `rownames<-` (unique(df_sig$name)), 
+                       scale="row", clusterRows = opt$clusterRows, clusterCols = opt$clusterCols, bias=opt$colorBias)
+
   ggsave(opt$outPdfFile, ggarrange(plotlist = list(p1, p2), nrow=1, ncol=2, labels = c("A)", "B)")), height=opt$plotHeight, width=opt$plotWidth, device="pdf")
   #ggsave(opt$outPdfFile, marrangeGrob(grobs = list(p1, p2), nrow=1, ncol=2, labels=c("A", "B")),  height=opt$plotHeight, width=opt$plotWidth, device="pdf")
   df[["sig"]] <- df_sig
