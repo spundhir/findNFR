@@ -14,6 +14,7 @@ mm9 /scratch/genomes/assemblies/Mus_musculus/mm9/mm9.fa
 mm9 NA
 mm9 NA
 mm9 NA
+mm9 NA
 mm10    /scratch/genomes/annotations/SIZE/mouse.mm10.genome
 mm10    mm
 mm10 2652783500
@@ -29,6 +30,7 @@ mm10    /scratch/genomes/assemblies/Mus_musculus/mm10/mm10.fa
 mm10    /scratch/genomes/annotations/GTRD/Mus_musculus_meta_clusters.interval.gz
 mm10    /scratch/genomes/annotations/BED/gene_to_gene_distance/mm10_geneDensityStat.bed
 mm10    /scratch/genomes/annotations/HiC/TAD/TADMap_scaffold_mm10.bed
+mm10    /localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/loopCatalog/mm10/loops_5k.bed
 hg19    /scratch/genomes/annotations/SIZE/human.hg19.genome
 hg19    hs
 hg19    2864785220
@@ -41,6 +43,7 @@ hg19    /scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz
 hg19    /scratch/genomes/annotations/BLACKLIST/hg19_blacklist.bed.gz
 hg19    NA
 hg19    /scratch/genomes/assemblies/Homo_sapiens/hg19/hg19.fa.chr
+hg19    NA
 hg19    NA
 hg19    NA
 hg19    NA
@@ -59,9 +62,11 @@ hg38    /scratch/genomes/assemblies/Homo_sapiens/hg38/hg38.fa.chr
 hg38    /scratch/genomes/annotations/GTRD/Homo_sapiens_meta_clusters.interval.gz
 hg38    /scratch/genomes/annotations/BED/gene_to_gene_distance/hg38_geneDensityStat.bed
 hg38    /scratch/genomes/annotations/HiC/TAD/TADMap_scaffold_hg38.bed
+hg38    /localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/loopCatalog/hg38/loops_5k.bed
 danRer7 /scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome
 danRer7 dr
 danRer7 1369631918
+danRer7 NA
 danRer7 NA
 danRer7 NA
 danRer7 NA
@@ -89,6 +94,7 @@ rn5 NA
 rn5 NA
 rn5 NA
 rn5 NA
+rn5 NA
 dm6 /scratch/genomes/annotations/SIZE/drosophila.dm6.genome
 dm6 dm
 dm6 142573017
@@ -104,12 +110,14 @@ dm6 NA
 dm6 NA
 dm6 NA
 dm6 NA
+dm6 NA
 ce11 /scratch/genomes/annotations/SIZE/worm.ce11.genome
 ce11 ce
 ce11 100286401
 ce11 /localhome/bric/xfd783/genomes/annotations/BED/ce11_ensembl_gene.bed
 ce11 NA
 ce11 /localhome/bric/xfd783/genomes/annotations/GTF/ce11_ensembl.gtf
+ce11 NA
 ce11 NA
 ce11 NA
 ce11 NA
