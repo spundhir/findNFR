@@ -46,9 +46,9 @@ source("~/software/myScripts/R-scripts/FUNCTIONS.R")
 
 ## read input file
 if(identical(opt$inFile, "stdin")==T) {
-    df <- read.table(file("stdin"))
+    df <- read.table(file("stdin"), headet=T)
 } else {
-    df <- read.table(opt$inFile)
+    df <- read.table(opt$inFile, header=T)
 }
 
 ## format input data
