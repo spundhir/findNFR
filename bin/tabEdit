@@ -62,7 +62,7 @@ fi
 
 ## perform operations on the input file
 if [ ! -z "$COL_NAME" ]; then
-    zless $INFILE | perl -ane 'for($i=0; $i<scalar(@F); $i++) { if($F[$i]=~/'$COL_NAME'/) { print $i+1; } }'
+    zless $INFILE | head -n 1 | perl -ane 'for($i=0; $i<scalar(@F); $i++) { if($F[$i]=~/^'$COL_NAME'$/) { print $i+1; } }'
 elif [ ! -z "$TAB" ]; then
     zless $INFILE | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
 elif [ ! -z "$COMMA" ]; then
