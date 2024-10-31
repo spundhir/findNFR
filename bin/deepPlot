@@ -13,6 +13,7 @@ AVERAGE_TYPE="mean"
 PLOT_TYPE="se"
 PROCESSORS=1
 PLOTBYREGION=1
+MIN_N_CLASS=1
 
 #### usage ####
 usage() {
@@ -32,6 +33,7 @@ usage() {
     echo "[OPTIONS: genomic region file]"
     echo " -c          [plot by class]"
     echo " -C <int>    [randomly split input file to define given number of classes]"
+    echo " -B <int>    [class should atleast have given number of elements (default: 1)]"
     echo "[OPTIONS: bigWig file(s)]"
     echo " -f <string> [filter in bigWig files matching identifiers eg. wt or gmp]"
     echo "             [if multiple seperate them by a comma]"
@@ -107,13 +109,14 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:o:cC:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:L:m:r:Q:z:Z:FIxg:X:UDOHK:h ARG; do
+while getopts i:j:o:cC:B:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:L:m:r:Q:z:Z:FIxg:X:UDOHK:h ARG; do
 	case "$ARG" in
 		i) REGIONFILE=$OPTARG;;
 		j) BWDIR=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         c) CLASS_SPLIT=1;;
         C) RANDOM_SPLIT=$OPTARG;;
+        C) MIN_N_CLASS=$OPTARG;;
         f) FILTER_MATCH=$OPTARG;;
         d) FILTER_NOMATCH=$OPTARG;;
         e) PLOTREGION=$OPTARG;;
@@ -250,7 +253,8 @@ else
         if [ ! -z "$CLASS_SPLIT" ]; then
             INPUTFILE=""
             i=0
-            for CLASS in $(cat $REGIONFILE | cut -f 7 | sort | uniq); do
+            CLASS_TO_ANA=($(less $REGIONFILE | cut -f 7 | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>'${MIN_N_CLASS}') { print "$F[1]\t"; }'));
+            for CLASS in "${CLASS_TO_ANA[@]}"; do
                 perl -ane 'if($F[6]=~/^'$CLASS'$/) { $F[6]=~s/\,/\_/g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n"; }' $REGIONFILE > $REGIONFILE.$i
                 INPUTFILE="$INPUTFILE $REGIONFILE.$i"
                 i=$((i+1))
