@@ -116,7 +116,7 @@ while getopts i:j:o:cC:B:f:d:e:l:M:kn:N:s:a:A:T:5:3:pPt:q:Y:E:R:S:y:v:V:G:W:L:m:
         o) OUTDIR=$OPTARG;;
         c) CLASS_SPLIT=1;;
         C) RANDOM_SPLIT=$OPTARG;;
-        C) MIN_N_CLASS=$OPTARG;;
+        B) MIN_N_CLASS=$OPTARG;;
         f) FILTER_MATCH=$OPTARG;;
         d) FILTER_NOMATCH=$OPTARG;;
         e) PLOTREGION=$OPTARG;;
