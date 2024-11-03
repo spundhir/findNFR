@@ -258,7 +258,7 @@ else
                 perl -ane 'if($F[6]=~/^'$CLASS'$/) { $F[6]=~s/\,/\_/g; print "$F[0]"; foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } print "\n"; }' $REGIONFILE > $REGIONFILE.$i
                 INPUTFILE="$INPUTFILE $REGIONFILE.$i"
                 i=$((i+1))
-                REGION_LABEL_AUTO="$REGION_LABEL_AUTO,$CLASS"
+                REGION_LABEL_AUTO="$REGION_LABEL_AUTO,$(echo ${CLASS} | sed -E 's/\,/_/g')"
             done
             if [ -z "$REGION_LABEL" ]; then
                 REGION_LABEL_AUTO=$(echo $REGION_LABEL_AUTO | sed -E 's/^\,//g')
