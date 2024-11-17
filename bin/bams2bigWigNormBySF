@@ -174,8 +174,8 @@ if [ "$FILTER_FILES" -eq 1 ]; then
         filterFilesByName -i $BAMFILE -f $INCLUDE_FILTER -e bam $ARG | tr '\,' '\n'
     elif [ ! -z "$EXCLUDE_FILTER" ]; then
         filterFilesByName -i $BAMFILE -F $EXCLUDE_FILTER -e bam $ARG | tr '\,' '\n'
-    else
-        cat $BAMFILE
+    elif [ -z "$INCLUDE_FILTER" -a -z "$EXCLUDE_FILTER" ]; then
+        filterFilesByName -i $BAMFILE -f bam -e bam $ARG | tr '\,' '\n'
     fi | grep -v "^$" | perl -ane 'chomp($_); if(scalar(@F)==1) { print "tpm\t$_\n"; } else { print "$_\n"; }' > ${FILEID}.bamConfig
     BAMFILE=${FILEID}.bamConfig
 
