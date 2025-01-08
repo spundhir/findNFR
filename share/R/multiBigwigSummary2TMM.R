@@ -32,6 +32,7 @@ if(identical(opt$matrixFile, "stdin")==T) {
 
 suppressPackageStartupMessages(library(edgeR))
 
+## source: https://www.biostars.org/p/413626/#414440
 data <- data[,c(-1,-2,-3)]
 NF <- edgeR::calcNormFactors(data, method=opt$normMethod) ## calculate normalization factor
 LS <- colSums(data) ## calculate library size
