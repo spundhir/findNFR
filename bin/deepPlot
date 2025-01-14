@@ -582,7 +582,8 @@ else
 
         echo
         echo -n "Plot correlation between ChIP-seq signal of input samples as a heatmap (`date`).. ">&2
-        plotCorrelation -in $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignal.npz --corMethod pearson --skipZeros --whatToPlot heatmap --removeOutliers -o $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignal.png
+        #plotCorrelation -in $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignal.npz --corMethod pearson --skipZeros --whatToPlot heatmap --removeOutliers -o $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignal.png
+        plotPCA -in $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignal.npz -o $OUTDIR/${PLOTTITLE}_multiBigwigSummary.binSignal.png --transpose
         echo "done" >&2
     fi
 fi
