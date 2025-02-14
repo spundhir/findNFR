@@ -120,7 +120,7 @@ if [ "$GENOME" == "mm9" ]; then
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
     GENOME_MOTIF="mm9r"
     if [ -z "$TFBS_FILE" ]; then
-        TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
+        TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2024_version/2024_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
     fi
     GTRD_DIR=""
     UNIBIND_DIR=""
@@ -129,7 +129,7 @@ elif [ "$GENOME" == "hg19" ]; then
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
     if [ -z "$TFBS_FILE" ]; then
-        TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoHuman_eukaryote.homer"
+        TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2024_version/2024_tf_jaspar_hocomocoHuman_eukaryote.homer"
     fi
     GTRD_DIR=""
     UNIBIND_DIR=""
@@ -138,7 +138,7 @@ elif [ "$GENOME" == "mm10" ]; then
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
     GENOME_MOTIF="mm10r"
     if [ -z "$TFBS_FILE" ]; then
-        TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
+        TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2024_version/2024_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
     fi
     GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/mm10/giggle/"
     UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/mm10/giggle/"
@@ -147,7 +147,7 @@ elif [ "$GENOME" == "hg38" ]; then
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
     GENOME_MOTIF="hg38r"
     if [ -z "$TFBS_FILE" ]; then
-        TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/2021_tf_jaspar_hocomocoHuman_eukaryote.homer"
+        TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2024_version/2024_tf_jaspar_hocomocoHuman_eukaryote.homer"
     fi
     GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/hg38/giggle/"
     UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/hg38/giggle/"
