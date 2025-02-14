@@ -84,7 +84,8 @@ for (( i=0; i<${#MOTIFS[@]}; i++ )); do
     MOTIFS[$i]=$(echo ${MOTIFS[$i]} | perl -ane 's/\//\\\//g; print $_;')
     zless $MOTIFFILE | perl -ane '
         @t=split(/\s+/,$_);
-        if($t[1]=~/^\Q'${MOTIFS[$i]}'\E\//) {
+        #if($t[1]=~/^\Q'${MOTIFS[$i]}'\E\//) {
+        if($t[1]=~/^\Q'${MOTIFS[$i]}'\E/) {
             $t[1]=~s/^.*\(/'${MOTIFS[$i]}'(/g;
             #$t[1]=~s/[^A-Za-z0-9]+/_/g;
             $t[1]=~s/[()]+/_/g;
