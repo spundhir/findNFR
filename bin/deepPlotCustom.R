@@ -7,8 +7,8 @@ option_list <- list(
   make_option(c("-i", "--inputDeeptoolsMatrix"), help="input deepPlot matrix file"),
   make_option(c("-o", "--outputFile"), help="output deepPlot file"),
   make_option(c("-j", "--groupAnno"), help="group annotation"),
-  make_option(c("-G", "--plotHeight"), default=800, help="plot height"),
-  make_option(c("-W", "--plotWidth"), default=800, help="plot width")
+  make_option(c("-G", "--plotHeight"), default=15, help="plot height in cm"),
+  make_option(c("-W", "--plotWidth"), default=15, help="plot width in cm")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -50,7 +50,7 @@ p <- lapply(seq(1:(length(params$sample_boundaries)-1)), function(i) {
             #ggline(df.melt, x="variable", y="value", add="mean", color = "class", numeric.x.axis=T, title = params$sample_labels[i], plot_type = "l") + ylab("") + xlab("") +
             #        theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
             #        scale_x_discrete(breaks=c(1,100,200))
-            df.melt <- summaryBy(value ~ variable + class, df.melt, FUN=function(x) c(mean(x), sd(x)/sqrt(length(x))))
+            df.melt <- summaryBy(value ~ variable + class, df.melt, FUN=function(x) c(mean(x, na.rm=TRUE), sd(x, na.rm=TRUE)/sqrt(length(x))))
             colnames(df.melt) <- c("variable", "class", "mean", "se")
             ggplot(df.melt, aes(as.numeric(variable), mean, color=class)) + geom_line() + 
                     geom_ribbon(aes(y = mean, ymin = mean - se, ymax = mean + se), alpha=0.1, linetype = 0) +
@@ -63,5 +63,5 @@ p <- lapply(seq(1:(length(params$sample_boundaries)-1)), function(i) {
                     ylab("") + ggtitle(params$sample_labels[i])
     })
 
-ggarrange(plotlist = p) %>% ggexport(filename = opt$outputFile, width=800, height=800)
+ggarrange(plotlist = p, common.legend = T, legend="top") %>% ggexport(filename = opt$outputFile, width=opt$plotWidth, height=opt$plotHeight)
 q()
