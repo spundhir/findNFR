@@ -24,7 +24,7 @@ echo Program: "multiClassMotifAna (perform motif analysis on genomic regions fro
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: multiClassMotifAna -i <file> -o <dir> [OPTIONS]"
 	echo "Options:"
-	echo " -i <file>   [input file containing gene list(s) (can be stdin)]"
+	echo " -i <file>   [input file having genomic regions in BED format (can be stdin)]"
     echo "             [format]"
     echo "             => chr start end name score strand class"
     echo " -o <dir>    [output directory]"

@@ -7,8 +7,8 @@ option_list <- list(
   make_option(c("-i", "--inputDeeptoolsMatrix"), help="input deepPlot matrix file"),
   make_option(c("-o", "--outputFile"), help="output deepPlot file"),
   make_option(c("-j", "--groupAnno"), help="group annotation"),
-  make_option(c("-G", "--plotHeight"), help="plot height in cm"),
-  make_option(c("-W", "--plotWidth"), help="plot width in cm")
+  make_option(c("-G", "--plotHeight"), default=800, help="plot height"),
+  make_option(c("-W", "--plotWidth"), default=800, help="plot width")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -63,5 +63,5 @@ p <- lapply(seq(1:(length(params$sample_boundaries)-1)), function(i) {
                     ylab("") + ggtitle(params$sample_labels[i])
     })
 
-ggarrange(plotlist = p) %>% ggexport(filename = opt$outputFile)
+ggarrange(plotlist = p) %>% ggexport(filename = opt$outputFile, width=800, height=800)
 q()
