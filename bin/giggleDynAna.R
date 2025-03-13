@@ -50,10 +50,10 @@ suppressPackageStartupMessages(library(ggpubr))
 ## heatmap function
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 matrix2Heatmap <- function(x, y=NULL, scale=NULL, col=NULL, bias=NULL, clusterRows=FALSE, clusterCols=FALSE, displayN=FALSE, return_rows=FALSE, title=NULL,
-                           columnLabels=NULL, rowAnnot=NULL, legendPos="bottom") {
-  suppressPackageStartupMessages(library(ComplexHeatmap))
-  suppressPackageStartupMessages(library(ggpubr))
-  suppressPackageStartupMessages(library(tiff))
+                           columnLabels=NULL, rowAnnot=NULL, legendPos="bottom", showRowNames=T, displayN_customMat=NULL) {
+  library(ComplexHeatmap)
+  library(ggpubr)
+  library(tiff)
   
   # x = matrix or data frame
   # y = cluster information (from cluster_matrix)
@@ -67,6 +67,7 @@ matrix2Heatmap <- function(x, y=NULL, scale=NULL, col=NULL, bias=NULL, clusterRo
   }
   
   if(is.null(bias)) { bias=1; }
+  if(is.null(displayN_customMat)) { displayN_customMat <- x }
   
   if(scale=="row") {
     x <- t(scale(t(x)))
@@ -92,23 +93,23 @@ matrix2Heatmap <- function(x, y=NULL, scale=NULL, col=NULL, bias=NULL, clusterRo
   #   legend=as.numeric(sprintf("%0.2f", c(seq(min(!is.na(mat)), max(!is.na(mat)), length.out = 10))))
   # }
   if(return_rows==TRUE) {
-    row_order(draw(Heatmap(mat, cluster_rows=clusterRows, cluster_columns=clusterCols, col=col, use_raster = T, column_title = title,
-                           show_row_names=T, raster_device="tiff", raster_quality = 2, split = df$clusters, gap = unit(2, "mm"),
-                           rect_gp = gpar(col = "black"))))
+    return(row_order(draw(Heatmap(mat, cluster_rows=clusterRows, cluster_columns=clusterCols, col=col, use_raster = T, column_title = title,
+                                  show_row_names=showRowNames, raster_device="tiff", raster_quality = 2, split = df$clusters, gap = unit(2, "mm"),
+                                  rect_gp = gpar(col = "black")))))
   } else if(displayN==FALSE) {
     grid.grabExpr(draw(Heatmap(mat, cluster_rows=clusterRows, cluster_columns=clusterCols, col=col, use_raster = T, column_title = title,
-                               show_row_names=T, raster_device="tiff", raster_quality = 2, split = df$clusters, gap = unit(2, "mm"),
+                               show_row_names=showRowNames, raster_device="tiff", raster_quality = 2, split = df$clusters, gap = unit(2, "mm"),
                                border=F, column_labels=columnLabels, right_annotation = rowAnnot, heatmap_legend_param = list(direction = "horizontal")),
                        heatmap_legend_side = legendPos, annotation_legend_side = legendPos))
   } else {
     grid.grabExpr(draw(Heatmap(mat, cluster_rows=clusterRows, cluster_columns=clusterCols, col=col, use_raster = T, column_title = title,
-                               show_row_names=T, raster_device="tiff", raster_quality = 2, split = df$clusters, gap = unit(2, "mm"),
-                               cell_fun = function(j, i, x, y, width, height, fill) { grid.text(sprintf("%.2f", mat[i, j]), x, y, gp = gpar(fontsize = 8)) },
+                               show_row_names=showRowNames, raster_device="tiff", raster_quality = 2, split = df$clusters, gap = unit(2, "mm"),
+                               cell_fun = function(j, i, x, y, width, height, fill) { grid.text(sprintf("%s", displayN_customMat[i, j]), x, y, 
+                                                                                                gp = gpar(fontsize = 8)) },
                                rect_gp = gpar(col = "black"), column_labels=columnLabels, right_annotation = rowAnnot, heatmap_legend_param = list(direction = "horizontal")),
                        heatmap_legend_side = legendPos, annotation_legend_side = legendPos))
   }
 }
-
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## start plot code
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
@@ -187,8 +188,8 @@ if(nrow(df_sig)>2) {
     theme_bw(base_size=15) +
     theme(text=element_text(size=10), axis.text.x=element_text(angle=90, vjust = 0.5, hjust=1), legend.position = "bottom")
   
-  p2 <- matrix2Heatmap(matrix(df_sig[,"odds_ratio"], nrow=length(unique(df_sig$name))) %>% as.data.frame() %>% `colnames<-` (unique(df_sig$class)) %>% `rownames<-` (unique(df_sig$name)), 
-                       scale="row", clusterRows = opt$clusterRows, clusterCols = opt$clusterCols, bias=opt$colorBias)
+  p2 <- matrix2Heatmap(matrix(df_sig[,"odds_ratio"], nrow=length(unique(df_sig$name))) %>% as.data.frame() %>% `colnames<-` (unique(df_sig$class)) %>% `rownames<-` (unique(df_sig$name)) %>% round(2), 
+                       scale="row", clusterRows = opt$clusterRows, clusterCols = opt$clusterCols, bias=opt$colorBias, displayN = T)
 
   ggsave(opt$outPdfFile, ggarrange(plotlist = list(p1, p2), nrow=1, ncol=2, labels = c("A)", "B)")), height=opt$plotHeight, width=opt$plotWidth, device="pdf")
   #ggsave(opt$outPdfFile, marrangeGrob(grobs = list(p1, p2), nrow=1, ncol=2, labels=c("A", "B")),  height=opt$plotHeight, width=opt$plotWidth, device="pdf")
