@@ -60,12 +60,12 @@ echo "done"
 
 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 if [ "$GENOME" == "mm10" ]; then
-    ATAC_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/chipAtlas/atac/mm10/giggle/tissue/"
+    ATAC_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/chipAtlas/atac/mm10/giggle/"
     JASPAR_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/jaspar/mm10/giggle/"
     GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/mm10/giggle/"
     UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/mm10/giggle/"
 elif [ "$GENOME" == "hg38" ]; then
-    ATAC_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/chipAtlas/atac/hg38/giggle/tissue/"
+    ATAC_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/chipAtlas/atac/hg38/giggle/"
     JASPAR_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/jaspar/hg38/giggle/"
     GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/hg38/giggle/"
     UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/hg38/giggle/"
