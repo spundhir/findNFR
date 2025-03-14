@@ -171,22 +171,12 @@ df <- lapply(c("overlaps", "odds_ratio", "combo_score", "fishers_two_tail"), fun
         })
 names(df) <- c("overlaps", "odds_ratio", "combo_score", "fishers_two_tail")
 
-## select top N enriched samples for each tissue
-# sig_names <- lapply(colnames(df$combo_score), function(x) {
-#   t <- df$combo_score %>% dplyr::select( {{ x }} ) %>% mutate(sample=row.names(.), tissue=gsub(".05.*", "", row.names(.)))
-#   t[order(t$tissue, -t[,1]),] %>% group_by(tissue) %>% slice_head(n=2) %>% as.data.frame %>% dplyr::select(sample) %>% unlist %>% as.vector %>% unique
-# }) %>% unlist %>% unique
-
 ## apply significance level threshold to filter out samples
 sig_names <- row.names(df$combo_score)[which(rowSds(normalize.quantiles(as.matrix(df$combo_score))) > summary(rowSds(normalize.quantiles(as.matrix(df$combo_score))))[3])]
 sig_names <- sig_names[sig_names %in% (apply(df$fishers_two_tail, 1, function(x) min(x)) %>% as.data.frame %>% dplyr::filter(. < 1e-15) %>% row.names)]
 
 ## apply minimum overlap threshold to filter out samples
 sig_names <- sig_names[sig_names %in% (apply(df$overlaps, 1, function(x) min(x)) %>% as.data.frame %>% dplyr::filter(. > 50) %>% row.names)]
-
-## select top N enriched samples for each tissue
-# t <- df$combo_score %>% mutate(sample=row.names(.), tissue=gsub(".05.*", "", row.names(.)), sd = rowSds(normalize.quantiles(as.matrix(df$combo_score)))) %>% dplyr::filter(tissue %in% (table(gsub(".05.*", "", sig_names)) %>% as.data.frame %>% dplyr::filter(Freq>5) %>% dplyr::select(Var1) %>% unlist %>% as.vector))
-# t[order(t$tissue, -t$sd),] %>% group_by(tissue) %>% slice_head(n=6) %>% as.data.frame %>% dplyr::select(sample) %>% unlist %>% as.vector %>% unique
 
 ## identify significant overlaps based on top N ordered by combo score
 sig_rows <- which(row.names(df$combo_score) %in% sig_names)
@@ -246,7 +236,7 @@ if(nrow(df_sig)>2) {
     theme(text=element_text(size=10), axis.text.x=element_text(angle=90, vjust = 0.5, hjust=1), legend.position = "bottom")
   
   p2 <- matrix2Heatmap(matrix(df_sig[,"odds_ratio"], nrow=length(unique(df_sig$name))) %>% as.data.frame() %>% `colnames<-` (unique(df_sig$class)) %>% `rownames<-` (unique(df_sig$name)) %>% round(2), 
-                       scale="row", clusterRows = T, clusterCols = T, bias=1, displayN = T)
+                       scale="row", clusterRows = opt$clusterRows, clusterCols = opt$clusterCols, bias=opt$colorBias, displayN = T)
 
   ggarrange(p2, ncol=2)
   ggsave(opt$outPdfFile, ggarrange(plotlist = list(p1, p2), nrow=1, ncol=2, labels = c("A)", "B)")), height=opt$plotHeight, width=opt$plotWidth, device="pdf")
