@@ -172,6 +172,8 @@ if(length(sig_rows)>2) {
     if(nrow(dat_df[which(apply(dat_df, 1, function(x) max(x)>20)==T),])>0) {
         dat_df[which(apply(dat_df, 1, function(x) max(x)>20)==T),]$class <- 3
     }
+    mat_df$is_sig <- "no"
+    mat_df[sig_rows,]$is_sig <- "yes"
     mat_df <- merge(mat_df, dat_df, by=0)
     colnames(mat_df)[1] <- "motif"
     write.table(mat_df[order(-mat_df[,"diff"]),], txtFile, quote=F, append=F, sep="\t", col.names=T, row.names=F)
