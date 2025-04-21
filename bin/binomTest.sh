@@ -42,16 +42,15 @@ if [ ! -f "$FEATURES_REF" -o -z "$FEATURES_INT" -o "$HELP" ]; then
 fi
 
 ## create temporary BED file if input is from stdin
+TMP=$(date | md5sum | cut -f 1 -d " ")
+#TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+TMP="8297ab2cc40b06008ace7b732b89b1ff"
 if [ "$FEATURES_INT" == "stdin" ]; then
-    TMP=$(date | md5sum | cut -f 1 -d " ")
-    #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     while read LINE; do
         echo -e "${LINE}"
     done > $TMP
     FEATURES_INT=$TMP
 else
-    TMP=$(date | md5sum | cut -f 1 -d " ")
-    #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
     scp $FEATURES_INT $TMP
     FEATURES_INT=$TMP
 fi
@@ -62,7 +61,7 @@ if [ ! -z "$FILTER_INT" ]; then
 fi
 
 echo -e "#file\tfeatures\ttotal\toverlap\tmean\tstddev\tp-value\tpercentage\texp_overlap\texp_per"
-#echo "$FEATURES_REF\t$FEATURES_INT\t$FILTER_REF";
+#echo -e "$FEATURES_REF\t$FEATURES_INT\t$FILTER_REF"; exit
 if [ -z "$FILTER_REF" ]; then
     N=`zless $FEATURES_INT | wc -l | cut -f 1 -d " "`;
     Pr=`tabEdit -i $FEATURES_REF -D | perl -ane '$cov+=($F[2]-$F[1])+1; END { printf("%0.6f", $cov/'$GENOME_SIZE'); }'`;
