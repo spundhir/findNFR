@@ -216,15 +216,15 @@ BAMFILES_COUNT=${#BAMFILES[@]}
 BWFILE=""
 ID=""
 for(( i=0; i<${#BAMFILES[@]}; i++ )); do
-    if [ ! -s "${OUTDIR}/$(echo ${BAMFILES[i]} | parallel -j 1 'echo {/.}').bw" ]; then
+    if [ ! -s "${OUTDIR}/$(echo ${BAMFILES[i]} | perl -ane '$_=~s/^.+\///g; $_=~s/\..+$//g; print $_;').bw" ]; then
         bam2bwForChIP -i ${BAMFILES[i]} -o ${OUTDIR} -g ${GENOME} -e -p ${PROCESSOR}
     fi
 
     ID="${ID} $(echo ${BAMFILES[i]} | parallel -j 1 'echo {/.}' | sed -E 's/[\-]/./g')"
-    BWFILE="${BWFILE} ${OUTDIR}/$(echo ${BAMFILES[i]} | parallel -j 1 'echo {/.}').bw"
+    BWFILE="${BWFILE} ${OUTDIR}/$(echo ${BAMFILES[i]} | perl -ane '$_=~s/^.+\///g; $_=~s/\..+$//g; print $_;').bw"
 done
 BWFILE=$(echo ${BWFILE} | perl -ane '$_=~s/^\s+//; print $_;')
-#echo "${BWFILE}"
+#echo "${BWFILE}"; exit
 
 >&2 echo "done"
 
