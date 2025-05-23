@@ -499,10 +499,10 @@ else
         ARG_HEATMAP="$ARG_HEATMAP --alpha $ALPHA";
     fi
     if [ ! -z "$ZAXIS_MIN" ]; then
-        ARG_HEATMAP="$ARG_HEATMAP --zMin $YAXIS_MIN";
+        ARG_HEATMAP="$ARG_HEATMAP --zMin $ZAXIS_MIN";
     fi
     if [ ! -z "$ZAXIS_MAX" ]; then
-        ARG_HEATMAP="$ARG_HEATMAP --zMax $YAXIS_MIN";
+        ARG_HEATMAP="$ARG_HEATMAP --zMax $ZAXIS_MAX";
     fi
     if [ ! -z "$PLOT_HEIGHT" ]; then
         ARG_HEATMAP="$ARG_HEATMAP --heatmapHeight $PLOT_HEIGHT";
