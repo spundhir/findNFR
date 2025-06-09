@@ -25,20 +25,23 @@ if(is.null(opt$inFile) | is.null(opt$outFile)) {
 ## load libraries
 suppressPackageStartupMessages(library(universalmotif))
 
+
 ## read input motif file
-if(identical(opt$inFile, "stdin")==T) { 
+if(identical(opt$inFile, "stdin")==T) {
+    tmp_file <- tempfile(fileext = ".txt")
+    writeLines(readLines(file("stdin")), tmp_file)
     if(opt$inFormat=="homer") {
-        df <- suppressWarnings(read_homer(file("stdin")))
+        df <- suppressWarnings(read_homer(tmp_file))
     } else if(opt$inFormat=="jaspar") {
-        df <- suppressWarnings(read_jaspar(file("stdin")))
+        df <- suppressWarnings(read_jaspar(tmp_file))
     } else if(opt$inFormat=="meme") {
-        df <- suppressWarnings(read_meme(file("stdin"), readsites=T, readsites.meta=T))
+        df <- suppressWarnings(read_meme(tmp_file, readsites=T, readsites.meta=T))
     } else if(opt$inFormat=="transfac") {
-        df <- suppressWarnings(read_transfac(file("stdin")))
+        df <- suppressWarnings(read_transfac(tmp_file))
     } else if(opt$inFormat=="uniprobe") {
-        df <- suppressWarnings(read_uniprobe(file("stdin")))
+        df <- suppressWarnings(read_uniprobe(tmp_file))
     } else {
-        df <- suppressWarnings(read_matrix(file("stdin"), positions = "columns", headers = T, rownames = T))
+        df <- suppressWarnings(read_matrix(tmp_file, positions = "columns", headers = T, rownames = T))
     }
 } else {
     if(opt$inFormat=="homer") {
