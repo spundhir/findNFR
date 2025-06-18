@@ -4,7 +4,7 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file containing motifs (can be stdin)"),
-	make_option(c("-o", "--outFile"), help="output file containing motifs"),
+	make_option(c("-o", "--outFile"), help="output file containing motifs (optional, default=stdout)"),
     make_option(c("-f", "--inFormat"), default="matrix", help="format of motifs in input file (homer, jaspar, meme, transfac, uniprobe, cisbp, matrix; default=%default)"),
     make_option(c("-F", "--outFormat"), default="homer", help="format of motifs in output file (homer, jaspar, meme, transfac, uniprobe, cisbp, matrix; default=%default)")
 )
@@ -13,7 +13,7 @@ parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
 opt <- parse_args(parser)
 
 ## check, if all required arguments are given
-if(is.null(opt$inFile) | is.null(opt$outFile)) {
+if(is.null(opt$inFile)) {
 	cat("\nProgram: convertMotifFormat.R (R script to convert format of motifs)\n")
 	cat("Author: BRIC, University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
@@ -28,10 +28,10 @@ suppressPackageStartupMessages(library(universalmotif))
 
 ## read input motif file
 if(identical(opt$inFile, "stdin")==T) {
-    tmp_file <- tempfile(fileext = ".txt")
-    #tmp_file <- "/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2025_version/t.txt"
-    writeLines(readLines(file("stdin")), tmp_file)
-    opt$inFile <- tmp_file
+    tmpInFile <- tempfile(fileext = ".txt")
+    #tmpInFile <- "/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2025_version/t.txt"
+    writeLines(readLines(file("stdin")), tmpInFile)
+    opt$inFile <- tmpInFile
 }
 
 if(opt$inFormat=="homer") {
@@ -51,6 +51,13 @@ if(opt$inFormat=="homer") {
 }
 
 ## convert motifs into desired format and write to ouput file
+if(is.null(opt$outFile)) {
+    tmpOutFile <- tempfile(fileext = ".txt")
+    opt$outFile <- tmpOutFile
+} else {
+    tmpOutFile <- NULL
+}
+
 if(opt$outFormat=="homer") {
     write_homer(df, opt$outFile, overwrite = T)
 } else if(opt$outFormat=="jaspar") {
@@ -67,4 +74,7 @@ if(opt$outFormat=="homer") {
     write_matrix(df, opt$outFile, positions = "columns", headers = T, rownames = T)
 }
 
+if(!is.null(tmpOutFile)) {
+    cat(readLines(tmpOutFile), sep="\n")
+}
 q()
