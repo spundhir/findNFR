@@ -286,7 +286,7 @@ elif [ ! -z "$LIST" ]; then
     annotatePeaks.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF -m $PWM -size $SIZE -hist $BIN_SIZE_HIST -histNorm 5 -matrix $OUTDIR/REGIONS_INTEREST.matrix | perl -an -F'/\t+/' -e 'print "$F[0]\t"; $line=(); for($i=1; $i<scalar(@F)-4; $i+=3) { $line.="$F[$i]\t"; } $line=~s/\t$//g; print "$line\n";' > $OUTDIR/REGIONS_INTEREST.hist
 
     if [ -z "$FORMAT_HIST" ]; then
-        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -find $PWM -size $SIZE -seqlogo > $OUTDIR/REGIONS_INTEREST.find
+        findMotifsGenome.pl $OUTDIR/REGIONS_INTEREST.bed $GENOME_MOTIF $OUTDIR -find $PWM -size $SIZE -seqlogo -dumpFasta > $OUTDIR/REGIONS_INTEREST.find
 
         ## filter only highest scoring motif postion for each region
         cat <(grep -w Offset $OUTDIR/REGIONS_INTEREST.find) <(grep -wv Offset $OUTDIR/REGIONS_INTEREST.find | sort -k 4,4 -k 1,1 -k 6rg,6 | perl -ane 'if(!$seen{$F[3]}{$F[0]}) { print $_; $seen{$F[3]}{$F[0]}=1; }') > $OUTDIR/REGIONS_INTEREST.find.unique
