@@ -48,13 +48,14 @@ usage() {
     echo " -M          [file having gene to gene distance map in BED format]"
     echo " -A          [file having TAD positions in BED format]"
     echo " -L          [file having LOOP positions in BED format]"
+    echo " -O          [directory having DNA sequence motifs in LOLA format]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts g:i:msetncTRBDFGMALh ARG; do
+while getopts g:i:msetncTRBDFGMALOh ARG; do
 	case "$ARG" in
         g) GENOME=$OPTARG;;
 		i) FILE=$OPTARG;;
@@ -73,6 +74,7 @@ while getopts g:i:msetncTRBDFGMALh ARG; do
         M) GENE_DIST_BED=1;;
         A) TAD=1;;
         L) LOOPS=1;;
+        O) LOLAMOTIFDB=1;;
 		h) HELP=1;;
 	esac
 done
@@ -114,6 +116,8 @@ if [ "$(grep -w $GENOME $FILE | wc -l)" -gt 0 ]; then
         grep -w $GENOME $FILE | head -n 15 | tail -n 1 | perl -ane 'print "$F[1]";'
     elif [ ! -z "$LOOPS" ] ; then
         grep -w $GENOME $FILE | head -n 16 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$LOLAMOTIFDB" ] ; then
+        grep -w $GENOME $FILE | head -n 17 | tail -n 1 | perl -ane 'print "$F[1]";'
     else
         grep -w $GENOME $FILE | head -n 1 | tail -n 1 | perl -ane 'print "$F[1]";'
     fi
