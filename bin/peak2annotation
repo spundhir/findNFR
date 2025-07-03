@@ -66,6 +66,7 @@ GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g 
 TSS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -t)
 JASPAR_DB=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -O)
 DHS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -D)
+CRM_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -C)
 if [ ! -f "$GENOME_FILE" -o ! -f "$TSS_FILE" ]; then
     >&2 echo
     >&2 echo "computation for $GENOME is not available yet"
@@ -78,7 +79,7 @@ fi
 
 ## create temporary BED file if input is from stdin
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-#TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
+TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
 if [ "$BEDFILE" == "stdin" ]; then
     while read LINE; do
         echo -e "${LINE}"
@@ -90,14 +91,25 @@ fi | tabEdit -i stdin -n 7 > ${TMP}.bed
 ## compute peak distance to closest gene TSS (protein coding)
 #closestBed -a <(sortBed -i ${TMP}.bed) -b <(grep -w protein_coding ${TSS_FILE} | cut -f 1-6 | sortBed -i stdin) -D b -t first | cut -f 1-7,14 | peak2annotation.R -i stdin -o 
 
-## compute motif enrichment at peak regions
-mkdir -p ${TMP}_dir
-if [ "${GENOME}" == "mm10" ]; then
-    cut -f 1-6 ${TMP}.bed | liftOver stdin ~/genomes/annotations/LIFT_OVER/mm10ToMm39.over.chain.gz ${TMP.bed.mm39} unMapped
-    rm unMapped
-    mv ${TMP}.bed.mm39 ${TMP}.bed 
-fi
-JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.bed analysis/deepPlot/REGIONS_INTEREST.bed ${TMP}_dir 2022 ${PROCESSOR}
+## define peak regions that overlap with DNA accessible regions, and all TF binding CRMs as background for JASPAR enrichment analysis
+#intersectBed -a ${DHS_FILE} -b ${TMP}.bed -u | cut -f 1-6 > ${TMP}.bed.peaks
+#cat ${TMP}.bed.peaks <(intersectBed -a ${DHS_FILE} -b ${CRM_FILE} -u | cut -f 1-6) | sort | uniq > ${TMP}.bed.bkg
+cat ${TMP}.bed | cut -f 1-6 > ${TMP}.bed.peaks
+cat ${TMP}.bed.peaks <(intersectBed -a <(zcat ${DHS_FILE} | cut -f 1-6) -b ${TMP}.bed.peaks -v) > ${TMP}.bed.bkg
 
-## remove temporary file
+## compute motif enrichment at peak regions
+if [ "${GENOME}" == "mm10" ]; then
+    liftOver stdin ${TMP}.bed.peaks ~/genomes/annotations/LIFT_OVER/mm10ToMm39.over.chain.gz ${TMP}.bed.peaks.mm39 unMapped
+    rm unMapped
+    mv ${TMP}.bed.peaks.mm39 ${TMP}.bed.peaks 
+    liftOver stdin ${TMP}.bed.bkg ~/genomes/annotations/LIFT_OVER/mm10ToMm39.over.chain.gz ${TMP}.bed.bkg.mm39 unMapped
+    rm unMapped
+    mv ${TMP}.bed.bkg.mm39 ${TMP}.bed.bkg
+fi
+mkdir -p ${TMP}_dir
+JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.bed.peaks ${TMP}.bed.bkg ${TMP}_dir 2022 ${PROCESSOR}
+
+## remove temporary files
 rm ${TMP}.bed
+rm ${TMP}.bed.peaks
+rm ${TMP}.bed.bkg
