@@ -1,0 +1,132 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm10";
+PROCESSOR=1
+
+#### usage ####
+usage() {
+	echo Program: "peak2qc (quality check on peaks with their spatial and motif enrichment)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: motifAna -i <file> -o <dir> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file having genomic regions in BED format (or stdin)]"
+    echo "             [format: chr start end name score strand signalValue]"
+    echo " -o <dir>    [output directory to store results]"
+    echo "[OPTIONS]"
+    echo " -j <file>   [input file having DNA accessbile regions in BED format (default: genome-specific DHS file)]" 
+    echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm10)]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
+    echo " -d <int>    [size of region (default: given)]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:o:j:g:p:d:h ARG; do
+	case "$ARG" in
+		i) BEDFILE=$OPTARG;;
+        o) OUTDIR=$OPTARG;;
+        j) DHS_FILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        d) SIZE=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BEDFILE" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+
+get_seeded_random()
+{
+    seed="$1"
+    openssl enc -aes-256-ctr -pass pass:"$seed" -nosalt </dev/zero 2>/dev/null
+}
+###############
+
+<<"COMMENT1"
+COMMENT1
+>&2 echo -n "Create directory/file structure (`date`).. "
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
+if [ "$BEDFILE" == "stdin" ]; then
+    while read LINE; do
+        echo -e "${LINE}"
+    done
+else
+    zless $BEDFILE
+fi | tabEdit -i stdin -n 7 > ${TMP}.bed
+>&2 echo "done"
+
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+TSS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -t)
+JASPAR_DB=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -O)
+if [ -z "${DHS_FILE}" ]; then
+    DHS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -D)
+    CRM_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -C)
+    zcat ${DHS_FILE} | shuf --random-source=<(get_seeded_random 42) -n 100000 | cut -f 1-6 > ${TMP}.dhs
+else
+    zless ${DHS_FILE} | grep -v start | cut -f 1-6 > ${TMP}.dhs
+fi
+zless ${TMP}.bed | cut -f 1-6 > ${TMP}.peaks
+cat ${TMP}.peaks <(intersectBed -a ${TMP}.dhs -b ${TMP}.peaks -v) > ${TMP}.dhs.tmp
+mv ${TMP}.dhs.tmp ${TMP}.dhs
+DHS_FILE=${TMP}.dhs
+#intersectBed -a ${DHS_FILE} -b ${TMP}.bed -u | cut -f 1-6 > ${TMP}.peaks
+#cat ${TMP}.peaks <(intersectBed -a ${DHS_FILE} -b ${CRM_FILE} -u | cut -f 1-6) | sort | uniq > ${TMP}.dhs
+>&2 echo "done"
+
+>&2 echo -n "File check (`date`).. "
+if [ ! -f "${BEDFILE}" -o ! -f "${GENOME_FILE}" -o ! -f "${TSS_FILE}" -o ! -d "${JASPAR_DB}" -o ! -f "${DHS_FILE}" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+
+>&2 echo "Compute peak distance to closest gene TSS (protein coding) (`date`).. "
+closestBed -a <(sortBed -i ${TMP}.bed) -b <(grep -w protein_coding ${TSS_FILE} | cut -f 1-6 | sortBed -i stdin) -D b -t first | cut -f 1-7,14 > ${TMP}.spatial
+>&2 echo "done"
+
+>&2 echo "Compute Transcription Factor enrichment at peaks (`date`).. "
+mkdir -p ${TMP}_dir
+if [ "${GENOME}" == "mm10" ]; then
+    #liftOver stdin ${TMP}.peaks ~/genomes/annotations/LIFT_OVER/mm10ToMm39.over.chain.gz ${TMP}.peaks.tmp unMapped
+    #rm unMapped
+    #liftOver stdin ${TMP}.dhs ~/genomes/annotations/LIFT_OVER/mm10ToMm39.over.chain.gz ${TMP}.dhs.tmp unMapped
+    #rm unMapped
+    #JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.peaks.tmp ${TMP}.dhs.tmp ${TMP}_dir 2024 ${PROCESSOR}
+    #rm ${TMP}.peaks.tmp ${TMP}.dhs.tmp
+    JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.peaks ${TMP}.dhs ${TMP}_dir 2024 ${PROCESSOR}
+else
+    JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.peaks ${TMP}.dhs ${TMP}_dir 2022 ${PROCESSOR}
+fi
+>&2 echo "done"
+
+## remove temporary files
+rm ${TMP}.bed
+rm ${TMP}.dhs
+rm ${TMP}.peaks
+#rm ${TMP}.spatial
+#rm -r ${TMP}_dir
