@@ -74,37 +74,37 @@ p <- lapply(list.files(opt$inDir, pattern="chr", full.names = T), function(FILE)
 ## step-2 analysis on inFile (statistics on distance between genes and DHS)
 #################################
 df <- data.table::fread(opt$inFile)
-colnames(df) <- c("chr", "start", "end", "gene", "score", "strand", "gene2gene_dist", "gene_length", "dhs", "dhs2gene_dist")
-df$dhs_class <- ifelse(df$dhs2gene_dist==0, "intragenic", "intergenic")
-df$gene_class <- cut2((df$gene2gene_dist), g=10, levels.mean=T)
-levels(df$gene_class) <- cut2((df$gene2gene_dist), g=10, onlycuts = T)[2:length(cut2((df$gene2gene_dist), g=10, onlycuts = T))]
-# df$gene_class <- cut(df$gene2gene_dist, breaks = c(0, 1000, 10000, 20000, 50000, 100000, 200000, 500000, 100000000))
-df$gene_cluster <- df$gene_class
-levels(df$gene_cluster) <- seq(1, length(levels(df$gene_cluster)))
+colnames(df) <- c("chr", "start", "end", "gene", "score", "strand", "gene2geneDist", "gene_length", "dhs", "dhs2geneDist")
+df$dhs_class <- ifelse(df$dhs2geneDist==0, "intragenic", "intergenic")
+df$gene2geneDistClass <- cut2((df$gene2geneDist), g=10, levels.mean=T)
+levels(df$gene2geneDistClass) <- cut2((df$gene2geneDist), g=10, onlycuts = T)[2:length(cut2((df$gene2geneDist), g=10, onlycuts = T))]
+# df$gene2geneDistClass <- cut(df$gene2geneDist, breaks = c(0, 1000, 10000, 20000, 50000, 100000, 200000, 500000, 100000000))
+df$geneDensityClass <- df$gene2geneDistClass
+levels(df$geneDensityClass) <- seq(length(levels(df$geneDensityClass)), 1)
 
-# p1 <- ggplot(unique(df[,c("gene","gene2gene_dist")]), aes(log(gene2gene_dist))) + geom_density(fill="#9ebcda") + theme_bw() + 
+# p1 <- ggplot(unique(df[,c("gene","gene2geneDist")]), aes(log(gene2geneDist))) + geom_density(fill="#9ebcda") + theme_bw() + 
 #   xlim(c(0,15)) + xlab("Distance between genes (bp; log)")
 
-p1 <- ggplot(df, aes(log(dhs2gene_dist+1))) + geom_density(fill="#9ebcda") + theme_bw() + xlim(c(0,15)) + 
+p1 <- ggplot(df, aes(log(dhs2geneDist+1))) + geom_density(fill="#9ebcda") + theme_bw() + xlim(c(0,15)) + 
 xlab("Distance between DHS and closest gene (bp; log+1)") + ylab("Density") +
 annotate(geom="text", x=5, y=0.4, label=sprintf("# Genes=%d", length(unique(df$gene))), color="red") +
 annotate(geom="text", x=5, y=0.35, label=sprintf("# DHS=%d", length(unique(df$dhs))), color="red")
 
-t <- unlist(lapply(levels(df$gene_class), function(x) length(unique(df[which(df$gene_class==x),]$dhs))))
-names(t) <- levels(df$gene_class)
+t <- unlist(lapply(levels(df$gene2geneDistClass), function(x) length(unique(df[which(df$gene2geneDistClass==x),]$dhs))))
+names(t) <- levels(df$gene2geneDistClass)
 t <- reshape2::melt(t)
-t$gene_class <- factor(row.names(t), levels=levels(df$gene_class), ordered=T)
-p2 <- ggplot(t, aes(gene_class, value)) + geom_bar(stat="identity") + theme_bw() + theme(axis.text.x = element_text(size=10, angle=45)) + 
+t$gene2geneDistClass <- factor(row.names(t), levels=levels(df$gene2geneDistClass), ordered=T)
+p2 <- ggplot(t, aes(gene2geneDistClass, value)) + geom_bar(stat="identity") + theme_bw() + theme(axis.text.x = element_text(size=10, angle=45)) + 
 ylab("# of DHS") + xlab("Distance between genes (bp)")
 
-t <- unlist(lapply(levels(df$gene_class), function(x) length(unique(df[which(df$gene_class==x),]$gene))))
-names(t) <- levels(df$gene_class)
+t <- unlist(lapply(levels(df$gene2geneDistClass), function(x) length(unique(df[which(df$gene2geneDistClass==x),]$gene))))
+names(t) <- levels(df$gene2geneDistClass)
 t <- reshape2::melt(t)
-t$gene_class <- factor(row.names(t), levels=levels(df$gene_class), ordered=T)
-p3 <- ggplot(t, aes(gene_class, value)) + geom_bar(stat="identity") + theme_bw() + theme(axis.text.x = element_text(size=10, angle=45)) + 
+t$gene2geneDistClass <- factor(row.names(t), levels=levels(df$gene2geneDistClass), ordered=T)
+p3 <- ggplot(t, aes(gene2geneDistClass, value)) + geom_bar(stat="identity") + theme_bw() + theme(axis.text.x = element_text(size=10, angle=45)) + 
 ylab("# of genes") + xlab("Distance between genes (bp)")
 
-p4 <- ggplot(df, aes(gene_class, log(dhs2gene_dist+1))) + geom_boxplot() + theme_bw() + 
+p4 <- ggplot(df, aes(gene2geneDistClass, log(dhs2geneDist+1))) + geom_boxplot() + theme_bw() + 
 theme(axis.text.x = element_text(size=10, angle=45)) + ylab("Distance between DHS and closest gene (bp; log+1)") +
 xlab("Distance between genes (bp)")
 
@@ -113,8 +113,8 @@ xlab("Distance between genes (bp)")
 # t <- reshape2::melt(t)
 # p5 <- ggplot(t, aes(L1, value)) + geom_boxplot() + theme_bw() + theme_bw() + theme(axis.title.x=element_blank(), axis.text.x = element_text(size=10, angle=45)) + ylab("# of DHS per gene")
 
-t <- lapply(levels(df$gene_class), function(x) (table(df[which(df$gene_class==x),]$dhs_class)))
-names(t) <- levels(df$gene_class)
+t <- lapply(levels(df$gene2geneDistClass), function(x) (table(df[which(df$gene2geneDistClass==x),]$dhs_class)))
+names(t) <- levels(df$gene2geneDistClass)
 t <- reshape2::melt(t)[,c(3,1,2)]
 colnames(t) <- c("xlabels", "class", "freq")
 t$xlabels <- factor(t$xlabels, levels=as.character(unique(t$xlabels)), ordered = T)
@@ -128,10 +128,10 @@ p5 <- ggplot(t, aes(xlabels, density, fill=factor(class), label = freq)) +
         theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
         theme_bw() + theme(axis.text.x = element_text(size=10, angle=45)) + xlab("Distance between genes (bp)")
 
-p6 <- ggplot(unique(df[,c("gene","gene_class","gene_length")]), aes(gene_class, log(gene_length))) + geom_boxplot() + theme_bw() + 
+p6 <- ggplot(unique(df[,c("gene","gene2geneDistClass","gene_length")]), aes(gene2geneDistClass, log(gene_length))) + geom_boxplot() + theme_bw() + 
 theme(axis.text.x = element_text(size=10, angle=45)) + ylab("gene length (bp; log)") + xlab("Distance between genes (bp)")
 
-# table(unique(df[,c("gene", "gene_cluster")])$gene_cluster)
+# table(unique(df[,c("gene", "geneDensityClass")])$geneDensityClass)
 
 #################################
 ## step-3 analysis on inDir (heatmap, clustering of genes based on their distance to each other)
@@ -143,16 +143,16 @@ h <- lapply(list.files(opt$inDir, pattern="chr", full.names = T), function(FILE)
     mat$V1 <- NULL
     mat[is.na(mat)] <- 0
     mat$Row.names <- row.names(mat)
-    mat <- merge(mat, unique(df[,c("gene", "gene_cluster")]), by.x="Row.names", by.y="gene", all.x="T")
+    mat <- merge(mat, unique(df[,c("gene", "geneDensityClass")]), by.x="Row.names", by.y="gene", all.x="T")
     row.names(mat) <- mat$Row.names
     mat$Row.names <- NULL
 
-    col_cluster <- rev(colorRampPalette(brewer.pal(length(unique(mat$gene_cluster)), "RdBu"), bias=1)(length(unique(mat$gene_cluster))))
-    names(col_cluster) <- c(levels(mat$gene_cluster)[levels(mat$gene_cluster) %in% unique(mat$gene_cluster)], "UA")
+    col_cluster <- rev(colorRampPalette(brewer.pal(length(unique(mat$geneDensityClass)), "RdBu"), bias=1)(length(unique(mat$geneDensityClass))))
+    names(col_cluster) <- c(levels(mat$geneDensityClass)[levels(mat$geneDensityClass) %in% unique(mat$geneDensityClass)], "UA")
 
     ra <- rowAnnotation(na_col=NA,
-        gene_cluster = mat$gene_cluster,
-        col=list(gene_cluster = col_cluster)
+        geneDensityClass = mat$geneDensityClass,
+        col=list(geneDensityClass = col_cluster)
     )
 
     grid.grabExpr(draw(Heatmap(as.matrix(mat[,-ncol(mat)]), cluster_rows=T, cluster_columns=T,
@@ -179,6 +179,6 @@ garbage <- dev.off()
 #################################
 ## step-5 output file containing gene density information
 #################################
-write.table(unique(df[,c("chr", "start", "end", "gene", "score", "strand", "gene_class", "gene_cluster")]), "", sep="\t", quote=F, row.names = F, col.names=T)
+write.table(unique(df[,c("chr", "start", "end", "gene", "score", "strand", "gene2geneDist", "gene_length", "gene2geneDistClass", "geneDensityClass")]), "", sep="\t", quote=F, row.names = F, col.names=T)
 
 q()
