@@ -19,7 +19,6 @@ usage() {
     echo " -j <file>   [input file having DNA accessbile regions in BED format (default: genome-specific DHS file)]" 
     echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm10)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
-    echo " -d <int>    [size of region (default: given)]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -33,7 +32,6 @@ while getopts i:o:j:g:p:d:h ARG; do
         j) DHS_FILE=$OPTARG;;
         g) GENOME=$OPTARG;;
         p) PROCESSOR=$OPTARG;;
-        d) SIZE=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -65,7 +63,7 @@ get_seeded_random()
 COMMENT1
 >&2 echo -n "Create directory/file structure (`date`).. "
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
+#TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
 if [ "$BEDFILE" == "stdin" ]; then
     while read LINE; do
         echo -e "${LINE}"
@@ -79,6 +77,7 @@ fi | tabEdit -i stdin -n 7 > ${TMP}.bed
 GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
 TSS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -t)
 JASPAR_DB=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -O)
+GENEDIST_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -M)
 if [ -z "${DHS_FILE}" ]; then
     DHS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -D)
     CRM_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -C)
@@ -105,22 +104,27 @@ if [ ! -f "${BEDFILE}" -o ! -f "${GENOME_FILE}" -o ! -f "${TSS_FILE}" -o ! -d "$
 fi
 >&2 echo "done"
 
->&2 echo "Compute peak distance to closest gene TSS (protein coding) (`date`).. "
-closestBed -a <(sortBed -i ${TMP}.bed) -b <(grep -w protein_coding ${TSS_FILE} | cut -f 1-6 | sortBed -i stdin) -D b -t first | cut -f 1-7,14 > ${TMP}.spatial
+>&2 echo -n "Compute peak distance to closest gene TSS (protein coding) (`date`).. "
+## chr start end name score strand signalValue gene dist_to_geneTSS geneDensity (1: gene dense; 10: gene sparse region)
+closestBed -a <(sortBed -i ${TMP}.bed) -b <(grep -w protein_coding ${TSS_FILE} | cut -f 1-6 | sortBed -i stdin) -D b -t first | cut -f 1-7,11,14 > ${TMP}.spatial
+join -a 1 -1 8 -2 1 <(sort -k 8,8 ${TMP}.spatial) <(cut -f 4,8 ${GENEDIST_FILE} | sort -k 1,1) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[0]\t$F[8]\t$F[9]\n";' | tabEdit -i stdin -n 10 > ${TMP}.spatial.tmp
+mv ${TMP}.spatial.tmp ${TMP}.spatial
 >&2 echo "done"
 
->&2 echo "Compute Transcription Factor enrichment at peaks (`date`).. "
+>&2 echo -n "Compute Transcription Factor enrichment at peaks (`date`).. "
 mkdir -p ${TMP}_dir
+rm -r ${TMP}_dir/*
 if [ "${GENOME}" == "mm10" ]; then
-    #liftOver stdin ${TMP}.peaks ~/genomes/annotations/LIFT_OVER/mm10ToMm39.over.chain.gz ${TMP}.peaks.tmp unMapped
+    #liftOver ${TMP}.peaks ~/genomes/annotations/LIFT_OVER/mm10ToMm39.over.chain.gz ${TMP}.peaks.tmp unMapped &>/dev/null
     #rm unMapped
-    #liftOver stdin ${TMP}.dhs ~/genomes/annotations/LIFT_OVER/mm10ToMm39.over.chain.gz ${TMP}.dhs.tmp unMapped
+    #liftOver ${TMP}.dhs ~/genomes/annotations/LIFT_OVER/mm10ToMm39.over.chain.gz ${TMP}.dhs.tmp unMapped &>/dev/null
     #rm unMapped
-    #JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.peaks.tmp ${TMP}.dhs.tmp ${TMP}_dir 2024 ${PROCESSOR}
+    #JASPAR_DB="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/jaspar/mm39/lola"
+    #JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.peaks.tmp ${TMP}.dhs.tmp ${TMP}_dir 2022 ${PROCESSOR} &>${TMP}_dir/log
     #rm ${TMP}.peaks.tmp ${TMP}.dhs.tmp
-    JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.peaks ${TMP}.dhs ${TMP}_dir 2024 ${PROCESSOR}
+    JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.peaks ${TMP}.dhs ${TMP}_dir 2024 ${PROCESSOR} &>${TMP}_dir/log
 else
-    JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.peaks ${TMP}.dhs ${TMP}_dir 2022 ${PROCESSOR}
+    JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.peaks ${TMP}.dhs ${TMP}_dir 2022 ${PROCESSOR} &>${TMP}_dir/log
 fi
 >&2 echo "done"
 

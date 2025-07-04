@@ -33,9 +33,11 @@ if(!is.null(opt$inDistFile)) {
     } else {
         df <- read.table(opt$inDistFile)
     }
-    colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "dist_to_geneTSS")
-
+    #df <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah.spatial")
+    colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "gene", "dist_to_geneTSS", "geneDensity")
+    
     ## reorganize values to plot
+    df$geneDensity <- as.factor(df$geneDensity)
     df$dist_to_geneTSS <- log(abs(df$dist_to_geneTSS)+1) * ifelse(df$dist_to_geneTSS<0, -1, 1)
     df$annot.type <- "TSS"
     df[which(abs(df$dist_to_geneTSS) > log(1) & abs(df$dist_to_geneTSS) <= log(50000)),]$annot.type <- "proximal"
@@ -62,9 +64,12 @@ if(!is.null(opt$inDistFile)) {
                 geom_vline(xintercept = brk, lty=2) +
                 scale_x_continuous(breaks=brk, labels = as.numeric(sprintf("%0.0f", brk))) +
                 #annotate("text", x = c(-10, -5, 0, 5, 10), y = 2, label = lbl,  parse = F, size=3) +  theme_classic2() +
-                annotate("text", x = c(-12.5, -9, 0, 9, 12.5), y = 2, label = lbl,  parse = F, size=3) +  theme_classic2()
+                annotate("text", x = c(-12.5, -9, 0, 9, 12.5), y = 2, label = lbl,  parse = F, size=3) +  theme_classic2() +
                 theme(legend.position="top") + xlab("Distance to closest gene TSS in bp (log)") + ylab("Peak signalValue (Macs2)") +
                 labs(color = "Peak position")
+    ## peaks proximal to genes are located in gene dense regions (circular argument).
+    # ggecdf(df[which(!is.na(df$geneDensity)),], x="signalValue", color="geneDensity", facet.by="annot.type", palette = colorBrewer2palette(name="RdBu", count = 10))
+    # freqPlot(melt(table(df[which(!is.na(df$geneDensity)),c("annot.type", "geneDensity")])), "density")
 } else if(!is.null(opt$inJasparFile)) {
     df <- read.table(opt$inJasparFile)
 }
