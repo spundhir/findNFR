@@ -6,17 +6,16 @@ PROCESSOR=1
 
 #### usage ####
 usage() {
-	echo Program: "peak2qc (quality check on peaks with their spatial and motif enrichment)"
+	echo Program: "jasparEnrichAna (perform motif enrichment analysis using jaspar enrichment)"
 	echo Author: BRIC, University of Copenhagen, Denmark
 	echo Version: 1.0
 	echo Contact: pundhir@binf.ku.dk
-	echo "Usage: peak2qc -i <file> -o <dir> [OPTIONS]"
+	echo "Usage: jasparEnrichAna -i <file> -o <dir> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input file having genomic regions in BED format (or stdin)]"
-    echo "             [format: chr start end name score strand signalValue]"
     echo " -o <dir>    [output directory to store results]"
     echo "[OPTIONS]"
-    echo " -j <file>   [input file having DNA accessbile regions in BED format (default: genome-specific DHS file)]" 
+    echo " -j <file>   [input file having DNA accessbile regions in BED format as background (default: genome-specific DHS file)]" 
     echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm10)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
 	echo " -h          [help]"
@@ -37,7 +36,7 @@ while getopts i:o:j:g:p:d:h ARG; do
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ -z "$BEDFILE" -o "$HELP" ]; then
+if [ -z "$BEDFILE" -o -z "$OUTDIR" -o "$HELP" ]; then
 	usage
 fi
 
@@ -64,21 +63,19 @@ COMMENT1
 >&2 echo -n "Create directory/file structure (`date`).. "
 mkdir -p ${OUTDIR}
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
+#TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
 if [ "$BEDFILE" == "stdin" ]; then
     while read LINE; do
         echo -e "${LINE}"
     done
 else
     zless $BEDFILE
-fi | tabEdit -i stdin -n 7 > ${TMP}.bed
+fi | tabEdit -i stdin -n 6 > ${TMP}.bed
 >&2 echo "done"
 
 >&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
-TSS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -t)
 JASPAR_DB=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -O)
-GENEDIST_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -M)
 if [ -z "${DHS_FILE}" ]; then
     DHS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -D)
     CRM_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -C)
@@ -86,16 +83,13 @@ if [ -z "${DHS_FILE}" ]; then
 else
     zless ${DHS_FILE} | grep -v start | cut -f 1-6 > ${TMP}.dhs
 fi
-zless ${TMP}.bed | cut -f 1-6 > ${TMP}.peaks
-cat ${TMP}.peaks <(intersectBed -a ${TMP}.dhs -b ${TMP}.peaks -v) > ${TMP}.dhs.tmp
+cat ${TMP}.bed <(intersectBed -a ${TMP}.dhs -b ${TMP}.bed -v) > ${TMP}.dhs.tmp
 mv ${TMP}.dhs.tmp ${TMP}.dhs
 DHS_FILE=${TMP}.dhs
-#intersectBed -a ${DHS_FILE} -b ${TMP}.bed -u | cut -f 1-6 > ${TMP}.peaks
-#cat ${TMP}.peaks <(intersectBed -a ${DHS_FILE} -b ${CRM_FILE} -u | cut -f 1-6) | sort | uniq > ${TMP}.dhs
 >&2 echo "done"
 
 >&2 echo -n "File check (`date`).. "
-if [ ! -f "${BEDFILE}" -o ! -f "${GENOME_FILE}" -o ! -f "${TSS_FILE}" -o ! -d "${JASPAR_DB}" -o ! -f "${DHS_FILE}" ]; then
+if [ ! -f "${BEDFILE}" -o ! -f "${GENOME_FILE}" -o ! -d "${JASPAR_DB}" -o ! -f "${DHS_FILE}" ]; then
     >&2 echo
     >&2 echo "computation for $GENOME is not available yet"
     >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
@@ -105,22 +99,25 @@ if [ ! -f "${BEDFILE}" -o ! -f "${GENOME_FILE}" -o ! -f "${TSS_FILE}" -o ! -d "$
 fi
 >&2 echo "done"
 
->&2 echo -n "Compute peak distance to closest gene TSS (protein coding) (`date`).. "
-## chr start end name score strand signalValue gene dist_to_geneTSS gene2geneDist
-closestBed -a <(sortBed -i ${TMP}.bed) -b <(grep -w protein_coding ${TSS_FILE} | cut -f 1-6 | sortBed -i stdin) -D b -t first | cut -f 1-7,11,14 > ${TMP}.spatial
-join -a 1 -1 8 -2 1 <(sort -k 8,8 ${TMP}.spatial) <(cut -f 4,7 ${GENEDIST_FILE} | sort -k 1,1) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[0]\t$F[8]\t$F[9]\n";' | tabEdit -i stdin -n 10 > ${TMP}.spatial.tmp
-mv ${TMP}.spatial.tmp ${TMP}.spatial
-scp ${TMP}.spatial ${OUTDIR}/peaks.spatial
->&2 echo "done"
-
 >&2 echo -n "Compute Transcription Factor enrichment at peaks (`date`).. "
-if [ ! -f "${OUTDIR}/jasparEnrichmentResults.txt" ]; then
-    jasparEnrichAna -i ${TMP}.peaks -o ${OUTDIR} -j ${TMP}.dhs -g ${GENOME} -p ${PROCESSOR}
+mkdir -p ${TMP}_dir
+rm -r ${TMP}_dir/*
+if [ "${GENOME}" == "mm10" ]; then
+    #liftOver ${TMP}.bed ~/genomes/annotations/LIFT_OVER/mm10ToMm39.over.chain.gz ${TMP}.bed.tmp unMapped &>/dev/null
+    #rm unMapped
+    #liftOver ${TMP}.dhs ~/genomes/annotations/LIFT_OVER/mm10ToMm39.over.chain.gz ${TMP}.dhs.tmp unMapped &>/dev/null
+    #rm unMapped
+    #JASPAR_DB="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/jaspar/mm39/lola"
+    #JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.bed.tmp ${TMP}.dhs.tmp ${TMP}_dir 2022 ${PROCESSOR} &>${TMP}_dir/log
+    #rm ${TMP}.bed.tmp ${TMP}.dhs.tmp
+    JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.bed ${TMP}.dhs ${TMP}_dir 2024 ${PROCESSOR} &>${TMP}_dir/log
+else
+    JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.bed ${TMP}.dhs ${TMP}_dir 2022 ${PROCESSOR} &>${TMP}_dir/log
 fi
->&2 echo "done"
+mv ${TMP}_dir/allEnrichments.tsv ${OUTDIR}/jasparEnrichmentResults.txt
 
 ## remove temporary files
 rm ${TMP}.bed
-rm ${TMP}.spatial
-rm ${TMP}.peaks
 rm ${TMP}.dhs
+rm -r ${TMP}_dir
+>&2 echo "done"
