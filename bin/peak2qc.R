@@ -33,7 +33,7 @@ if(!is.null(opt$inDistFile)) {
     } else {
         df <- read.table(opt$inDistFile)
     }
-    #df <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah.spatial")
+    # df <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/peak2qc/peaks.spatial")
     colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "gene", "dist_to_geneTSS", "gene2geneDist")
     
     ## reorganize values to plot
@@ -67,12 +67,11 @@ if(!is.null(opt$inDistFile)) {
                 theme(legend.position="top") + xlab("Distance to closest gene TSS in bp (log)") + ylab("Peak signalValue (Macs2)") +
                 labs(color = "Peak position")
     ## peaks proximal to genes are located in gene dense regions (circular argument).
-    p2 <- ggplot(df[which(df$annot.type!="TSS"),], aes(x=abs(dist_to_geneTSS), y=log(gene2geneDist))) + geom_point() + theme_bw() + 
+    p2 <- ggplot(df[which(df$annot.type!="TSS"),], aes(x=abs(dist_to_geneTSS), y=log(gene2geneDist))) + geom_point(aes(color=annot.type)) + theme_bw() + 
             geom_hline(yintercept = 12.5, lty=2) + geom_vline(xintercept = 12.5, lty=2) + 
             xlab("Distance b/w peak to closest gene TSS in bp (log)") +
             ylab("Distance b/w peak closest gene to its closest gene in bp (log) - gene sparsity")
-} else if(!is.null(opt$inJasparFile)) {
-    df <- read.table(opt$inJasparFile)
 }
 ggsave(filename = opt$outFile, plot = p1, width = 4, height = 3)
+write.table(df, "", sep="\t", col.names = T, row.names = F, quote = F)
 q()
