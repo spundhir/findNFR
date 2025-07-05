@@ -74,5 +74,5 @@ if(!is.null(opt$inDistFile)) {
 } else if(!is.null(opt$inJasparFile)) {
     df <- read.table(opt$inJasparFile)
 }
-ggsave(filename = opt$outFile, plot = p, width = 4, height = 3)
+ggsave(filename = opt$outFile, plot = p1, width = 4, height = 3)
 q()
