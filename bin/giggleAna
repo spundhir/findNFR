@@ -16,7 +16,7 @@ usage() {
     echo " -o <dir>    [output directory to store results]"
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
-    echo " -d <string> [database to query (atac, jaspar, gtrd, unibind; default: unibind)]"
+    echo " -d <string> [database to query (atac, jaspar, gtrd, unibind, homer; default: unibind)]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -64,16 +64,19 @@ if [ "$GENOME" == "mm10" ]; then
     JASPAR_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/jaspar/mm10/giggle/"
     GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/mm10/giggle/"
     UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/mm10/giggle/"
+    HOMER_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/homer/mm10/giggle"
 elif [ "$GENOME" == "hg38" ]; then
     ATAC_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/chipAtlas/atac/hg38/giggle/"
     JASPAR_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/jaspar/hg38/giggle/"
     GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/hg38/giggle/"
     UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/hg38/giggle/"
+    HOMER_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/homer/hg38/giggle"
 elif [ "$GENOME" == "danRer7" ]; then
     ATAC_DIR=""
     JASPAR_DIR=""
     GTRD_DIR=""
     UNIBIND_DIR=""
+    HOMER_DIR=""
 else
     echo "Presently the program only support analysis for mm10 or hg38"
     echo
@@ -115,6 +118,8 @@ elif [ -d "$GTRD_DIR" -a "$DATABASE" == "gtrd" ]; then
     giggle search -i $GTRD_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsGTRD.txt
 elif [ -d "$UNIBIND_DIR" -a "$DATABASE" == "unibind" ]; then
     giggle search -i $UNIBIND_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsUNIBIND.txt
+elif [ -d "$HOMER_DIR" -a "$DATABASE" == "homer" ]; then
+    giggle search -i $HOMER_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsHOMER.txt
 else
     echo
     usage
@@ -129,4 +134,3 @@ fi
 #wait
 #wait_for_jobs_to_finish "Wait for jobs to finish... "
 #echo "done"
-
