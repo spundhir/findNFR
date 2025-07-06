@@ -42,7 +42,7 @@ while getopts i:o:g:p:d:h ARG; do
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ -z "$BEDFILE" -o "$HELP" ]; then
+if [ -z "$BEDFILE" -o ! -d "${OUTDIR}" -o "$HELP" ]; then
 	usage
 fi
 
@@ -106,7 +106,7 @@ cat ${TMP}.spatial | peak2qc.R -i stdin -o ${OUTDIR}/peaks.spatial.pdf > ${OUTDI
 
 >&2 echo -n "Compute Transcription Factor enrichment at peaks (`date`).. "
 if [ ! -d "${OUTDIR}/multiClassMotifAna" ]; then
-    cut -f 1-6,11 ${OUTDIR}/peaks.spatial | multiClassMotifAna -i stdin -o ${OUTDIR}/multiClassMotifAna/ -s ~/software/homer/data/knownTFs/vertebrates/2025_version/homer/homer_motifs.homer -g ${GENOME} -r ${PROCESSOR} -c ${NMOTIFS} -t ${LENGTH} -p ${PVALUE} -y ${MIN_P_T} -n ${S} -d ${SIZE} &>${OUTDIR}/multiClassMotifAna.log
+    cut -f 1-6,11 ${OUTDIR}/peaks.spatial | grep -v start | multiClassMotifAna -i stdin -o ${OUTDIR}/multiClassMotifAna/ -s ~/software/homer/data/knownTFs/vertebrates/2025_version/homer/homer_motifs.homer -g ${GENOME} -r ${PROCESSOR} -c ${NMOTIFS} -t ${LENGTH} -p ${PVALUE} -y ${MIN_P_T} -n ${S} -d ${SIZE} &>${OUTDIR}/multiClassMotifAna.log
     #motifAna -i ${TMP}.bed -o ${OUTDIR}/motifAna -m 1 -t 7,8,9,10,11,12,13,14 -u 0.75 -v 1.5 -x 1e-15 -y 3 -n 100 -g ${GENOME} -p ${PROCESSOR} -d given
     #findMotifsGenome.pl ${TMP}.bed ${GENOME}r ${OUTDIR}/motifAna -mknown ~/software/homer/data/knownTFs/vertebrates/2025_version/homer/homer_motifs.homer -p ${PROCESSOR} -len ${LENGTH} -S ${S} -size ${SIZE} -seqlogo > ${OUTDIR}/motifAna/findMotifs.log
 
