@@ -14,7 +14,7 @@ opt <- parse_args(parser)
 
 ## check, if all required arguments are given
 if(((is.null(opt$inDistFile) & is.null(opt$inJasparFile)) | is.null(opt$outFile))) {
-  cat("\nProgram: peak2qc.R (plot peak QC information)\n")
+  cat("\nProgram: peak2spatialAna.R (plot peak signal classified based on distance to TSS)\n")
   cat("Author: BRIC, University of Copenhagen, Denmark\n")
   cat("Version: 1.0\n")
   cat("Contact: pundhir@binf.ku.dk\n");
@@ -33,7 +33,7 @@ if(!is.null(opt$inDistFile)) {
     } else {
         df <- read.table(opt$inDistFile)
     }
-    # df <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/peak2qc/peaks.spatial")
+    # df <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/peakSpatialAna/peaks.spatial")
     colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "gene", "dist_to_geneTSS", "gene2geneDist")
     
     ## reorganize values to plot

@@ -23,7 +23,7 @@ echo Program: "multiClassGiggleAna (perform giggle analysis on genomic regions f
     echo " -o <dir>    [output directory]"
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
-    echo " -d <string> [database to query (atac, jaspar, gtrd, unibind; default: unibind)]"
+    echo " -d <string> [database to query (atac, jaspar, gtrd, unibind, homer; default: unibind)]"
     echo " -c <int>    [number of top hits to analyze from each sample (default: 10)]"
     echo " -f          [also filter based on -x, -y and -z (defaut=only -c)]"
     echo " -x <float>  [p-value (default: 1e-15)]"
@@ -90,6 +90,7 @@ if [ "$GENOME" == "mm10" ]; then
     JASPAR_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/jaspar/mm10/giggle/"
     GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/mm10/giggle/"
     UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/mm10/giggle/"
+    HOMER_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/homer/mm10/giggle"
 elif [ "$GENOME" == "hg38" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg38.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
@@ -97,6 +98,7 @@ elif [ "$GENOME" == "hg38" ]; then
     JASPAR_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/jaspar/hg38/giggle/"
     GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/hg38/giggle/"
     UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/hg38/giggle/"
+    HOMER_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/homer/hg38/giggle"
 elif [ "$GENOME" == "danRer7" ]; then
     GENOME_FILE="/scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome"
     REPEAT_FILE="/scratch/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"
@@ -104,6 +106,7 @@ elif [ "$GENOME" == "danRer7" ]; then
     JASPAR_DIR=""
     GTRD_DIR=""
     UNIBIND_DIR=""
+    HOMER_DIR=""
 else
     echo "Presently the program only support analysis for mm10, hg38 or danRer7"
     echo
@@ -140,7 +143,7 @@ for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$
 
 <<"COMMENT"
 COMMENT
-    giggleAna -i $OUTDIR/enhancer_$ID.bed -o $GIGGLEDIR -g $GENOME -d ${DATABASE} &>$GIGGLEDIR/$ID.log &
+    giggleAna -i $OUTDIR/enhancer_$ID.bed -g $GENOME -d ${DATABASE} > ${GIGGLEDIR}/giggleResults${DATABASE^^}.txt 2>$GIGGLEDIR/$ID.log &
 
     CLASS_COUNT=$((CLASS_COUNT+1))
     GIGGLEDIR_ALL="$GIGGLEDIR_ALL,$GIGGLEDIR"

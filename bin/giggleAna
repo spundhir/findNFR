@@ -13,7 +13,6 @@ usage() {
 	echo "Usage: giggleAna -i <file> -o <dir> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input file having genomic regions in BED format (or stdin)]"
-    echo " -o <dir>    [output directory to store results]"
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
     echo " -d <string> [database to query (atac, jaspar, gtrd, unibind, homer; default: unibind)]"
@@ -23,10 +22,9 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:g:d:h ARG; do
+while getopts i:g:d:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
-        o) OUTDIR=$OPTARG;;
         g) GENOME=$OPTARG;;
         d) DATABASE=$OPTARG;;
 		h) HELP=1;;
@@ -34,7 +32,7 @@ while getopts i:o:g:d:h ARG; do
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ -z "$BEDFILE" -o -z "$OUTDIR" -o "$HELP" ]; then
+if [ -z "$BEDFILE" -o "$HELP" ]; then
 	usage
 fi
 
@@ -52,13 +50,7 @@ function wait_for_jobs_to_finish {
 
 <<"COMMENT1"
 COMMENT1
-echo -n "Create directory structure... "
-if [ ! -d "$OUTDIR" ]; then
-    mkdir -p $OUTDIR
-fi
-echo "done"
-
-echo -n "Populating files based on input genome, $GENOME (`date`).. "
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 if [ "$GENOME" == "mm10" ]; then
     ATAC_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/chipAtlas/atac/mm10/giggle/"
     JASPAR_DIR="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/jaspar/mm10/giggle/"
@@ -82,54 +74,52 @@ else
     echo
     usage
 fi
-echo done
+>&2 echo done
 
 ## determine, if the input regions are from a file or stdin
-echo -n "Create region file depending on if the input is from file or STDIN... "
+>&2 echo -n "Create region file depending on if the input is from file or STDIN... "
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 if [ -f "$BEDFILE" ]; then
-    zless $BEDFILE > $OUTDIR/REGIONS_INTEREST.bed.tmp 
+    zless $BEDFILE > ${TMP}.bed
 elif [ "$BEDFILE" == "stdin" ]; then
-    while read LINE; do echo "${LINE}"; done > $OUTDIR/REGIONS_INTEREST.bed.tmp
+    while read LINE; do echo "${LINE}"; done > ${TMP}.bed
 else
     usage
 fi
 
-ROW_COUNT=$(zless $OUTDIR/REGIONS_INTEREST.bed.tmp | wc -l)
-ID_COUNT=$(zless $OUTDIR/REGIONS_INTEREST.bed.tmp | cut -f 4 | sort | uniq | wc -l)
+ROW_COUNT=$(zless ${TMP}.bed | wc -l)
+ID_COUNT=$(zless ${TMP}.bed | cut -f 4 | sort | uniq | wc -l)
 
 KEEP_ID=0
 if [ "$ROW_COUNT" -eq "$ID_COUNT" ]; then
     KEEP_ID=1
 fi
 
+## ensure that peak ids are unique
 #echo -e "$ROW_COUNT\t$ID_COUNT\t$KEEP_ID\n"; exit
-zless $OUTDIR/REGIONS_INTEREST.bed.tmp | perl -ane 'BEGIN { $counter=1; } if($F[5]!~/^\+$/ && $F[5]!~/^\-$/) { $F[5]="."; } if('$KEEP_ID') { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t1\t$F[5]"; } else { print "$F[0]\t$F[1]\t$F[2]\tREGION$counter\t1\t$F[5]"; } print "\n"; $counter++;' > $OUTDIR/REGIONS_INTEREST.bed
-rm $OUTDIR/REGIONS_INTEREST.bed.tmp
-echo "done"
+zless ${TMP}.bed | perl -ane 'BEGIN { $counter=1; } if($F[5]!~/^\+$/ && $F[5]!~/^\-$/) { $F[5]="."; } if('$KEEP_ID') { print "$F[0]\t$F[1]\t$F[2]\t$F[3]\t1\t$F[5]"; } else { print "$F[0]\t$F[1]\t$F[2]\tREGION$counter\t1\t$F[5]"; } print "\n"; $counter++;' | bgzip > ${TMP}.bed.gz
+>&2 echo "done"
 
 ## perform giggle enrichment analysis
-TARGET_TOTAL=$(cat $OUTDIR/REGIONS_INTEREST.bed | wc -l)
-cat $OUTDIR/REGIONS_INTEREST.bed | bgzip > $OUTDIR/REGIONS_INTEREST.bed.gz
+TARGET_TOTAL=$(zcat ${TMP}.bed.gz | wc -l)
 if [ -d "$ATAC_DIR" -a "$DATABASE" == "atac" ]; then
-    giggle search -i $ATAC_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s -f 05 | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsATAC.txt
+    giggle search -i $ATAC_DIR -q ${TMP}.bed.gz -s -f 05 | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 elif [ -d "$JASPAR_DIR" -a "$DATABASE" == "jaspar" ]; then
-    giggle search -i $JASPAR_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsJASPAR.txt
+    giggle search -i $JASPAR_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 elif [ -d "$GTRD_DIR" -a "$DATABASE" == "gtrd" ]; then
-    giggle search -i $GTRD_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsGTRD.txt
+    giggle search -i $GTRD_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 elif [ -d "$UNIBIND_DIR" -a "$DATABASE" == "unibind" ]; then
-    giggle search -i $UNIBIND_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsUNIBIND.txt
+    giggle search -i $UNIBIND_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 elif [ -d "$HOMER_DIR" -a "$DATABASE" == "homer" ]; then
-    giggle search -i $HOMER_DIR -q $OUTDIR/REGIONS_INTEREST.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' > $OUTDIR/giggleResultsHOMER.txt
+    giggle search -i $HOMER_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 else
     echo
     usage
 fi
 
-rm $OUTDIR/REGIONS_INTEREST.bed.gz
-
-if [ ! -z "$TMP" ]; then
-    rm $TMP
-fi
+## remove temporary files
+rm ${TMP}.bed
+rm ${TMP}.bed.gz
 
 #wait
 #wait_for_jobs_to_finish "Wait for jobs to finish... "

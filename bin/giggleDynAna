@@ -134,3 +134,5 @@ else
     giggleDynAna.R -i $OUTDIR/GIGGLE_ENRICHMENT_"${DATABASE^^}".TXT -o $OUTDIR/giggleEnrichment_"${DATABASE^^}".pdf -c ${NHITS} -x ${PVALUE} -y ${MIN_OVERLAP} -z ${ODDS_RATIO} ${ADDITIONAL_ARGUMENT}
 fi
 
+echo "-c ${NHITS} -x ${PVALUE} -y ${MIN_OVERLAP} -z ${ODDS_RATIO} ${ADDITIONAL_ARGUMENT}" > $OUTDIR/giggleDynAnaParameters.txt
+

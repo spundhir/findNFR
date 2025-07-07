@@ -16,7 +16,7 @@ option_list <- list(
   make_option(c("-R", "--clusterRows"), default=T, help="cluster rows in the heatmap (default=%default)"),
   make_option(c("-C", "--clusterCols"), default=T, help="cluster columns in the heatmap (default=%default)"),
   make_option(c("-W", "--plotWidth"), default=15, help="width of the heatmap (default=%default)"),
-  make_option(c("-H", "--plotHeight"), default=10, help="height of the heatmap (default=%default)")
+  make_option(c("-H", "--plotHeight"), default=15, help="height of the heatmap (default=%default)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
