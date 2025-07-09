@@ -157,7 +157,7 @@ if(identical(opt$inFile, "stdin")==T) {
 } else {
     data <- read.table(opt$inFile, header=T)
 }
-# data <- read.table("~/project/chip-seq-analysis/analysis_test/human/analysis/multiClassGiggleAna/giggleDynAna/GIGGLE_ENRICHMENT_ATAC.TXT", header=T)
+# data <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/peakSpatialAna/h3k4me1/multiClassGiggleAna/giggleDynAna/GIGGLE_ENRICHMENT_HOMER.TXT", header=T)
 
 ## organize data frame containing enrichment results
 no_rows=nrow(data)/length(unique(data$id))
@@ -173,16 +173,16 @@ names(df) <- c("overlaps", "odds_ratio", "combo_score", "fishers_two_tail")
 
 ## apply significance level threshold to filter out samples
 sig_names <- row.names(df$combo_score)[which(rowSds(normalize.quantiles(as.matrix(df$combo_score))) > summary(rowSds(normalize.quantiles(as.matrix(df$combo_score))))[3])]
-sig_names <- sig_names[sig_names %in% (apply(df$fishers_two_tail, 1, function(x) min(x)) %>% as.data.frame %>% dplyr::filter(. < 1e-15) %>% row.names)]
+sig_names <- sig_names[sig_names %in% (apply(df$fishers_two_tail, 1, function(x) min(x)) %>% as.data.frame %>% dplyr::filter(. < opt$pVal) %>% row.names)]
 
 ## apply minimum overlap threshold to filter out samples
-sig_names <- sig_names[sig_names %in% (apply(df$overlaps, 1, function(x) min(x)) %>% as.data.frame %>% dplyr::filter(. > 50) %>% row.names)]
+sig_names <- sig_names[sig_names %in% (apply(df$overlaps, 1, function(x) min(x)) %>% as.data.frame %>% dplyr::filter(. > opt$minOverlap) %>% row.names)]
 
 ## identify significant overlaps based on top N ordered by combo score
 sig_rows <- which(row.names(df$combo_score) %in% sig_names)
 
 ## filter out overlaps corresponding to which standard deviation is zero
-sig_rows <- sig_rows[sig_rows %in% which(log(rowSds(as.matrix(df[["odds_ratio"]]))) > 0)]
+sig_rows <- sig_rows[sig_rows %in% which((rowSds(as.matrix(df[["odds_ratio"]]))) > 0.5)]
 
 ## filter out overlaps based on significance thresholds
 if(!is.null(opt$filterPval)) {
@@ -190,7 +190,7 @@ if(!is.null(opt$filterPval)) {
   sig_rows <- sig_rows[sig_rows %in% which(rowMin(as.matrix(df[["fishers_two_tail"]])) < opt$pVal &
                                              rowMin(as.matrix(df[["overlaps"]])) > opt$minOverlap &
                                              log(rowMax(round(as.matrix(df[["odds_ratio"]])))) >= opt$minOddsRatio &
-                                             log(rowSds(as.matrix(df[["odds_ratio"]]))) > 4)]
+                                             log(rowSds(as.matrix(df[["odds_ratio"]]))) > 0)]
 }
 
 ## add overlaps which must be included
