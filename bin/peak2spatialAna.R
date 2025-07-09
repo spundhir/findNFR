@@ -33,20 +33,20 @@ if(!is.null(opt$inDistFile)) {
     } else {
         df <- read.table(opt$inDistFile)
     }
-    # df <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/peakSpatialAna/peaks.spatial")
+    # df <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/peakSpatialAna/h3k4me3/peaks.spatial", header=T)
     colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "gene", "dist_to_geneTSS", "gene2geneDist")
     
     ## reorganize values to plot
     df$dist_to_geneTSS <- log(abs(df$dist_to_geneTSS)+1) * ifelse(df$dist_to_geneTSS<0, -1, 1)
-    df$annot.type <- "TSS"
-    df[which(abs(df$dist_to_geneTSS) > log(1) & abs(df$dist_to_geneTSS) <= log(50000)),]$annot.type <- "proximal"
+    df$annot.type <- "promoter"
+    df[which(abs(df$dist_to_geneTSS) > log(1000) & abs(df$dist_to_geneTSS) <= log(50000)),]$annot.type <- "proximal"
     df[which(abs(df$dist_to_geneTSS) > log(50000)),]$annot.type <- "distal"
-    df$annot.type <- factor(df$annot.type, levels=c("TSS", "proximal", "distal"), ordered=T)
+    df$annot.type <- factor(df$annot.type, levels=c("promoter", "proximal", "distal"), ordered=T)
     table(df$annot.type)
 
-    brk <- c(min(df$dist_to_geneTSS), -log(50000), 0, log(50000), max(df$dist_to_geneTSS))
+    brk <- c(min(df$dist_to_geneTSS), -log(50000), -log(1000), 0, log(1000), log(50000), max(df$dist_to_geneTSS))
     lbl_abs <- (table(cut(df$dist_to_geneTSS, 
-                          breaks=c(min(df$dist_to_geneTSS), -log(50000), -log(1.01), 0, log(1.01), log(50000), max(df$dist_to_geneTSS)), 
+                          breaks=c(min(df$dist_to_geneTSS), -log(50000), -log(1000), 0, log(1000), log(50000), max(df$dist_to_geneTSS)), 
                           labels=c(min(df$dist_to_geneTSS), -log(50000), 0, 0, log(50000), max(df$dist_to_geneTSS))))) %>% as.vector
     lbl_per <- gsub("\\s", "", paste(sprintf("%0.1f", (lbl_abs*100)/nrow(df)), "%"))
 
@@ -66,8 +66,8 @@ if(!is.null(opt$inDistFile)) {
                 geom_vline(xintercept = brk, lty=2) +
                 scale_x_continuous(breaks=brk, labels = as.numeric(sprintf("%0.0f", brk))) +
                 #annotate("text", x = c(-10, -5, 0, 5, 10), y = 2, label = lbl,  parse = F, size=3) +  theme_classic2() +
-                annotate("text", x = c(-12.5, -6.5, 0, 6.5, 12.5), y = MAX_VAL, label = lbl_abs,  parse = F, size=3) +  
-                annotate("text", x = c(-12.5, -6.5, 0, 6.5, 12.5), y = MAX_VAL-(round(MAX_VAL/10)/2), label = paste0("(", lbl_per, ")"),  parse = F, size=3) +
+                annotate("text", x = c(-12.5, -9, 0, 9, 12.5), y = MAX_VAL, label = lbl_abs,  parse = F, size=3) +  
+                annotate("text", x = c(-12.5, -9, 0, 9, 12.5), y = MAX_VAL-(round(MAX_VAL/10)/2), label = paste0("(", lbl_per, ")"),  parse = F, size=3) +
                 theme_classic2() + scale_color_manual(values=c("#440154", "#21908c", "#fde725")) +
                 theme(legend.position="top") + xlab("Distance to closest gene TSS in bp (log)") + ylab("Peak signalValue (Macs2)") +
                 labs(color = "Peak position")
