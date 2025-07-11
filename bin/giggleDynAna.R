@@ -157,7 +157,7 @@ if(identical(opt$inFile, "stdin")==T) {
 } else {
     data <- read.table(opt$inFile, header=T)
 }
-# data <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/peakSpatialAna/h3k4me1/multiClassGiggleAna/giggleDynAna/GIGGLE_ENRICHMENT_HOMER.TXT", header=T)
+# data <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/peakSpatialAna/atac/multiClassGiggleAna/giggleDynAna/GIGGLE_ENRICHMENT_HOMER.TXT", header=T)
 
 ## organize data frame containing enrichment results
 no_rows=nrow(data)/length(unique(data$id))
@@ -176,7 +176,7 @@ sig_names <- row.names(df$combo_score)[which(rowSds(normalize.quantiles(as.matri
 sig_names <- sig_names[sig_names %in% (apply(df$fishers_two_tail, 1, function(x) min(x)) %>% as.data.frame %>% dplyr::filter(. < opt$pVal) %>% row.names)]
 
 ## apply minimum overlap threshold to filter out samples
-sig_names <- sig_names[sig_names %in% (apply(df$overlaps, 1, function(x) min(x)) %>% as.data.frame %>% dplyr::filter(. > opt$minOverlap) %>% row.names)]
+sig_names <- sig_names[sig_names %in% (apply(df$overlaps, 1, function(x) max(x)) %>% as.data.frame %>% dplyr::filter(. > opt$minOverlap) %>% row.names)]
 
 ## identify significant overlaps based on top N ordered by combo score
 sig_rows <- which(row.names(df$combo_score) %in% sig_names)

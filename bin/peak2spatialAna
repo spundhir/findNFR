@@ -92,7 +92,7 @@ fi
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@##
 >&2 echo -n "Create region file depending on if the input is from file or STDIN (`date`).. " 
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
+#TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
 if [ "$BEDFILE" == "stdin" ]; then
     while read LINE; do
         echo -e "${LINE}"
@@ -113,8 +113,11 @@ cat ${TMP}.spatial | peak2spatialAna.R -i stdin -o ${OUTDIR}/peaks.spatial.pdf >
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@##
 >&2 echo -n "Compute Transcription Factor enrichment at peaks using Giggle (`date`).. "
-mkdir -p ${OUTDIR}/multiClassGiggleAna
-rm -r ${OUTDIR}/multiClassGiggleAna/*
+if [ -d "${OUTDIR}/multiClassGiggleAna" ]; then 
+    rm -r ${OUTDIR}/multiClassGiggleAna
+else
+    mkdir -p ${OUTDIR}/multiClassGiggleAna
+fi
 cut -f 1-6,11 ${OUTDIR}/peaks.spatial | grep -v start | multiClassGiggleAna -i stdin -o ${OUTDIR}/multiClassGiggleAna/ -g ${GENOME} -d homer -c ${NMOTIFS} -x ${PVALUE} -y ${MIN_P_T} &>${OUTDIR}/multiClassGiggleAna/multiClassGiggleAna.log
 scp -p ${OUTDIR}/multiClassGiggleAna/giggleDynAna/GIGGLE_ENRICHMENT_HOMER.TXT ${OUTDIR}
 scp -p ${OUTDIR}/multiClassGiggleAna/giggleDynAna/giggleEnrichment_HOMER.pdf ${OUTDIR}
