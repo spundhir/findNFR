@@ -1,0 +1,138 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm10";
+PROCESSOR=1
+
+#### usage ####
+usage() {
+	echo Program: "loop2domain (identify interaction domain for genes)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: loop2domain -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file having genomic regions in iBED format (or stdin)]"
+    echo "             [format: chr start end targetGene iScore strand sampleCount (optional)]"
+    echo "[OPTIONS]"
+    echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm10)]"
+    echo " -p <int>    [number of processors to use (default: 1)]"
+	echo " -n <string> [name, which will be used to generate output file names (default: input file name, -i)]"
+	echo " -h          [help]"
+	echo
+    echo "[OUTPUT]"
+	echo "             [<name>.domain & <name>.matrix]"
+	exit 0
+}
+
+#### parse options ####
+while getopts i:g:p:n:h ARG; do
+	case "$ARG" in
+		i) BEDFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        p) PROCESSOR=$OPTARG;;
+        n) NAME=$OPTARG;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$BEDFILE" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+
+get_seeded_random()
+{
+    seed="$1"
+    openssl enc -aes-256-ctr -pass pass:"$seed" -nosalt </dev/zero 2>/dev/null
+}
+###############
+
+<<"COMMENT1"
+COMMENT1
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@##
+echo
+>&2 echo -n "Populating files based on input genome, $GENOME (`date`).. "
+GENOME_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME)
+TSS_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -t)
+GENEDIST_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FILE -g $GENOME -M)
+if [ ! -f "${GENOME_FILE}" -o ! -f "${TSS_FILE}" -o ! -f "${GENEDIST_FILE}" ]; then
+    >&2 echo
+    >&2 echo "computation for $GENOME is not available yet"
+    >&2 echo "please add the chromosome size file for $GENOME at $FINDNFRPATH/data/annotations"
+    >&2 echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    >&2 echo
+    usage
+fi
+>&2 echo "done"
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@##
+>&2 echo -n "Create region file depending on if the input is from file or STDIN (`date`).. " 
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+#TMP="BA4CnrY32vxBf4ZEtNqKdgFe4JoEHmah"
+if [ "$BEDFILE" == "stdin" ]; then
+    while read LINE; do
+        echo -e "${LINE}"
+    done
+else
+    zless $BEDFILE
+fi | tabEdit -i stdin -n 7 | sed -E 's/NA$/0/g' > ${TMP}.bed
+>&2 echo "done"
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@##
+>&2 echo -n "Find genomic interaction domains for genes  (`date`).. "
+if [ -z "${NAME}" ]; then
+    NAME=${BEDFILE}
+fi
+
+if [ ! -f "${NAME}.domain" ]; then
+    echo -e "chr\tstart\tend\ttargetGene\tiScore\tstrand\tsampleCount" > ${NAME}.domain
+    cat ${TMP}.bed | groupBy -i stdin -g 1,2,3 -c 1,2,3,4,5,6,7 -o distinct,distinct,distinct,collapse,collapse,distinct,collapse | cut -f 4- | groupBy -i stdin -g 4 -c 1,2,3,4,5,6,7 -o distinct,collapse,collapse,collapse,collapse,distinct,collapse | perl -ane '
+            $F[2]=~s/\,.*$//g;
+            $F[3]=~s/^.*\,//g;
+            print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\n";
+        ' | perl -ane '
+            @g=split(/\,/,$F[3]);
+            @s=split(/\,/,$F[4]);
+            @n=split(/\,/,$F[6]);
+            %info=();
+            for($i=0; $i<scalar(@g); $i++) {
+                $info{$g[$i]}{'s'}+=$s[$i];
+                $info{$g[$i]}{'n'}+=$n[$i];
+            }
+            $g="";
+            $s="";
+            $n="";
+            foreach(sort keys %info) {
+                $g="$g,$_";
+                $s="$s,$info{$_}{'s'}";
+                $n="$n,$info{$_}{'n'}";
+            }
+            $g=~s/^\,//g;
+            $s=~s/^\,//g;
+            $n=~s/^\,//g;
+            print "$F[0]\t$F[1]\t$F[2]\t$g\t$s\t$F[5]\t$n\n";
+        ' >> ${NAME}.domain
+fi
+>&2 echo "done"
+
+>&2 echo -n "Organize gene x gene interaction domain matrix  (`date`).. "
+cat ${NAME}.domain | loop2domain.R -i stdin -p ${PROCESSOR} > ${NAME}.matrix
+>&2 echo "done"
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@##
+## remove temporary files
+rm ${TMP}.bed
+
