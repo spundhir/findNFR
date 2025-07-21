@@ -18,10 +18,9 @@ usage() {
     echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm10)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
 	echo " -n <string> [name, which will be used to generate output file names (default: input file name, -i)]"
+	echo "             [output files: <name>.domain & <name>.matrix]"
 	echo " -h          [help]"
 	echo
-    echo "[OUTPUT]"
-	echo "             [<name>.domain & <name>.matrix]"
 	exit 0
 }
 
@@ -97,39 +96,37 @@ if [ -z "${NAME}" ]; then
     NAME=${BEDFILE}
 fi
 
-if [ ! -f "${NAME}.domain" ]; then
-    echo -e "chr\tstart\tend\ttargetGene\tiScore\tstrand\tsampleCount" > ${NAME}.domain
-    cat ${TMP}.bed | groupBy -i stdin -g 1,2,3 -c 1,2,3,4,5,6,7 -o distinct,distinct,distinct,collapse,collapse,distinct,collapse | cut -f 4- | groupBy -i stdin -g 4 -c 1,2,3,4,5,6,7 -o distinct,collapse,collapse,collapse,collapse,distinct,collapse | perl -ane '
-            $F[2]=~s/\,.*$//g;
-            $F[3]=~s/^.*\,//g;
-            print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\n";
-        ' | perl -ane '
-            @g=split(/\,/,$F[3]);
-            @s=split(/\,/,$F[4]);
-            @n=split(/\,/,$F[6]);
-            %info=();
-            for($i=0; $i<scalar(@g); $i++) {
-                $info{$g[$i]}{'s'}+=$s[$i];
-                $info{$g[$i]}{'n'}+=$n[$i];
-            }
-            $g="";
-            $s="";
-            $n="";
-            foreach(sort keys %info) {
-                $g="$g,$_";
-                $s="$s,$info{$_}{'s'}";
-                $n="$n,$info{$_}{'n'}";
-            }
-            $g=~s/^\,//g;
-            $s=~s/^\,//g;
-            $n=~s/^\,//g;
-            print "$F[0]\t$F[1]\t$F[2]\t$g\t$s\t$F[5]\t$n\n";
-        ' >> ${NAME}.domain
-fi
+echo -e "chr\tstart\tend\ttargetGene\tiScore\tstrand\tsampleCount" > ${NAME}.domain
+cat ${TMP}.bed | groupBy -i stdin -g 1,2,3 -c 1,2,3,4,5,6,7 -o distinct,distinct,distinct,collapse,collapse,distinct,collapse | cut -f 4- | groupBy -i stdin -g 4 -c 1,2,3,4,5,6,7 -o distinct,collapse,collapse,collapse,collapse,distinct,collapse | perl -ane '
+        $F[2]=~s/\,.*$//g;
+        $F[3]=~s/^.*\,//g;
+        print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\n";
+    ' | perl -ane '
+        @g=split(/\,/,$F[3]);
+        @s=split(/\,/,$F[4]);
+        @n=split(/\,/,$F[6]);
+        %info=();
+        for($i=0; $i<scalar(@g); $i++) {
+            $info{$g[$i]}{'s'}+=$s[$i];
+            $info{$g[$i]}{'n'}+=$n[$i];
+        }
+        $g="";
+        $s="";
+        $n="";
+        foreach(sort { $info{$b}{'s'} <=> $info{$a}{'s'} } keys %info) {
+            $g="$g,$_";
+            $s="$s,$info{$_}{'s'}";
+            $n="$n,$info{$_}{'n'}";
+        }
+        $g=~s/^\,//g;
+        $s=~s/^\,//g;
+        $n=~s/^\,//g;
+        print "$F[0]\t$F[1]\t$F[2]\t$g\t$s\t$F[5]\t$n\n";
+    ' >> ${NAME}.domain
 >&2 echo "done"
 
 >&2 echo -n "Organize gene x gene interaction domain matrix  (`date`).. "
-cat ${NAME}.domain | loop2domain.R -i stdin -p ${PROCESSOR} > ${NAME}.matrix
+cat ${NAME}.domain | loop2domain.R -i stdin -g ${GENOME} -p ${PROCESSOR} > ${NAME}.domain.matrix
 >&2 echo "done"
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@##
