@@ -126,7 +126,9 @@ cat ${TMP}.bed | groupBy -i stdin -g 1,2,3 -c 1,2,3,4,5,6,7 -o distinct,distinct
 >&2 echo "done"
 
 >&2 echo -n "Organize gene x gene interaction domain matrix  (`date`).. "
-cat ${NAME}.domain | loop2domain.R -i stdin -g ${GENOME} -p ${PROCESSOR} > ${NAME}.domain.matrix
+if [ ! -f "${NAME}.domainFinal" ]; then
+    cat ${NAME}.domain | loop2domain.R -i stdin -g ${GENOME} -p ${PROCESSOR} > ${NAME}.domainFinal
+fi
 >&2 echo "done"
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@##
