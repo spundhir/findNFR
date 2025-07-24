@@ -17,8 +17,8 @@ usage() {
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm10)]"
     echo " -p <int>    [number of processors to use (default: 1)]"
-	echo " -n <string> [name, which will be used to generate output file names (default: input file name, -i)]"
-	echo "             [output files: <name>.domain & <name>.matrix]"
+	echo " -n <string> [string, which will be used to name output files (default: input file name, -i)]"
+	echo "             [output files: <name>.matrix, <name>.domain & <name>.Rds]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -122,16 +122,17 @@ cat ${TMP}.bed | groupBy -i stdin -g 1,2,3 -c 1,2,3,4,5,6,7 -o distinct,distinct
         $s=~s/^\,//g;
         $n=~s/^\,//g;
         print "$F[0]\t$F[1]\t$F[2]\t$g\t$s\t$F[5]\t$n\n";
-    ' >> ${NAME}.domain
+    ' >> ${NAME}.tmp
 >&2 echo "done"
 
 >&2 echo -n "Organize gene x gene interaction domain matrix  (`date`).. "
-if [ ! -f "${NAME}.domainFinal" ]; then
-    cat ${NAME}.domain | loop2domain.R -i stdin -g ${GENOME} -p ${PROCESSOR} > ${NAME}.domainFinal
+if [ ! -f "${NAME}.domain" ]; then
+    cat ${NAME}.tmp | loop2domain.R -i stdin -g ${GENOME} -p ${PROCESSOR} > ${NAME}.domain
 fi
 >&2 echo "done"
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## remove temporary files
 rm ${TMP}.bed
+rm ${TMP}.tmp
 
