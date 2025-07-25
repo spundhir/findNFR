@@ -165,6 +165,7 @@ dfO <- bed2overlap(df, df, minOverlap = 5000)
 dl <- mclapply(GENES, function(GENE) {
     #df[grepl(sprintf("(^|,)%s(,|$)", GENE), df$targetGene),c("targetGene","iScore")] %>% separate_longer_delim(cols=c(targetGene,iScore), delim = ",") %>% mutate(iScore=as.numeric(iScore)) %>% summaryBy(formula = iScore ~ targetGene, FUN = "sum") %>% mutate(gene=GENE) %>% 'colnames<-'(c("sGene", "iScore", "qGene")) %>% dplyr::select(c("qGene", "sGene", "iScore"))
   dfO[which(dfO$name_q==GENE),] %>% dplyr::mutate(iScore=log(iScore_q * iScore_s)) %>% dplyr::select(targetGene_s, iScore) %>% summaryBy(formula = iScore ~ targetGene_s, FUN = "sum") %>% mutate(gene=GENE) %>% 'colnames<-'(c("sGene", "iScore", "qGene")) %>% dplyr::select(c("qGene", "sGene", "iScore"))
+  # dfO[which(dfO$name_q==GENE),] %>% dplyr::mutate(iScore=log(iScore_s)) %>% dplyr::select(targetGene_s, iScore) %>% summaryBy(formula = iScore ~ targetGene_s, FUN = "sum") %>% mutate(gene=GENE) %>% 'colnames<-'(c("sGene", "iScore", "qGene")) %>% dplyr::select(c("qGene", "sGene", "iScore"))
   }, mc.cores=opt$processors, mc.set.seed = 5)
 
 ## Combine all into one table
