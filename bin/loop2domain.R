@@ -180,9 +180,10 @@ mat <- matrix(NA, length(all_genes), length(all_genes), dimnames = list(all_gene
 mat[cbind(dt$qGene, dt$sGene)] <- dt$iScore
 
 mat <- mat[GENE_SORTED,GENE_SORTED]
+mat.norm <- sweep(mat, 1, diag(as.matrix(mat)), "/")
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-## write matrix to stdout
+## write matrix to file
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 write.table(mat, file=sprintf("%s.matrix", opt$name), col.names=T, row.names=T, quote=F, sep="\t")
 
@@ -193,8 +194,8 @@ write.table(mat, file=sprintf("%s.matrix", opt$name), col.names=T, row.names=T, 
 gene_chr <- (df %>% dplyr::select(chr, targetGene) %>% unique)
 
 t <- mclapply(unique(gene_chr$chr), function(CHR) {
-  mat.sub <- mat[which(colnames(mat) %in% gene_chr[which(gene_chr==CHR),]$targetGene), 
-                 which(colnames(mat) %in% gene_chr[which(gene_chr==CHR),]$targetGene)] %>%
+  mat.sub <- mat.norm[which(colnames(mat.norm) %in% gene_chr[which(gene_chr==CHR),]$targetGene), 
+                 which(colnames(mat.norm) %in% gene_chr[which(gene_chr==CHR),]$targetGene)] %>%
     replace(is.na(.), 0)
   
   ## APPROACH-1
@@ -246,12 +247,12 @@ geneCluster <- geneCluster %>% group_by(cluster) %>% summarise(chr = unique(chr,
                                                 start = min(start, na.rm = TRUE),
                                                 end = max(end, na.rm = TRUE),
                                                 gene = paste(name, collapse = ","),
-                                                iScore = paste(iScore, collapse = ","),
+                                                iScore = paste(sprintf("%0.2f", iScore), collapse = ","),
                                                 strand = "."
                                                 ) %>% dplyr::select(c("chr", "start", "end", "gene", "iScore", "strand", "cluster")) %>% dplyr::arrange(chr, start, end)
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-## write gene domains to stdout
+## write gene domains to file
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 write.table(geneCluster, file=sprintf("%s.domain", opt$name), col.names=T, row.names=F, quote=F, sep="\t")
 
