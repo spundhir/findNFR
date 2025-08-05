@@ -9,18 +9,18 @@ usage() {
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: gene2genomeOrgStat -g <string> -o <dir> [OPTIONS]"
 	echo "Options:"
-    echo " -g <string> [genome (mm10 or hg38)]"
-    echo " -o <dir>    [output directory]"
-    echo "[OPTIONS]"
-    echo " -i <file>   [gene coodinate file (default: auto-retrieve based on -g)]"
-    echo "             [format: chr start end name score strand ensembl_id protein_coding]"
-    echo " -j <file>   [DHS coodinate file (default: auto-retrieve based on -g)]"
-    echo "             [format: chr start end name score strand]"
-    echo "[OUTPUT]"
-    echo "             [stdout: chr start end gene score strand gene_class gene_cluster]"
-    echo "             [gene_class: distance between genes]"
-    echo "             [gene_cluster: ranking of gene density; 1 (dense) - 10 (sparse)]"
-    echo " -h          [help]"
+	echo " -g <string> [genome (mm10 or hg38)]"
+	echo " -o <dir>    [output directory]"
+	echo "[OPTIONS]"
+	echo " -i <file>   [gene coodinate file (default: auto-retrieve based on -g)]"
+	echo "             [format: chr start end name score strand ensembl_id protein_coding]"
+	echo " -j <file>   [DHS coodinate file (default: auto-retrieve based on -g)]"
+	echo "             [format: chr start end name score strand]"
+	echo "[OUTPUT]"
+	echo "             [stdout: chr start end gene score strand gene_class gene_cluster]"
+	echo "             [gene_class: distance between genes]"
+	echo "             [gene_cluster: ranking of gene density; 1 (dense) - 10 (sparse)]"
+	echo " -h          [help]"
 	exit 0
 }
 
@@ -65,7 +65,7 @@ mkdir -p ${OUTDIR}
 ## start analysis
 >&2 echo -n "Starting analysis (`date`).. "
 if [ ! -s "${OUTDIR}/gene2genomeOrgStat.pdf" ]; then
-    # -k parameter (grep -w protein_coding /scratch/genomes/annotations/BED/mm10_ensembl_gene.bed | cut -f 1 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1) (grep -w protein_coding /scratch/genomes/annotations/BED/hg38_ensembl_gene.bed | cut -f 1 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1)
+    # -k parameter (grep -w protein_coding /home/xfd783/genomes/annotations/BED/mm10_ensembl_gene.bed | cut -f 1 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1) (grep -w protein_coding /home/xfd783/genomes/annotations/BED/hg38_ensembl_gene.bed | cut -f 1 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1)
     for CHR in $(less ${GENOME_FILE} | cut -f 1 | grep -v chrM); do closestBed -a <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }' | grep -w ${CHR}) -b <(grep -w protein_coding ${GENE_FILE} | perl -ane 'if(!$seen{$F[3]}) { print $_; $seen{$F[3]}=1; }' | grep -w ${CHR}) -d -k 2500 -N -g ${GENOME_FILE} 2>/dev/null > ${OUTDIR}/${GENOME}_gene2geneDist.bed.${CHR}; done
 
     ## output: "chr", "start", "end", "gene", "score", "strand", "gene2gene_dist", "gene_length", "dhs", "dhs2gene_dist"

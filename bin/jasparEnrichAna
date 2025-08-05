@@ -107,7 +107,7 @@ if [ "${GENOME}" == "mm10" ]; then
     #rm unMapped
     #liftOver ${TMP}.dhs ~/genomes/annotations/LIFT_OVER/mm10ToMm39.over.chain.gz ${TMP}.dhs.tmp unMapped &>/dev/null
     #rm unMapped
-    #JASPAR_DB="/localhome/bric/xfd783/bric_share/bp_nextgen/09_ALL_PUBLIC/database/jaspar/mm39/lola"
+    #JASPAR_DB="/home/xfd783/data/09_ALL_PUBLIC/database/jaspar/mm39/lola"
     #JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.bed.tmp ${TMP}.dhs.tmp ${TMP}_dir 2022 ${PROCESSOR} &>${TMP}_dir/log
     #rm ${TMP}.bed.tmp ${TMP}.dhs.tmp
     JASPAR_enrich.sh oneSetBg ${JASPAR_DB} ${TMP}.bed ${TMP}.dhs ${TMP}_dir 2024 ${PROCESSOR} &>${TMP}_dir/log

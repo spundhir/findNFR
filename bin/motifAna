@@ -31,43 +31,43 @@ usage() {
 	echo "Usage: motifAna -i <file> -o <dir> [OPTIONS]"
 	echo "Options:"
 	echo " -i <file>   [input file having genomic regions in BED format (or stdin)]"
-    echo " -o <dir>    [output directory to store results]"
-    echo "[OPTIONS]"
-    echo " -m <int>    [running mode (default: 1)]"
-    echo "             [mode 1: Determine all TFBS motifs enriched in the input regions]"
-    echo "              -s <file>   [input file having PWM of TFBS motifs (genome specific)]"
-    echo "              -t <string> [motif length (default=8,10,12)]"
-    echo "              -u <float>  [similarity threshold used to remove similar motifs (default: 0.6; **OBSOLETE**)]"
-    echo "              -v <float>  [remove motifs with information content less than # (default: not used; **OBSOLETE**)]"
-    echo "              -w <int>    [remove motifs with less than # number of target instances (default: not used; **OBSOLETE**)]"
-    echo "              -x <float>  [p-value cutoff (default: 0.01)]"
-    echo "              -y <float>  [remove motifs with target percentage less than # (default: 0)]"
-    echo "              -z <float>  [remove motifs with background percentage greater than # (default: 100)]"
-    echo "              -n <int>    [number of motifs to optimize for each motif length (default: 25)]"
-    echo "              -b <file>   [custom background file in bed format]"
-    echo "                          [can also be a class identifier, where class is sixth column in input bed file (-i)]"
-    echo "             [mode 2: analyze the enrichment of specific TFBS motifs in the input regions]"
-    echo "              -l <file>   [motif file for which enrichment will be analyzed]"
-    echo "                          [if multiple, separate them by a comma]"
-    echo "              -j <string> [name of motifs that are of interest (id before a '/', eg. E2F1_MOUSE.H10MO.A in E2F1_MOUSE.H10MO.A/hocomoco)]"
-    echo "                          [if multiple separate them by a comma]"
-    echo "                          [if motif name has ',', replace it with '&']"
-    echo "                          [If not provided analysis will be done using all motifs]"
-    echo "              -f          [output histogram file only (default: histogram + annotation)]"
-    echo "              -D <int>    [bin size of region for histogram (default: 10 bp)]"
-    echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
-    echo " -p <int>    [number of processors to use (default: 1)]"
-    echo " -d <int>    [size of region (default: 200 bp)]"
-    echo "             [The size of the region used for motif finding is important.  If analyzing ChIP-Seq peaks from a transcription factor,]"
-    echo "             [Chuck would recommend 50 bp for establishing the primary motif bound by a given transcription factor and 200 bp for  ]"
-    echo "             [finding both primary and 'co-enriched' motifs for a transcription factor.  When looking at histone marked regions,   ]"
-    echo "             [500-1000 bp is probably a good idea (i.e. H3K4me or H3/H4 acetylated regions).  In theory, HOMER can work with very  ]"
-    echo "             [large regions (i.e. 10kb), but with the larger the regions comes more sequence and longer execution time.  These     ]"
-    echo "             [regions will be based off the center of the peaks.  If you prefer an offset, you can specify '-d -300,100' to     ]"
-    echo "             [search a region of size 400 that is centered 100 bp upstream of the peak center (useful if doing motif finding on    ]"
-    echo "             [putative TSS regions).  If you have variable length regions, use the option '-d given' and HOMER will use the     ]"
-    echo "             [exact regions that were used as input]"
-    echo " -G          [also perform GIGGLE enrichment analysis]"
+	echo " -o <dir>    [output directory to store results]"
+	echo "[OPTIONS]"
+	echo " -m <int>    [running mode (default: 1)]"
+	echo "             [mode 1: Determine all TFBS motifs enriched in the input regions]"
+	echo "              -s <file>   [input file having PWM of TFBS motifs (genome specific)]"
+	echo "              -t <string> [motif length (default=8,10,12)]"
+	echo "              -u <float>  [similarity threshold used to remove similar motifs (default: 0.6; **OBSOLETE**)]"
+	echo "              -v <float>  [remove motifs with information content less than # (default: not used; **OBSOLETE**)]"
+	echo "              -w <int>    [remove motifs with less than # number of target instances (default: not used; **OBSOLETE**)]"
+	echo "              -x <float>  [p-value cutoff (default: 0.01)]"
+	echo "              -y <float>  [remove motifs with target percentage less than # (default: 0)]"
+	echo "              -z <float>  [remove motifs with background percentage greater than # (default: 100)]"
+	echo "              -n <int>    [number of motifs to optimize for each motif length (default: 25)]"
+	echo "              -b <file>   [custom background file in bed format]"
+	echo "                          [can also be a class identifier, where class is sixth column in input bed file (-i)]"
+	echo "             [mode 2: analyze the enrichment of specific TFBS motifs in the input regions]"
+	echo "              -l <file>   [motif file for which enrichment will be analyzed]"
+	echo "                          [if multiple, separate them by a comma]"
+	echo "              -j <string> [name of motifs that are of interest (id before a '/', eg. E2F1_MOUSE.H10MO.A in E2F1_MOUSE.H10MO.A/hocomoco)]"
+	echo "                          [if multiple separate them by a comma]"
+	echo "                          [if motif name has ',', replace it with '&']"
+	echo "                          [If not provided analysis will be done using all motifs]"
+	echo "              -f          [output histogram file only (default: histogram + annotation)]"
+	echo "              -D <int>    [bin size of region for histogram (default: 10 bp)]"
+	echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
+	echo " -p <int>    [number of processors to use (default: 1)]"
+	echo " -d <int>    [size of region (default: 200 bp)]"
+	echo "             [The size of the region used for motif finding is important.  If analyzing ChIP-Seq peaks from a transcription factor,]"
+	echo "             [Chuck would recommend 50 bp for establishing the primary motif bound by a given transcription factor and 200 bp for  ]"
+	echo "             [finding both primary and 'co-enriched' motifs for a transcription factor.  When looking at histone marked regions,   ]"
+	echo "             [500-1000 bp is probably a good idea (i.e. H3K4me or H3/H4 acetylated regions).  In theory, HOMER can work with very  ]"
+	echo "             [large regions (i.e. 10kb), but with the larger the regions comes more sequence and longer execution time.  These     ]"
+	echo "             [regions will be based off the center of the peaks.  If you prefer an offset, you can specify '-d -300,100' to     ]"
+	echo "             [search a region of size 400 that is centered 100 bp upstream of the peak center (useful if doing motif finding on    ]"
+	echo "             [putative TSS regions).  If you have variable length regions, use the option '-d given' and HOMER will use the     ]"
+	echo "             [exact regions that were used as input]"
+	echo " -G          [also perform GIGGLE enrichment analysis]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -76,7 +76,7 @@ usage() {
 #### parse options ####
 while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fD:g:p:d:Gh ARG; do
 	case "$ARG" in
-		i) BEDFILE=$OPTARG;;
+	i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         m) MODE=$OPTARG;;
         s) TFBS_FILE=$OPTARG;;
@@ -97,7 +97,7 @@ while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fD:g:p:d:Gh ARG; do
         p) PROCESSOR=$OPTARG;;
         d) SIZE=$OPTARG;;
         G) GIGGLE=1;;
-		h) HELP=1;;
+	h) HELP=1;;
 	esac
 done
 
@@ -128,8 +128,8 @@ echo "done"
 
 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 if [ "$GENOME" == "mm9" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm9.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm9.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
     GENOME_MOTIF="mm9r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2024_version/2024_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
@@ -137,8 +137,8 @@ if [ "$GENOME" == "mm9" ]; then
     GTRD_DIR=""
     UNIBIND_DIR=""
 elif [ "$GENOME" == "hg19" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg19.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg19.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2024_version/2024_tf_jaspar_hocomocoHuman_eukaryote.homer"
@@ -146,26 +146,26 @@ elif [ "$GENOME" == "hg19" ]; then
     GTRD_DIR=""
     UNIBIND_DIR=""
 elif [ "$GENOME" == "mm10" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm10.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm10.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
     GENOME_MOTIF="mm10r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2024_version/2024_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
     fi
-    GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/mm10/giggle/"
-    UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/mm10/giggle/"
+    GTRD_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/gtrd/v21.12/mm10/giggle/"
+    UNIBIND_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/unibind/v2022/mm10/giggle/"
 elif [ "$GENOME" == "hg38" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg38.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg38.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
     GENOME_MOTIF="hg38r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2024_version/2024_tf_jaspar_hocomocoHuman_eukaryote.homer"
     fi
-    GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/hg38/giggle/"
-    UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/hg38/giggle/"
+    GTRD_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/gtrd/v21.12/hg38/giggle/"
+    UNIBIND_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/unibind/v2022/hg38/giggle/"
 elif [ "$GENOME" == "danRer7" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/zebrafish.danRer7.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"
     GENOME_MOTIF="danRer7r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="NA"

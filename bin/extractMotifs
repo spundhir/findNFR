@@ -12,10 +12,10 @@ usage() {
 	echo "Options:"
 	echo " -i <file>   [input file containing motifs (or stdin)]"
 	echo " -j <string> [name of motifs needs to be extracted]"
-    echo "             [if multiple, separate them by a comma]"
-    echo "             [if motif name has ',', replace it with '&']"
-    echo "[OPTIONS]"
-    echo " -g <string> [genome for which to perform the analysis (default: mm9)]"
+	echo "             [if multiple, separate them by a comma]"
+	echo "             [if motif name has ',', replace it with '&']"
+	echo "[OPTIONS]"
+	echo " -g <string> [genome for which to perform the analysis (default: mm9)]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -24,9 +24,9 @@ usage() {
 #### parse options ####
 while getopts i:j:g:h ARG; do
 	case "$ARG" in
-		i) MOTIFFILE=$OPTARG;;
+	i) MOTIFFILE=$OPTARG;;
         j) MOTIF=$OPTARG;;
-		h) HELP=1;;
+	h) HELP=1;;
 	esac
 done
 
@@ -48,16 +48,16 @@ function wait_for_jobs_to_finish {
 ###############
 
 if [ "$GENOME" == "mm9" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm9.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm9.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
     GENOME_MOTIF="mm9r"
 elif [ "$GENOME" == "hg19" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg19.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg19.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
 elif [ "$GENOME" == "danRer7" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/zebrafish.danRer7.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"
     GENOME_MOTIF="danRer7r"
 else
     echo "Presently the program only support analysis for mm9, hg19 or danRer7"

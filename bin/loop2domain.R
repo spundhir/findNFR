@@ -131,8 +131,8 @@ if(opt$genome=="mm10") {
     #                            dplyr::filter(group_name %in% entrez_ids$entrez_id), 
     #                        entrez_ids, by.x="group_name", by.y="entrez_id") %>% 
     #                    dplyr::arrange(seqnames, start, end) %>% dplyr::select(gene_name) %>% unlist
-    GENE_COOR <- read.table("/scratch/genomes/annotations/BED/mm10_ensembl_gene.bed")[,c(1:6)] %>% 'colnames<-'(c("chr", "start", "end", "name", "score", "strand")) %>% arrange(name) %>% distinct(name, .keep_all=T)
-    GENE_SORTED <- read.table("/scratch/genomes/annotations/BED/mm10_ensembl_tss.bed") %>% dplyr::arrange(V1, V2, V3) %>% dplyr::select(V4) %>% unique %>% unlist
+    GENE_COOR <- read.table("/home/xfd783/genomes/annotations/BED/mm10_ensembl_gene.bed")[,c(1:6)] %>% 'colnames<-'(c("chr", "start", "end", "name", "score", "strand")) %>% arrange(name) %>% distinct(name, .keep_all=T)
+    GENE_SORTED <- read.table("/home/xfd783/genomes/annotations/BED/mm10_ensembl_tss.bed") %>% dplyr::arrange(V1, V2, V3) %>% dplyr::select(V4) %>% unique %>% unlist
     GENE_SORTED <- GENE_SORTED[GENE_SORTED %in% GENES]
 } else if(opt$genome=="hg38") {
     #library(org.Hs.eg.db)
@@ -148,8 +148,8 @@ if(opt$genome=="mm10") {
     #                            dplyr::filter(group_name %in% entrez_ids$entrez_id), 
     #                        entrez_ids, by.x="group_name", by.y="entrez_id") %>% 
     #                    dplyr::arrange(seqnames, start, end) %>% dplyr::select(gene_name) %>% unlist
-    GENE_COOR <- read.table("/scratch/genomes/annotations/BED/hg38_ensembl_gene.bed")[,c(1:6)] %>% 'colnames<-'(c("chr", "start", "end", "name", "score", "strand")) %>% arrange(name) %>% distinct(name, .keep_all=T)
-    GENE_SORTED <- read.table("/scratch/genomes/annotations/BED/hg38_ensembl_tss.bed") %>% dplyr::arrange(V1, V2, V3) %>% dplyr::select(V4) %>% unique %>% unlist
+    GENE_COOR <- read.table("/home/xfd783/genomes/annotations/BED/hg38_ensembl_gene.bed")[,c(1:6)] %>% 'colnames<-'(c("chr", "start", "end", "name", "score", "strand")) %>% arrange(name) %>% distinct(name, .keep_all=T)
+    GENE_SORTED <- read.table("/home/xfd783/genomes/annotations/BED/hg38_ensembl_tss.bed") %>% dplyr::arrange(V1, V2, V3) %>% dplyr::select(V4) %>% unique %>% unlist
     GENE_SORTED <- GENE_SORTED[GENE_SORTED %in% GENES]
 } else {
     cat("Unknown genome provided\n");
@@ -181,7 +181,7 @@ mat <- matrix(NA, length(all_genes), length(all_genes), dimnames = list(all_gene
 mat[cbind(dt$qGene, dt$sGene)] <- dt$iScore
 
 mat <- mat[GENE_SORTED,GENE_SORTED]
-mat.norm <- sweep(mat, 1, diag(as.matrix(mat)), "/")
+mat.norm <- sweep(mat, 1, diag(as.matrix(mat)), "/") ## IMP STEP
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## write matrix to file
@@ -213,7 +213,7 @@ t <- mclapply(unique(gene_chr$chr), function(CHR) {
   ## APPROACH-2
   # mat.sub <- mat.sub[row.names(mat.sub[rowSums(mat.sub != 0) > 1, ]),row.names(mat.sub[rowSums(mat.sub != 0) > 1, ])]
   # ap_result <- apcluster(s = as.matrix(t(mat.sub)), seed=10, maxits=10000)
-  ap_result <- apcluster(cosine, t(mat.sub), seed=10, maxits=10000, details=TRUE)
+  ap_result <- apcluster(cosine, t(mat.sub), seed=10, maxits=10000, details=TRUE) ## IMP STEP
   geneCluster <- do.call(rbind, lapply(seq(1:length(ap_result@clusters)), function(i) cbind(names(ap_result@clusters[[i]]), i))) %>% as.data.frame %>% 'colnames<-'(c("gene", "cluster"))
   geneBlackListed <- lapply(seq(1:length(ap_result@clusters)), function(i) unlist(lapply(names(ap_result@clusters[[i]]), function(x) { if(length(which(mat.sub[x, names(ap_result@clusters[[i]])]>0))==1) { x; } }))) %>% unlist
   if(length(geneBlackListed)>0) {
@@ -255,7 +255,7 @@ geneCluster <- geneCluster %>% group_by(cluster) %>% summarise(chr = unique(chr,
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## write gene domains to file
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-write.table(geneCluster, file=sprintf("%s.domain", opt$name), col.names=T, row.names=F, quote=F, sep="\t")
+write.table(geneCluster, file=sprintf("%s.matrix.domain", opt$name), col.names=T, row.names=F, quote=F, sep="\t")
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## save objects to .RDS file

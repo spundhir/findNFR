@@ -116,8 +116,8 @@ echo "done"
 
 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 if [ "$GENOME" == "mm9" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm9.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm9.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
     GENOME_MOTIF="mm9r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2024_version/2024_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
@@ -125,8 +125,8 @@ if [ "$GENOME" == "mm9" ]; then
     GTRD_DIR=""
     UNIBIND_DIR=""
 elif [ "$GENOME" == "hg19" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg19.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg19.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2024_version/2024_tf_jaspar_hocomocoHuman_eukaryote.homer"
@@ -134,26 +134,26 @@ elif [ "$GENOME" == "hg19" ]; then
     GTRD_DIR=""
     UNIBIND_DIR=""
 elif [ "$GENOME" == "mm10" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm10.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm10.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
     GENOME_MOTIF="mm10r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2024_version/2024_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
     fi
-    GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/mm10/giggle/"
-    UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/mm10/giggle/"
+    GTRD_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/gtrd/v21.12/mm10/giggle/"
+    UNIBIND_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/unibind/v2022/mm10/giggle/"
 elif [ "$GENOME" == "hg38" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg38.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg38.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
     GENOME_MOTIF="hg38r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2024_version/2024_tf_jaspar_hocomocoHuman_eukaryote.homer"
     fi
-    GTRD_DIR="/scratch/genomes/annotations/GTRD/v21.12/hg38/giggle/"
-    UNIBIND_DIR="/scratch/genomes/annotations/UNIBIND/v2022/hg38/giggle/"
+    GTRD_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/gtrd/v21.12/hg38/giggle/"
+    UNIBIND_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/unibind/v2022/hg38/giggle/"
 elif [ "$GENOME" == "danRer7" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"   
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/zebrafish.danRer7.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"   
     GENOME_MOTIF="danRer7r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="NA"
@@ -257,4 +257,4 @@ else
 fi
 echo "done"
 
-#for CHR in $(cut -f 1 $(initialize_genome -g mm10)); do intersectBed -a <(tabEdit -i analysis/DF_ENHANCER.BED -f 1-6,annotation | cut -f 1-6,9 | grep -w ${CHR}) -b <(zgrep -w ${CHR} ~/genomes/annotations/GTRD/Mus\ musculus_meta_clusters.interval.gz | cut -f 1-6) -wo > analysis/multiClassMotifAna/gtrd/ENHANCERS.GTRD.${CHR}; done
+#for CHR in $(cut -f 1 $(initialize_genome -g mm10)); do intersectBed -a <(tabEdit -i analysis/DF_ENHANCER.BED -f 1-6,annotation | cut -f 1-6,9 | grep -w ${CHR}) -b <(zgrep -w ${CHR} ~/data/09_ALL_PUBLIC/database/gtrd/Mus_musculus_meta_clusters.interval.gz | cut -f 1-6) -wo > analysis/multiClassMotifAna/gtrd/ENHANCERS.GTRD.${CHR}; done

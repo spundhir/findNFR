@@ -1,4 +1,4 @@
-#!/localhome/bric/xfd783/miniconda3/bin/Rscript
+#!/usr/local/bin/Rscript
 suppressPackageStartupMessages(library("optparse"))
 
 ## parse command line arguments

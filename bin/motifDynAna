@@ -22,64 +22,64 @@ usage() {
 	echo Contact: pundhir@binf.ku.dk
 	echo "Usage: motifDynAna -i <dir> -o <dir> [OPTIONS]"
 	echo "Options:"
-    echo " -i <dir>    [directory containing result from prior run of motifAna script]"
-    echo "             [if multiple, seperate them by a comma]"
-    echo " -o <dir>    [output directory]"
-    echo "[OPTIONS]"
-    echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
-    echo " -p <int>    [number of processors to use (default: 1)]"
-    echo " -c <int>    [number of top motifs to analyze from each sample (default: 50)]"
-    echo " -t <string> [motif length (default=8,10,12)]"
-    echo " -u <float>  [similarity threshold used to remove similar motifs (default: 0.6; **OBSOLETE**)]"
-    echo " -v <float>  [remove motifs with information content less than # (default: not used; **OBSOLETE**)]"
-    echo " -w <int>    [remove motifs with less than # number of target instances (default: not used; **OBSOLETE**)]"
-    echo " -x <float>  [p-value cutoff (default: 0.01)]"
-    echo " -y <float>  [remove motifs with target percentage less than # (default: 0)]"
-    echo " -z <float>  [remove motifs with background percentage greater than # (default: 100)]"
-    echo " -n <int>    [number of motifs to optimize for each motif length (default: 25)]"
-    echo " -b <file>   [custom background file]"
-    echo " -d <int>    [size of region (default: 200bp)]"
-    echo "             [The size of the region used for motif finding is important.  If analyzing ChIP-Seq peaks from a transcription factor,]"
-    echo "             [Chuck would recommend 50 bp for establishing the primary motif bound by a given transcription factor and 200 bp for  ]"
-    echo "             [finding both primary and 'co-enriched' motifs for a transcription factor.  When looking at histone marked regions,   ]"
-    echo "             [500-1000 bp is probably a good idea (i.e. H3K4me or H3/H4 acetylated regions).  In theory, HOMER can work with very  ]"
-    echo "             [large regions (i.e. 10kb), but with the larger the regions comes more sequence and longer execution time.  These     ]"
-    echo "             [regions will be based off the center of the peaks.  If you prefer an offset, you can specify '-size -300,100' to     ]"
-    echo "             [search a region of size 400 that is centered 100 bp upstream of the peak center (useful if doing motif finding on    ]"
-    echo "             [putative TSS regions).  If you have variable length regions, use the option '-size given' and HOMER will use the     ]"
-    echo "             [exact regions that were used as input.]"
-    echo " -l <string> [name of motifs that must be included in the final output]"
-    echo "             [if multiple, separate them by a comma]"
-    echo "             [if motif name has ',', replace it with '&']"
-    echo " -M <file>   [file containing TF motifs which must be included in the output]"
-    echo " -G          [also perform GIGGLE enrichment analysis]"
-    echo " -h          [help]"
-    echo
-    exit 0
+	echo " -i <dir>    [directory containing result from prior run of motifAna script]"
+	echo "             [if multiple, seperate them by a comma]"
+	echo " -o <dir>    [output directory]"
+	echo "[OPTIONS]"
+	echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
+	echo " -p <int>    [number of processors to use (default: 1)]"
+	echo " -c <int>    [number of top motifs to analyze from each sample (default: 50)]"
+	echo " -t <string> [motif length (default=8,10,12)]"
+	echo " -u <float>  [similarity threshold used to remove similar motifs (default: 0.6; **OBSOLETE**)]"
+	echo " -v <float>  [remove motifs with information content less than # (default: not used; **OBSOLETE**)]"
+	echo " -w <int>    [remove motifs with less than # number of target instances (default: not used; **OBSOLETE**)]"
+	echo " -x <float>  [p-value cutoff (default: 0.01)]"
+	echo " -y <float>  [remove motifs with target percentage less than # (default: 0)]"
+	echo " -z <float>  [remove motifs with background percentage greater than # (default: 100)]"
+	echo " -n <int>    [number of motifs to optimize for each motif length (default: 25)]"
+	echo " -b <file>   [custom background file]"
+	echo " -d <int>    [size of region (default: 200bp)]"
+	echo "             [The size of the region used for motif finding is important.  If analyzing ChIP-Seq peaks from a transcription factor,]"
+	echo "             [Chuck would recommend 50 bp for establishing the primary motif bound by a given transcription factor and 200 bp for  ]"
+	echo "             [finding both primary and 'co-enriched' motifs for a transcription factor.  When looking at histone marked regions,   ]"
+	echo "             [500-1000 bp is probably a good idea (i.e. H3K4me or H3/H4 acetylated regions).  In theory, HOMER can work with very  ]"
+	echo "             [large regions (i.e. 10kb), but with the larger the regions comes more sequence and longer execution time.  These     ]"
+	echo "             [regions will be based off the center of the peaks.  If you prefer an offset, you can specify '-size -300,100' to     ]"
+	echo "             [search a region of size 400 that is centered 100 bp upstream of the peak center (useful if doing motif finding on    ]"
+	echo "             [putative TSS regions).  If you have variable length regions, use the option '-size given' and HOMER will use the     ]"
+	echo "             [exact regions that were used as input.]"
+	echo " -l <string> [name of motifs that must be included in the final output]"
+	echo "             [if multiple, separate them by a comma]"
+	echo "             [if motif name has ',', replace it with '&']"
+	echo " -M <file>   [file containing TF motifs which must be included in the output]"
+	echo " -G          [also perform GIGGLE enrichment analysis]"
+	echo " -h          [help]"
+	echo
+	exit 0
 }
 
 #### parse options ####
 while getopts i:o:g:p:c:t:u:v:w:x:y:z:n:b:d:l:M:Gh ARG; do
 	case "$ARG" in
 		i) INDIR=$OPTARG;;
-        o) OUTDIR=$OPTARG;;
-        g) GENOME=$OPTARG;;
-        p) PROCESSOR=$OPTARG;;
-        c) NMOTIFS=$OPTARG;;
-        t) LENGTH=$OPTARG;;
-        u) REDUCE_THRESHOLD=$OPTARG;;
-        v) INFO=$OPTARG;;
-        w) MIN_T=$OPTARG;;
-        x) PVALUE=$OPTARG;;
-        y) MIN_P_T=$OPTARG;;
-        z) B=$OPTARG;;
-        n) S=$OPTARG;;
-        b) BKG_FILE=$OPTARG;;
-        d) SIZE=$OPTARG;;
-        l) MUST_INCLUDE_MOTIF=$OPTARG;;
-        M) MUST_INCLUDE_MOTIF_FILE=$OPTARG;;
-        G) GIGGLE=1;;
-        h) HELP=1;;
+		o) OUTDIR=$OPTARG;;
+		g) GENOME=$OPTARG;;
+		p) PROCESSOR=$OPTARG;;
+		c) NMOTIFS=$OPTARG;;
+		t) LENGTH=$OPTARG;;
+		u) REDUCE_THRESHOLD=$OPTARG;;
+		v) INFO=$OPTARG;;
+		w) MIN_T=$OPTARG;;
+		x) PVALUE=$OPTARG;;
+		y) MIN_P_T=$OPTARG;;
+		z) B=$OPTARG;;
+		n) S=$OPTARG;;
+		b) BKG_FILE=$OPTARG;;
+		d) SIZE=$OPTARG;;
+		l) MUST_INCLUDE_MOTIF=$OPTARG;;
+		M) MUST_INCLUDE_MOTIF_FILE=$OPTARG;;
+		G) GIGGLE=1;;
+		h) HELP=1;;
 	esac
 done
 
@@ -114,24 +114,24 @@ echo "done"
 
 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 if [ "$GENOME" == "mm9" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm9.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm9.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
     GENOME_MOTIF="mm9r"
 elif [ "$GENOME" == "hg19" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg19.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg19.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
 elif [ "$GENOME" == "mm10" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/mouse.mm10.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm10.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
     GENOME_MOTIF="mm10r"
 elif [ "$GENOME" == "hg38" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/human.hg38.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg38.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
     GENOME_MOTIF="hg38r"
 elif [ "$GENOME" == "danRer7" ]; then
-    GENOME_FILE="/scratch/genomes/annotations/SIZE/zebrafish.danRer7.genome"
-    REPEAT_FILE="/scratch/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"
+    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/zebrafish.danRer7.genome"
+    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"
     GENOME_MOTIF="danRer7r"
 else
     echo "Presently the program only support analysis for mm9, hg19 or danRer7"
