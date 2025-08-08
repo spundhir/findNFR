@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -l nodes=1:ppn=4
 
-GENOME="mm9";
+GENOME="mm10";
 PROCESSOR=1
 NMOTIFS=50
 LENGTH="7,8,9,10,11,12,13,14" ## recommended 7,8,9,10,11,12,13,14 (Andersson et al. 2014)
