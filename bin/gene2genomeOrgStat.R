@@ -28,7 +28,7 @@ suppressPackageStartupMessages(library(tiff))
 suppressPackageStartupMessages(library(Hmisc))
 suppressPackageStartupMessages(library(plyr))
 suppressPackageStartupMessages(library(RColorBrewer))
-suppressPackageStartupMessages(library(session))
+#suppressPackageStartupMessages(library(session))
 suppressPackageStartupMessages(library(tiff))
 
 #################################

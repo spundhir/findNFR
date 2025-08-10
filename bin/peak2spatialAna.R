@@ -72,7 +72,7 @@ if(!is.null(opt$inDistFile)) {
                 theme(legend.position="top") + xlab("Distance to closest gene TSS in bp (log)") + ylab("Peak signalValue (Macs2)") +
                 labs(color = "Peak position")
     ## peaks proximal to genes are located in gene dense regions (circular argument).
-    p2 <- ggplot(df[which(df$annot.type!="TSS"),], aes(x=abs(dist_to_geneTSS), y=log(gene2geneDist))) + geom_point(aes(color=annot.type)) + theme_bw() + 
+    p2 <- ggplot(df[which(df$annot.type!="proximal"),], aes(x=abs(dist_to_geneTSS), y=log(gene2geneDist))) + geom_point(aes(color=annot.type)) + theme_bw() + 
             geom_hline(yintercept = 12.5, lty=2) + geom_vline(xintercept = 12.5, lty=2) + 
             xlab("Distance b/w peak to closest gene TSS in bp (log)") +
             ylab("Distance b/w peak closest gene to its closest gene in bp (log) - gene sparsity")
