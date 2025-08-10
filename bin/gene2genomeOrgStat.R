@@ -29,7 +29,6 @@ suppressPackageStartupMessages(library(Hmisc))
 suppressPackageStartupMessages(library(plyr))
 suppressPackageStartupMessages(library(RColorBrewer))
 #suppressPackageStartupMessages(library(session))
-suppressPackageStartupMessages(library(tiff))
 
 #################################
 ## functions
@@ -147,7 +146,7 @@ h <- lapply(list.files(opt$inDir, pattern="chr", full.names = T), function(FILE)
     row.names(mat) <- mat$Row.names
     mat$Row.names <- NULL
 
-    col_cluster <- rev(colorRampPalette(brewer.pal(length(unique(mat$geneDensityClass)), "RdBu"), bias=1)(length(unique(mat$geneDensityClass))))
+    col_cluster <- (colorRampPalette(brewer.pal(length(unique(mat$geneDensityClass)), "RdBu"), bias=1)(length(unique(mat$geneDensityClass))))
     names(col_cluster) <- c(levels(mat$geneDensityClass)[levels(mat$geneDensityClass) %in% unique(mat$geneDensityClass)], "UA")
 
     ra <- rowAnnotation(na_col=NA,
@@ -157,7 +156,7 @@ h <- lapply(list.files(opt$inDir, pattern="chr", full.names = T), function(FILE)
 
     grid.grabExpr(draw(Heatmap(as.matrix(mat[,-ncol(mat)]), cluster_rows=T, cluster_columns=T,
         col=colorRampPalette(c("dodgerblue4","grey97", "sienna3"), bias=1.5)(250), use_raster=T,
-        show_row_names=F, show_column_names=F, raster_device="tiff", raster_quality = 10, right_annotation = ra,
+        show_row_names=F, show_column_names=F, raster_device="png", raster_quality = 10, right_annotation = ra,
         column_title = sprintf("%s (N=%s)", gsub("^.*\\.", "", FILE), nrow(mat)))))
 })
 
