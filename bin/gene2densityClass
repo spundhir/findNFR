@@ -73,9 +73,9 @@ df.res <- do.call(rbind, p) %>% mutate(gene=row.names(.)) %>% dplyr::select(c("g
 df.res <- merge(genes, df.res, by.x="name", by.y="gene")
 df.res <- df.res[,c(2:4,1,5:ncol(df.res))]
 df.res$geneLength <- df.res$end - df.res$start
-df.res$gene2geneDensityClass <- cut2(df.res$geneDensityScore, g=10, levels.mean=T)
-levels(df.res$gene2geneDensityClass) <- cut2(df.res$geneDensityScore, g=10, onlycuts = T)[2:length(cut2(df.res$geneDensityScore, g=10, onlycuts = T))]
-levels(df.res$gene2geneDensityClass) <- seq(length(levels(df.res$gene2geneDensityClass)), 1)
+df.res$geneDensityClass <- cut2(df.res$geneDensityScore, g=10, levels.mean=T)
+levels(df.res$geneDensityClass) <- cut2(df.res$geneDensityScore, g=10, onlycuts = T)[2:length(cut2(df.res$geneDensityScore, g=10, onlycuts = T))]
+levels(df.res$geneDensityClass) <- seq(length(levels(df.res$geneDensityClass)), 1)
 # plot(log(df.res$gene2geneDist+1), df.res$geneDensityScore, xlab="Distance to closest gene (log)", ylab="Gene density score (norm)")
 # ggdensity(df.res, x="gene2geneDist+1", xscale="log2", fill="#9ebcda", facet.by="chr")
 
