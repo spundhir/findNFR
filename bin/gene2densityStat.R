@@ -105,11 +105,13 @@ df.res <- df.res[,c(2:4,1,5:ncol(df.res))]
 df.res$geneLength <- df.res$end - df.res$start
 df.res$geneDensityScore <- (max(df.res$geneDensityScore) + min(df.res$geneDensityScore) - df.res$geneDensityScore)
 df.res$geneDensityClass <- Hmisc::cut2(df.res$geneDensityScore, g=10, levels.mean=T)
-levels(df.res$geneDensityClass) <- sprintf("%0.0f", Hmisc::cut2(df.res$geneDensityScore, g=10, onlycuts = T))[2:length(Hmisc::cut2(df.res$geneDensityScore, g=10, onlycuts = T))]
+#levels(df.res$geneDensityClass) <- sprintf("%0.2f", Hmisc::cut2(df.res$geneDensityScore, g=10, onlycuts = T))[2:length(Hmisc::cut2(df.res$geneDensityScore, g=10, onlycuts = T))]
+levels(df.res$geneDensityClass) <- seq(1,10)
 #levels(df.res$geneDensityClass) <- seq(length(levels(df.res$geneDensityClass)), 1)
 # plot(log(df.res$dist2ClosestGene+1), df.res$geneDensityScore, xlab="Distance to closest gene (log)", ylab="Gene density score (norm)")
 # ggdensity(df.res, x="dist2ClosestGene+1", xscale="log2", fill="#9ebcda", facet.by="chr")
 # ggboxplot(df.res, x="geneDensityClass", y="geneLength", yscale="log2")
+# ggboxplot(df.res, x="geneDensityClass", y="dist2ClosestGene+1", yscale="log2")
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## step-3 output file containing gene density information

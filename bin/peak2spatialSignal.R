@@ -6,7 +6,7 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 option_list <- list(
-  make_option(c("-i", "--inFile"), help="input file containing peak score and distance to TSS information"),
+  make_option(c("-i", "--inFile"), help="input file containing peak score (macs2 output)"),
   make_option(c("-o", "--outFile"), help="output pdf file"),
   make_option(c("-g", "--genome"), default="mm10", help="genome (mm10 or hg38; default=%default)")
 )
@@ -155,7 +155,7 @@ p1 <- p + geom_point_rast(aes(color=annot.type), alpha=0.2) +
             theme(legend.position="top") + xlab("Distance to closest gene TSS in bp (log)") + ylab("Peak signalValue (Macs2; log2)") +
             labs(color = "Peak position")
 ## peaks proximal to genes are located in gene dense regions (circular argument)
-# p2 <- ggplot(df, aes(x=abs(dist_to_closestGeneTSS), y=log(100/(geneDensityScore)))) + geom_point(aes(color=annot.type)) + theme_bw() +
+# p2 <- ggplot(df, aes(x=abs(dist_to_closestGeneTSS), y=log(geneDensityScore))) + geom_point(aes(color=annot.type)) + theme_bw() +
 #         xlab("Distance b/w peak to closest gene TSS in bp (log)") +
 #         ylab("Gene Density Score (log)")
 # p2 <- ggplot(reshape2::melt(table(df[,c("annot.type", "geneDensityClass")])), aes(x=as.factor(geneDensityClass), y=value, fill=annot.type)) + geom_bar(stat = "identity", position = "fill") +
