@@ -135,14 +135,14 @@ lbl_per <- gsub("\\s", "", paste(sprintf("%0.1f", (lbl_abs*100)/nrow(df)), "%"))
 
 ## make the plot
 if(length(which(!is.na(df$signalValue))) > 0) {
-    p <- ggplot(df, aes(dist_to_closestGeneTSS, log2(signalValue)))
-    MAX_VAL=round(max(log2(df$signalValue)),0)
+    df$scoreToPlot <- log2(df$signalValue+1)
 } else {
-    p <- ggplot(df, aes(dist_to_closestGeneTSS, log2(score)))
-    MAX_VAL=round(max(log2(df$score)),0)
+    df$scoreToPlot <- log2(df$score+1)
 }
 
-p1 <- p + geom_point_rast(aes(color=annot.type), alpha=0.2) +
+MAX_VAL=round(max(df$scoreToPlot),0)
+p1 <- ggplot(df, aes(dist_to_closestGeneTSS, scoreToPlot)) +
+            geom_point_rast(aes(color=annot.type), alpha=0.2) +
             stat_density_2d(geom = "polygon", contour = TRUE, aes(fill = after_stat(level)), colour = "black", alpha=0.5, show.legend = F) +
             scale_fill_distiller(palette = "Reds", direction = 1) + 
             #xlim(c(-15,15)) + 
@@ -164,7 +164,7 @@ p1 <- p + geom_point_rast(aes(color=annot.type), alpha=0.2) +
 p2 <- ggbarplot(as.data.frame(table(df$geneDensityClass)), x="Var1", y="Freq", fill="Var1") + xlab("geneDensityClass") + ylab("# peaks") + 
   scale_fill_manual(values=rev(colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(10))) + theme(legend.position="none") +
   theme(plot.margin = margin(t = 50, r = 5, b = 5, l = 5))
-p3 <- ggecdf(df, x="signalValue", color="geneDensityClass", add="boxplot", xscale="log2") + 
+p3 <- ggecdf(df, x="scoreToPlot", color="geneDensityClass") + 
   scale_color_manual(values=rev(colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(10))) + xlab("Peak signalValue (Macs2; log2)") + ylab("ECDF") +
   theme(legend.position="none")
 P <- ggarrange(p1, ggarrange(p2, p3, nrow=2, ncol=1, labels=c("B", "C")), nrow=1, ncol=2, labels=c("A", ""), widths = c(3,1))
@@ -173,5 +173,5 @@ P <- ggarrange(p1, ggarrange(p2, p3, nrow=2, ncol=1, labels=c("B", "C")), nrow=1
 ## save output files
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ggsave(filename = opt$outFile, plot = P, width = 9, height = 6)
-write.table(df, "", sep="\t", col.names = T, row.names = F, quote = F)
+write.table(df[,-(ncol(df))], "", sep="\t", col.names = T, row.names = F, quote = F)
 q()
