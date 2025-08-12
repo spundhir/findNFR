@@ -1,0 +1,177 @@
+#!/usr/bin/env Rscript
+#suppressPackageStartupMessages(library("optparse", lib.loc = "/home/users/sachin/R/x86_64-redhat-linux-gnu-library/2.15"))
+suppressPackageStartupMessages(library("optparse"))
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+## parse command line arguments
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+option_list <- list(
+  make_option(c("-i", "--inFile"), help="input file containing peak score and distance to TSS information"),
+  make_option(c("-o", "--outFile"), help="output pdf file"),
+  make_option(c("-g", "--genome"), default="mm10", help="genome (mm10 or hg38; default=%default)")
+)
+
+parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
+opt <- parse_args(parser)
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+## check, if all required arguments are given
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+if(is.null(opt$inFile) | is.null(opt$outFile)) {
+  cat("\nProgram: peak2spatialSignal.R (plot peak signal classified based on distance to TSS)\n")
+  cat("Author: BRIC, University of Copenhagen, Denmark\n")
+  cat("Version: 1.0\n")
+  cat("Contact: pundhir@binf.ku.dk\n");
+  print_help(parser)
+  q()
+}
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+## load packages
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+suppressPackageStartupMessages(library("ggplot2"))
+suppressPackageStartupMessages(library("ggrastr"))
+suppressPackageStartupMessages(library("ggpubr"))
+suppressPackageStartupMessages(library("GenomicRanges"))
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+## load custom functions
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+## flank bed file coordinates
+bed2window <- function(df_bed, win=500, flank_to_tss=F) {
+  # df_bed: a data frame with genomic coordinates information in bed format
+  if(flank_to_tss==T) {
+    df_bed[,2] <- unlist(lapply(1:nrow(df_bed), function(x) { if(grepl("\\-", df_bed[x,6])) { df_bed[x,3]; } else { df_bed[x,2]; }}))
+    df_bed[,3] <- df_bed[,2] + win
+    df_bed[,2] <- df_bed[,2] - win
+  } else {
+    df_bed[,2] <- unlist(lapply(1:nrow(df_bed), function(x) round((df_bed[x,2]+df_bed[x,3])/2, 0)))
+    df_bed[,3] <- df_bed[,2] + win
+    df_bed[,2] <- df_bed[,2] - win
+  }
+  return(df_bed)
+}
+
+## find closest bed coordinate
+bed2closestCoor <- function(df_q, df_s) {
+  ## query coordinate (format: chr start end name)
+  ## subject coordinate (format: chr start end name score) NOTE: can also be bed file
+  colnames(df_q)[1:3] <- c("chr", "start", "end")
+  colnames(df_q) <- sprintf("%s_q", colnames(df_q))
+
+  query = makeGRangesFromDataFrame(df_q[,c("chr_q", "start_q", "end_q")],
+                                   seqnames.field = "chr_q", start.field = "start_q", end.field = "end_q",
+                                   keep.extra.columns = T, ignore.strand = T)
+
+  if(!is.data.frame(df_s)) {
+    df_s <- read.table(pipe(sprintf("grep -v start %s", df_s)), header=F)
+  }
+
+  colnames(df_s)[1:6] <- c("chr", "start", "end", "name", "score", "strand")
+  colnames(df_s) <- sprintf("%s_s", colnames(df_s))
+
+  subject = makeGRangesFromDataFrame(df_s,
+                                     seqnames.field = "chr_s", start.field = "start_s", end.field = "end_s",
+                                     keep.extra.columns = T, ignore.strand = F)
+
+  df_res <- data.frame(nearest(query, subject))
+  df_res <- df_s[df_res$nearest.query..subject.,]
+
+  df_res <- cbind(df_q, df_res)
+  row.names(df_res) <- row.names(df_q)
+
+  df_res$distance <- unlist(lapply(seq(1:nrow(df_res)), function(i) {
+    if(is.na(df_res[i,]$end_s)) {
+      NA;
+    } else if(df_res[i,]$strand_s=="-") {
+      df_res[i,]$start_s-df_res[i,]$start_q;
+    } else if(df_res[i,]$strand_s=="+") {
+      df_res[i,]$start_q-df_res[i,]$start_s;
+    } else {
+      abs(df_res[i,]$start_q-df_res[i,]$start_s);
+    }
+  }))
+
+  return(df_res)
+}
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+## initialize input files based on genome
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+## read input file
+if(identical(opt$inFile, "stdin")==T) {
+    peaks <- read.table(file("stdin"))[,c(1:7)]
+} else {
+    peaks <- read.table(opt$inFile)[,c(1:7)]
+}
+# peaks <- read.table("~/data/00_ALL_CHIP-SEQ_RAW/MLL-AF9/six1_on_peaks.bed", header=F)
+peaks <- bed2window(peaks, win = 1, flank_to_tss = F)
+colnames(peaks) <- c("chr", "start", "end", "name", "score", "strand", "signalValue")
+GENOME_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s", opt$genome), intern=T)
+TSS_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -t", opt$genome), intern=T)
+GENEDENSITY_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -M", opt$genome), intern=T)
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+## start analysis
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+## reorganize values to plot
+df <- bed2closestCoor(peaks, read.table(pipe(sprintf("grep -w protein_coding %s | cut -f 1-6", TSS_FILE))))[,c(1:7,11,14)]
+colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "closestGene", "dist_to_closestGeneTSS")
+df <- merge(df, read.table(GENEDENSITY_FILE, header=T)[,c("name", "geneDensityScore", "geneLength", "geneDensityClass")], by.x="closestGene", by.y="name")
+df <- df[,c(2:8,1,9:ncol(df))]
+df$dist_to_closestGeneTSS <- log(abs(df$dist_to_closestGeneTSS)+1) * ifelse(df$dist_to_closestGeneTSS<0, -1, 1)
+df$annot.type <- "promoter"
+df[which(abs(df$dist_to_closestGeneTSS) > log(1000) & abs(df$dist_to_closestGeneTSS) <= log(50000)),]$annot.type <- "proximal"
+df[which(abs(df$dist_to_closestGeneTSS) > log(50000)),]$annot.type <- "distal"
+df$annot.type <- factor(df$annot.type, levels=c("promoter", "proximal", "distal"), ordered=T)
+# table(df$annot.type)
+df$geneDensityClass <- factor(df$geneDensityClass)
+
+brk <- c(min(df$dist_to_closestGeneTSS), -log(50000), -log(1000), 0, log(1000), log(50000), max(df$dist_to_closestGeneTSS))
+lbl_abs <- (table(cut(df$dist_to_closestGeneTSS, 
+                      breaks=c(min(df$dist_to_closestGeneTSS), -log(50000), -log(1000), 0, log(1000), log(50000), max(df$dist_to_closestGeneTSS)), 
+                      labels=c(min(df$dist_to_closestGeneTSS), -log(50000), 0, 0, log(50000), max(df$dist_to_closestGeneTSS))))) %>% as.vector
+lbl_per <- gsub("\\s", "", paste(sprintf("%0.1f", (lbl_abs*100)/nrow(df)), "%"))
+
+## make the plot
+if(length(which(!is.na(df$signalValue))) > 0) {
+    p <- ggplot(df, aes(dist_to_closestGeneTSS, log2(signalValue)))
+    MAX_VAL=round(max(log2(df$signalValue)),0)
+} else {
+    p <- ggplot(df, aes(dist_to_closestGeneTSS, score))
+    MAX_VAL=round(max(log2(df$score)),0)
+}
+
+p1 <- p + geom_point_rast(aes(color=annot.type), alpha=0.2) +
+            stat_density_2d(geom = "polygon", contour = TRUE, aes(fill = after_stat(level)), colour = "black", alpha=0.5, show.legend = F) +
+            scale_fill_distiller(palette = "Reds", direction = 1) + 
+            #xlim(c(-15,15)) + 
+            geom_vline(xintercept = brk, lty=2) +
+            scale_x_continuous(breaks=brk, labels = as.numeric(sprintf("%0.0f", brk))) +
+            #annotate("text", x = c(-10, -5, 0, 5, 10), y = 2, label = lbl,  parse = F, size=3) +  theme_classic2() +
+            annotate("text", x = c(-12.5, -9, 0, 9, 12.5), y = MAX_VAL, label = lbl_abs,  parse = F, size=3) +  
+            annotate("text", x = c(-12.5, -9, 0, 9, 12.5), y = MAX_VAL-(round((MAX_VAL * 5/100),1)), label = paste0("(", lbl_per, ")"),  parse = F, size=3) +
+            theme_classic2() + scale_color_manual(values=c("#440154", "#21908c", "#fde725")) +
+            theme(legend.position="top") + xlab("Distance to closest gene TSS in bp (log)") + ylab("Peak signalValue (Macs2; log2)") +
+            labs(color = "Peak position")
+## peaks proximal to genes are located in gene dense regions (circular argument)
+# p2 <- ggplot(df, aes(x=abs(dist_to_closestGeneTSS), y=log(100/(geneDensityScore)))) + geom_point(aes(color=annot.type)) + theme_bw() +
+#         xlab("Distance b/w peak to closest gene TSS in bp (log)") +
+#         ylab("Gene Density Score (log)")
+# p2 <- ggplot(reshape2::melt(table(df[,c("annot.type", "geneDensityClass")])), aes(x=as.factor(geneDensityClass), y=value, fill=annot.type)) + geom_bar(stat = "identity", position = "fill") +
+#   scale_y_continuous(labels = scales::percent) + theme_classic() + scale_fill_manual(values=c("#440154", "#21908c", "#fde725")) +
+#   xlab("geneDensityClass") + ylab("Density") + labs(fill = "Peak position") + theme(legend.position="top")
+p2 <- ggbarplot(as.data.frame(table(df$geneDensityClass)), x="Var1", y="Freq", fill="Var1") + xlab("geneDensityClass") + ylab("# peaks") + 
+  scale_fill_manual(values=rev(colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(10))) + theme(legend.position="none") +
+  theme(plot.margin = margin(t = 50, r = 5, b = 5, l = 5))
+p3 <- ggecdf(df, x="signalValue", color="geneDensityClass", add="boxplot", xscale="log2") + 
+  scale_color_manual(values=rev(colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(10))) + xlab("Peak signalValue (Macs2; log2)") + ylab("ECDF") +
+  theme(legend.position="none")
+P <- ggarrange(p1, ggarrange(p2, p3, nrow=2, ncol=1, labels=c("B", "C")), nrow=1, ncol=2, labels=c("A", ""), widths = c(3,1))
+
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+## save output files
+##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+ggsave(filename = opt$outFile, plot = P, width = 9, height = 6)
+write.table(df, "", sep="\t", col.names = T, row.names = F, quote = F)
+q()
