@@ -135,13 +135,13 @@ lbl_per <- gsub("\\s", "", paste(sprintf("%0.1f", (lbl_abs*100)/nrow(df)), "%"))
 
 ## make the plot
 if(length(which(!is.na(df$signalValue))) > 0) {
-    df$scoreToPlot <- log2(df$signalValue+1)
+    df$signalValue <- log2(df$signalValue+1)
 } else {
-    df$scoreToPlot <- log2(df$score+1)
+    df$signalValue <- log2(df$score+1)
 }
 
-MAX_VAL=round(max(df$scoreToPlot),0)
-p1 <- ggplot(df, aes(dist_to_closestGeneTSS, scoreToPlot)) +
+MAX_VAL=round(max(df$signalValue),0)
+p1 <- ggplot(df, aes(dist_to_closestGeneTSS, signalValue)) +
             geom_point_rast(aes(color=annot.type), alpha=0.2) +
             stat_density_2d(geom = "polygon", contour = TRUE, aes(fill = after_stat(level)), colour = "black", alpha=0.5, show.legend = F) +
             scale_fill_distiller(palette = "Reds", direction = 1) + 
@@ -154,24 +154,32 @@ p1 <- ggplot(df, aes(dist_to_closestGeneTSS, scoreToPlot)) +
             theme_classic2() + scale_color_manual(values=c("#440154", "#21908c", "#fde725")) +
             theme(legend.position="top") + xlab("Distance to closest gene TSS in bp (log)") + ylab("Peak signalValue (Macs2; log2)") +
             labs(color = "Peak position")
+p2 <- ggplot(df, aes(geneDensityScore, signalValue)) +
+  geom_point_rast(aes(color=annot.type), alpha=0.2) +
+  stat_density_2d(geom = "polygon", contour = TRUE, aes(fill = after_stat(level)), colour = "black", alpha=0.5, show.legend = F) +
+  scale_fill_distiller(palette = "Reds", direction = 1) + 
+  theme_classic2() + scale_color_manual(values=c("#440154", "#21908c", "#fde725")) +
+  theme(legend.position="none") + xlab("Gene density score") + ylab("Peak signalValue (Macs2; log2)") +
+  labs(color = "Peak position") +
+  theme(plot.margin = margin(t = 50, r = 5, b = 5, l = 5))
 ## peaks proximal to genes are located in gene dense regions (circular argument)
-# p2 <- ggplot(df, aes(x=abs(dist_to_closestGeneTSS), y=log(geneDensityScore))) + geom_point(aes(color=annot.type)) + theme_bw() +
+# p3 <- ggplot(df, aes(x=abs(dist_to_closestGeneTSS), y=log(geneDensityScore))) + geom_point(aes(color=annot.type)) + theme_bw() +
 #         xlab("Distance b/w peak to closest gene TSS in bp (log)") +
 #         ylab("Gene Density Score (log)")
-# p2 <- ggplot(reshape2::melt(table(df[,c("annot.type", "geneDensityClass")])), aes(x=as.factor(geneDensityClass), y=value, fill=annot.type)) + geom_bar(stat = "identity", position = "fill") +
+# p3 <- ggplot(reshape2::melt(table(df[,c("annot.type", "geneDensityClass")])), aes(x=as.factor(geneDensityClass), y=value, fill=annot.type)) + geom_bar(stat = "identity", position = "fill") +
 #   scale_y_continuous(labels = scales::percent) + theme_classic() + scale_fill_manual(values=c("#440154", "#21908c", "#fde725")) +
 #   xlab("geneDensityClass") + ylab("Density") + labs(fill = "Peak position") + theme(legend.position="top")
-p2 <- ggbarplot(as.data.frame(table(df$geneDensityClass)), x="Var1", y="Freq", fill="Var1") + xlab("geneDensityClass") + ylab("# peaks") + 
+p3 <- ggbarplot(as.data.frame(table(df$geneDensityClass)), x="Var1", y="Freq", fill="Var1") + xlab("geneDensityClass") + ylab("# peaks") + 
   scale_fill_manual(values=rev(colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(10))) + theme(legend.position="none") +
-  theme(plot.margin = margin(t = 50, r = 5, b = 5, l = 5))
-p3 <- ggecdf(df, x="scoreToPlot", color="geneDensityClass") + 
-  scale_color_manual(values=rev(colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(10))) + xlab("Peak signalValue (Macs2; log2)") + ylab("ECDF") +
-  theme(legend.position="none")
+  theme(plot.margin = margin(t = 5, r = 5, b = 5, l = 5))
+# p4 <- ggecdf(df, x="signalValue", color="geneDensityClass") + 
+#   scale_color_manual(values=rev(colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(10))) + xlab("Peak signalValue (Macs2; log2)") + ylab("ECDF") +
+#   theme(legend.position="none")
 P <- ggarrange(p1, ggarrange(p2, p3, nrow=2, ncol=1, labels=c("B", "C")), nrow=1, ncol=2, labels=c("A", ""), widths = c(3,1))
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## save output files
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ggsave(filename = opt$outFile, plot = P, width = 9, height = 6)
-write.table(df[,-(ncol(df))], "", sep="\t", col.names = T, row.names = F, quote = F)
+write.table(df, "", sep="\t", col.names = T, row.names = F, quote = F)
 q()
