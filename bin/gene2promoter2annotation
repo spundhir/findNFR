@@ -227,7 +227,7 @@ GENE_DENSITY_FILE=$(initialize_genome -i $FINDNFRPATH/data/annotations/GENOME_FI
 if [ ! -z "$GENE_DENSITY_FILE" ]; then
     >&2 echo -n "Determine gene density (`date`).. "
     echo -ne "\tgeneDensity"
-    join -1 4 -2 1 -a 1 -e NA <(tabEdit -i ${PROMOTER_FILE} -D | sort -k 4,4) <(tabEdit -i ${GENE_DENSITY_FILE} -D | cut -f 4,8 | sort -k 1,1) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";' | tabEdit -i stdin -n 11 > ${TMP}.geneDensity
+    join -1 4 -2 1 -a 1 -e NA <(tabEdit -i ${PROMOTER_FILE} -D | sort -k 4,4) <(tabEdit -i ${GENE_DENSITY_FILE} -D | cut -f 4,10 | sort -k 1,1) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[0]"; foreach(@F[4..scalar(@F)-1]) { print "\t$_"; } print "\n";' | tabEdit -i stdin -n 11 > ${TMP}.geneDensity
     >&2 echo "done"
 fi
 

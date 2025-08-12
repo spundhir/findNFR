@@ -106,7 +106,7 @@ fi | tabEdit -i stdin -n 7 > ${TMP}.bed
 >&2 echo -n "Compute peak distance to closest gene TSS (protein coding) (`date`).. "
 ## chr start end name score strand signalValue gene dist_to_geneTSS gene2geneDist
 closestBed -a <(sortBed -i ${TMP}.bed | bed2window -i stdin -w 1) -b <(grep -w protein_coding ${TSS_FILE} | cut -f 1-6 | sortBed -i stdin) -D b -t first | cut -f 1-7,11,14 > ${TMP}.spatial
-join -a 1 -1 8 -2 1 <(sort -k 8,8 ${TMP}.spatial) <(cut -f 4,7 ${GENEDIST_FILE} | sort -k 1,1) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[0]\t$F[8]\t$F[9]\n";' | tabEdit -i stdin -n 10 > ${TMP}.spatial.tmp
+join -a 1 -1 8 -2 1 <(sort -k 8,8 ${TMP}.spatial) <(cut -f 4,10 ${GENEDIST_FILE} | sort -k 1,1) | perl -ane 'print "$F[1]\t$F[2]\t$F[3]\t$F[4]\t$F[5]\t$F[6]\t$F[7]\t$F[0]\t$F[8]\t$F[9]\n";' | tabEdit -i stdin -n 10 > ${TMP}.spatial.tmp
 mv ${TMP}.spatial.tmp ${TMP}.spatial
 cat ${TMP}.spatial | peak2spatialAna.R -i stdin -o ${OUTDIR}/peaks.spatial.pdf > ${OUTDIR}/peaks.spatial
 >&2 echo "done"
