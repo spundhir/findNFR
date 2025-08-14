@@ -103,15 +103,15 @@ zless ${TMP}.bed | perl -ane 'BEGIN { $counter=1; } if($F[5]!~/^\+$/ && $F[5]!~/
 ## perform giggle enrichment analysis
 TARGET_TOTAL=$(zcat ${TMP}.bed.gz | wc -l)
 if [ -d "$ATAC_DIR" -a "$DATABASE" == "atac" ]; then
-    giggle search -i $ATAC_DIR -q ${TMP}.bed.gz -s -f 05 | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' | body sort -k 8rg,8
+    giggle search -i $ATAC_DIR -q ${TMP}.bed.gz -s -f 05 | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 elif [ -d "$JASPAR_DIR" -a "$DATABASE" == "jaspar" ]; then
-    giggle search -i $JASPAR_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' | body sort -k 8rg,8
+    giggle search -i $JASPAR_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 elif [ -d "$GTRD_DIR" -a "$DATABASE" == "gtrd" ]; then
-    giggle search -i $GTRD_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' |  body sort -k 8rg,8
+    giggle search -i $GTRD_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 elif [ -d "$UNIBIND_DIR" -a "$DATABASE" == "unibind" ]; then
-    giggle search -i $UNIBIND_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' | body sort -k 8rg,8
+    giggle search -i $UNIBIND_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 elif [ -d "$HOMER_DIR" -a "$DATABASE" == "homer" ]; then
-    giggle search -i $HOMER_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }' | body sort -k 8rg,8
+    giggle search -i $HOMER_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 else
     echo
     usage
