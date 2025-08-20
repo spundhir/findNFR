@@ -22,11 +22,11 @@ usage() {
 	echo "[OPTIONS]"
 	echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
 	echo " -d <string> [database to query (atac, jaspar, gtrd, unibind; default: unibind)]"
-	echo " -c <int>    [number of top hits to analyze from each sample (default: 10)]"
-	echo " -f          [also filter based on -x, -y and -z (default=only -c)]"
+	echo " -f          [also filter based on -x, -y and -z (default=only variation)]"
 	echo " -x <float>  [p-value cutoff (default: 1e-15)]"
 	echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
 	echo " -z <float>  [minimum odds ratio (default: 2)]"
+	echo " -c <int>    [number of top hits to plot from each sample (default: 10)]"
 	echo " -l <string> [name of overlaps(s) that must be included in the final output]"
 	echo "             [if multiple, separate them by a comma]"
 	echo " -q          [plot quantile normalized data (default=raw)]"
@@ -36,17 +36,17 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:g:d:c:fx:y:z:l:qh ARG; do
+while getopts i:o:g:d:fx:y:z:c:l:qh ARG; do
 	case "$ARG" in
 	i) INDIR=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         g) GENOME=$OPTARG;;
         d) DATABASE=$OPTARG;;
-        c) NHITS=$OPTARG;;
         f) FILTER_PVAL=1;;
         x) PVALUE=$OPTARG;;
         y) MIN_OVERLAP=$OPTARG;;
         z) ODDS_RATIO=$OPTARG;;
+        c) NHITS=$OPTARG;;
         l) MUST_INCLUDE=$OPTARG;;
         q) QNORM=1;;
         h) HELP=1;;

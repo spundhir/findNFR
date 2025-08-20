@@ -7,18 +7,18 @@ suppressPackageStartupMessages(library("optparse"))
 option_list <- list(
   make_option(c("-i", "--inFile"), help="input file containing tf enrichment dynamics (can be stdin)"),
   make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
-  make_option(c("-c", "--topN"), default=10, help="number of top overlaps to analyze from each sample (default=%default)"),
   make_option(c("-f", "--filterPval"), action="store_true", help="filter based on -x, -y and -z (default=%default)"),
   make_option(c("-x", "--pVal"), default=1e-15, help="p-value cutoff (default=%default)"),
   make_option(c("-y", "--minOverlap"), default=50, help="minimum frequency of overlaps in each class (default=%default)"),
   make_option(c("-z", "--minOddsRatio"), default=2, help="minimum odds ratio of at least one class (default=%default)"),
+  make_option(c("-c", "--topN"), default=10, help="number of top hits to plot from each sample (default=%default)"),
   make_option(c("-l", "--mustInclude"), help="name of overlap(s) that must be included in the final output (if multiple, separate them by a comma)"),
   make_option(c("-q", "--quaNorm"), action="store_true", help="plot quantile normalized data (default=%default)"),
   make_option(c("-b", "--colorBias"), default=1, help="bias in color (default=%default)"),
   make_option(c("-R", "--clusterRows"), default=T, help="cluster rows in the heatmap (default=%default)"),
   make_option(c("-C", "--clusterCols"), default=T, help="cluster columns in the heatmap (default=%default)"),
   make_option(c("-W", "--plotWidth"), default=15, help="width of the heatmap (default=%default)"),
-  make_option(c("-H", "--plotHeight"), default=15, help="height of the heatmap (default=%default)")
+  make_option(c("-H", "--plotHeight"), default=20, help="height of the heatmap (default=%default)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -168,7 +168,8 @@ if(identical(opt$inFile, "stdin")==T) {
     data <- read.table(opt$inFile, header=T)
 }
 # data <- read.table("~/project/misc/julia//multiClassGiggleAna/giggleDynAna/GIGGLE_ENRICHMENT_HOMER.TXT", header=T)
-# opt <- NULL; opt$topN <- 10; opt$pVal <- 1e-15; opt$minOverlap <- 50; opt$minOddsRatio <- 8; opt$clusterRows <- T; opt$clusterCols <- T; opt$colorBias <- 1
+# opt <- NULL; opt$topN <- 10; opt$pVal <- 1e-15; opt$minOverlap <- 50; opt$minOddsRatio <- 8; 
+# opt$clusterRows <- T; opt$clusterCols <- T; opt$colorBias <- 1; opt$topN <- 10
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## organize data frame containing enrichment results
@@ -261,6 +262,8 @@ if(nrow(df_sig)>2) {
     theme(text=element_text(size=10), axis.text.x=element_text(angle=90, vjust = 0.5, hjust=1), legend.position = "bottom")
   
   mat2plot <- matrix(df_sig[,"odds_ratio"], nrow=length(unique(df_sig$name))) %>% as.data.frame() %>% `colnames<-` (unique(df_sig$class)) %>% `rownames<-` (unique(df_sig$name)) %>% round(2)
+  # topN <- intersect(rowSds(as.matrix(mat2plot)) %>% sort(decreasing = T) %>% head(opt$topN) %>% names,
+  #           unique(unlist(lapply(colnames(mat2plot), function(x) mat2plot[order(-mat2plot[,x]),] %>% head(opt$topN) %>% row.names))))
   p2 <- matrix2Heatmap(mat2plot, 
                        scale="row", clusterRows = opt$clusterRows, clusterCols = opt$clusterCols, bias=opt$colorBias, displayN = T)
 
