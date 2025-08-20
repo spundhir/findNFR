@@ -73,9 +73,11 @@ matrix2tau <- function(x)
 ## start analysis based on input genome
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 CURRENT_DIR=getwd()
-setwd("/home/xfd783/data/09_ALL_PUBLIC/database/bgee/rnaseq")
+## EDIT DBDIR TO FOLDER WHERE THE Bgee DATABASE SHOULD BE KEPT
+DBDIR="/home/xfd783/data/09_ALL_PUBLIC/database/bgee/rnaseq"
+setwd(DBDIR)
 if(opt$genome=="mouse" | opt$genome=="mm10") {
-  bgee <- Bgee$new(species = "Mus_musculus", dataType = "rna_seq", pathToData = "/home/xfd783/data/09_ALL_PUBLIC/database/bgee/rnaseq")
+  bgee <- Bgee$new(species = "Mus_musculus", dataType = "rna_seq", pathToData = DBDIR)
   data <- getData(bgee)
   expr <- dcast(as.data.table(data[,c("Gene.ID", "Anatomical.entity.name", "FPKM")]), Gene.ID ~ Anatomical.entity.name, value.var = "FPKM",
                fun.aggregate = function(x) mean(x, na.rm = TRUE))
@@ -92,7 +94,7 @@ if(opt$genome=="mouse" | opt$genome=="mm10") {
   expr$tau <- apply(log2(mat+1), 1, matrix2tau)
   # hist(expr$tau)
 } else if(opt$genome=="human" | opt$genome=="hg38") {
-  bgee <- Bgee$new(species = "Homo_sapiens", dataType = "rna_seq", pathToData = "/home/xfd783/data/09_ALL_PUBLIC/database/bgee/rnaseq")
+  bgee <- Bgee$new(species = "Homo_sapiens", dataType = "rna_seq", pathToData = DBDIR)
   data <- getData(bgee)
   expr <- dcast(as.data.table(data[,c("Gene.ID", "Anatomical.entity.name", "FPKM")]), Gene.ID ~ Anatomical.entity.name, value.var = "FPKM",
                fun.aggregate = function(x) mean(x, na.rm = TRUE))
