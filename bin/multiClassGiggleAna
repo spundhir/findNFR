@@ -6,7 +6,7 @@ DATABASE="unibind"
 NHITS=10
 PVALUE="1e-15"
 MIN_OVERLAP=50
-ODDS_RATIO=8
+ODDS_RATIO=2
 MIN_N_CLASS=1
 
 #### usage ####
@@ -28,7 +28,7 @@ echo Program: "multiClassGiggleAna (perform giggle analysis on genomic regions f
     echo " -f          [also filter based on -x, -y and -z (default=only -c)]"
     echo " -x <float>  [p-value (default: 1e-15)]"
     echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
-    echo " -z <float>  [minimum odds ratio (log) (default: 8)]"
+    echo " -z <float>  [minimum odds ratio (default: 2)]"
     echo " -l <string> [name of overlaps(s) that must be included in the final output]"
     echo "             [if multiple, separate them by a comma]"
     echo " -q          [plot quantile normalized data (default=raw)]"

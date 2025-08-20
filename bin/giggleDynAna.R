@@ -11,7 +11,7 @@ option_list <- list(
   make_option(c("-f", "--filterPval"), action="store_true", help="filter based on -x, -y and -z (default=%default)"),
   make_option(c("-x", "--pVal"), default=1e-15, help="p-value cutoff (default=%default)"),
   make_option(c("-y", "--minOverlap"), default=50, help="minimum frequency of overlaps in each class (default=%default)"),
-  make_option(c("-z", "--minOddsRatio"), default=1, help="minimum odds ratio (log) of at least one class (default=%default)"),
+  make_option(c("-z", "--minOddsRatio"), default=2, help="minimum odds ratio of at least one class (default=%default)"),
   make_option(c("-l", "--mustInclude"), help="name of overlap(s) that must be included in the final output (if multiple, separate them by a comma)"),
   make_option(c("-q", "--quaNorm"), action="store_true", help="plot quantile normalized data (default=%default)"),
   make_option(c("-b", "--colorBias"), default=1, help="bias in color (default=%default)"),

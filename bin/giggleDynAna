@@ -6,7 +6,7 @@ DATABASE="unibind"
 NHITS=10
 PVALUE="1e-15"
 MIN_OVERLAP=50
-ODDS_RATIO=8
+ODDS_RATIO=2
 
 #### usage ####
 usage() {
@@ -26,7 +26,7 @@ usage() {
 	echo " -f          [also filter based on -x, -y and -z (default=only -c)]"
 	echo " -x <float>  [p-value cutoff (default: 1e-15)]"
 	echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
-	echo " -z <float>  [minimum odds ratio (log) (default: 8)]"
+	echo " -z <float>  [minimum odds ratio (default: 2)]"
 	echo " -l <string> [name of overlaps(s) that must be included in the final output]"
 	echo "             [if multiple, separate them by a comma]"
 	echo " -q          [plot quantile normalized data (default=raw)]"
