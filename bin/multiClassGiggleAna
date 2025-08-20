@@ -25,13 +25,13 @@ echo Program: "multiClassGiggleAna (perform giggle analysis on genomic regions f
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
     echo " -d <string> [database to query (atac, jaspar, gtrd, unibind, homer; default: unibind)]"
     echo " -c <int>    [number of top hits to analyze from each sample (default: 10)]"
-    echo " -f          [also filter based on -x, -y and -z (defaut=only -c)]"
+    echo " -f          [also filter based on -x, -y and -z (default=only -c)]"
     echo " -x <float>  [p-value (default: 1e-15)]"
     echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
     echo " -z <float>  [minimum odds ratio (log) (default: 8)]"
     echo " -l <string> [name of overlaps(s) that must be included in the final output]"
     echo "             [if multiple, separate them by a comma]"
-    echo " -q          [plot quantile normalized data (defaut=raw)]"
+    echo " -q          [plot quantile normalized data (default=raw)]"
     echo " -n <int>    [minimum number of elements within each region class to plot (default: 1)]"
 	echo " -h          [help]"
 	echo
@@ -163,6 +163,8 @@ fi
 
 if [ "$CLASS_COUNT" -gt 1 ]; then
     GIGGLEDIR_ALL=$(echo $GIGGLEDIR_ALL | perl -ane '$_=~s/^\,//g; print $_;')
+    mkdir -p $OUTDIR/giggleDynAna
+    echo "giggleDynAna -i $GIGGLEDIR_ALL -o $OUTDIR/giggleDynAna -g ${GENOME} -d ${DATABASE} -c ${NHITS} -x ${PVALUE} -y ${MIN_OVERLAP} -z ${ODDS_RATIO} ${ADDITIONAL_ARGUMENT}" > $OUTDIR/giggleDynAna/giggleDynAnaParameters.txt
     giggleDynAna -i $GIGGLEDIR_ALL -o $OUTDIR/giggleDynAna -g ${GENOME} -d ${DATABASE} -c ${NHITS} -x ${PVALUE} -y ${MIN_OVERLAP} -z ${ODDS_RATIO} ${ADDITIONAL_ARGUMENT}
 else
     echo "Only one class is found. Not performing differential giggle enrichment analysis using giggleDynAna" 
