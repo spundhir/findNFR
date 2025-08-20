@@ -38,7 +38,8 @@ suppressPackageStartupMessages(library(biomaRt))
 ## load custom functions
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ##-----------------------------------------##
-# Calculate tau index (cell type specificity)
+## Calculate tau index (cell type specificity)
+## Paper: https://academic.oup.com/bib/article/18/2/205/2562739
 ##-----------------------------------------##
 #Function require a vector with expression of one gene in different tissues.
 #If expression for one tissue is not known, gene specificity for this gene is NA
