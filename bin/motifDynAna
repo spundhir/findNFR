@@ -115,23 +115,23 @@ echo "done"
 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 if [ "$GENOME" == "mm9" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm9.genome"
-    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/mouse.mm9.simpleRepeat.gz"
     GENOME_MOTIF="mm9r"
 elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg19.genome"
-    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
 elif [ "$GENOME" == "mm10" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm10.genome"
-    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/mouse.mm10.simpleRepeat.gz"
     GENOME_MOTIF="mm10r"
 elif [ "$GENOME" == "hg38" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg38.genome"
-    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/human.hg38.simpleRepeat.gz"
     GENOME_MOTIF="hg38r"
 elif [ "$GENOME" == "danRer7" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/zebrafish.danRer7.genome"
-    REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/zebrafish.danRer7.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/zebrafish.danRer7.simpleRepeat.gz"
     GENOME_MOTIF="danRer7r"
 else
     echo "Presently the program only support analysis for mm9, hg19 or danRer7"
