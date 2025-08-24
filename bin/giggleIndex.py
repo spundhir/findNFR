@@ -18,3 +18,5 @@ def main():
 if __name__ == "__main__":
     main()
 
+# index not working
+# https://github.com/ryanlayer/giggle/issues/21

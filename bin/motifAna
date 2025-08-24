@@ -4,11 +4,11 @@
 GENOME="mm9";
 MODE=1;
 ## v1
-#TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/motifCatalog/old_version/jaspar_uniprobe.motifs"
+#TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homerDB/old_version/jaspar_uniprobe.motifs"
 ## v2
-#TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/motifCatalog/old_version/jaspar_uniprobe_jolma.motifs"
+#TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homerDB/old_version/jaspar_uniprobe_jolma.motifs"
 ## v3
-#TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/motifCatalog/old_version/hocomoco_mouse.motifs"
+#TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homerDB/old_version/hocomoco_mouse.motifs"
 LIST="1,2"
 PROCESSOR=1
 LENGTH="8,10,12" ## recommended 7,8,9,10,11,12,13,14 (Andersson et al. 2014)
@@ -132,7 +132,7 @@ if [ "$GENOME" == "mm9" ]; then
     REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/mouse.mm9.simpleRepeat.gz"
     GENOME_MOTIF="mm9r"
     if [ -z "$TFBS_FILE" ]; then
-        TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/motifCatalog/2024_version/2024_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
+        TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homerDB/2024_version/2024_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
     fi
     GTRD_DIR=""
     UNIBIND_DIR=""
@@ -141,7 +141,7 @@ elif [ "$GENOME" == "hg19" ]; then
     REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
     if [ -z "$TFBS_FILE" ]; then
-        TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/motifCatalog/2024_version/2024_tf_jaspar_hocomocoHuman_eukaryote.homer"
+        TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homerDB/2024_version/2024_tf_jaspar_hocomocoHuman_eukaryote.homer"
     fi
     GTRD_DIR=""
     UNIBIND_DIR=""
@@ -150,7 +150,7 @@ elif [ "$GENOME" == "mm10" ]; then
     REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/mouse.mm10.simpleRepeat.gz"
     GENOME_MOTIF="mm10r"
     if [ -z "$TFBS_FILE" ]; then
-        TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/motifCatalog/2024_version/2024_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
+        TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homerDB/2024_version/2024_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
     fi
     GTRD_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/gtrd/v21.12/mm10/giggle/"
     UNIBIND_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/unibind/v2022/mm10/giggle/"
@@ -159,7 +159,7 @@ elif [ "$GENOME" == "hg38" ]; then
     REPEAT_FILE="/home/xfd783/genomes/annotations/REPEATS/human.hg38.simpleRepeat.gz"
     GENOME_MOTIF="hg38r"
     if [ -z "$TFBS_FILE" ]; then
-        TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/motifCatalog/2024_version/2024_tf_jaspar_hocomocoHuman_eukaryote.homer"
+        TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homerDB/2024_version/2024_tf_jaspar_hocomocoHuman_eukaryote.homer"
     fi
     GTRD_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/gtrd/v21.12/hg38/giggle/"
     UNIBIND_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/unibind/v2022/hg38/giggle/"

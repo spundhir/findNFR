@@ -74,7 +74,7 @@ matrix2tau <- function(x)
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 CURRENT_DIR=getwd()
 ## EDIT DBDIR TO FOLDER WHERE THE Bgee DATABASE SHOULD BE KEPT
-DBDIR="/home/xfd783/data/09_ALL_PUBLIC/database/expressionCatalog/bgee/rnaseq"
+DBDIR="/home/xfd783/data/09_ALL_PUBLIC/database/01_expressionCatalog/bgee/rnaseq"
 setwd(DBDIR)
 if(opt$genome=="mouse" | opt$genome=="mm10") {
   bgee <- Bgee$new(species = "Mus_musculus", dataType = "rna_seq", pathToData = DBDIR)
