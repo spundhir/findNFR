@@ -251,6 +251,9 @@ geneCluster <- geneCluster %>% group_by(cluster) %>% summarise(chr = unique(chr,
                                                 iScore = paste(sprintf("%0.2f", iScore), collapse = ","),
                                                 strand = "."
                                                 ) %>% dplyr::select(c("chr", "start", "end", "gene", "iScore", "strand", "cluster")) %>% dplyr::arrange(chr, start, end)
+geneCluster <- geneCluster %>% mutate(id = sprintf("%s_%s_%s", chr, start, end),
+                                        geneCount=unlist(lapply(strsplit(gene, ","), function(x) length(x))),
+                                        domainLength = end-start)
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## write gene domains to file
