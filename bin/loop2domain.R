@@ -9,7 +9,8 @@ option_list <- list(
   make_option(c("-i", "--inFile"), help = "input file containing gene interaction info (chr start end target_gene(s) iScore(s) strand #sample(s)"),
   make_option(c("-g", "--genome"), default = "mm10", help = "genome for which to perform the analysis (mm10, hg38; default: mm10)"),
   make_option(c("-p", "--processors"), default = 1, help = "number of processors to use (default: %default)"),
-  make_option(c("-n", "--name"), help = "string, which will be used to name output files (default: inFile)")
+  make_option(c("-n", "--name"), help = "string, which will be used to name output files (default: inFile)"),
+  make_option(c("-c", "--chatGPT"), action="store_true", help = "use chatGPT code")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list = option_list)
@@ -101,10 +102,11 @@ bed2overlap <- function(df, bed_file, win_flank = 0, minOverlap = 1, selectFirst
 ## read input file
 ## @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 if (identical(opt$inDistFile, "stdin") == T) {
-  df <- read.table(file("stdin"), header = T)
+  df <- fread(file("stdin"), header = T)
 } else {
-  df <- read.table(opt$inFile, header = T)
+  df <- fread(opt$inFile, header = T)
 }
+# df <- fread("~/data/09_ALL_PUBLIC/database/05_loopCatalog/mm10/loops_5k.bed", header = FALSE)
 colnames(df) <- c("chr", "start", "end", "targetGene", "iScore", "strand", "sampleCount")
 
 ## @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
@@ -176,34 +178,81 @@ if (opt$genome == "mm10") {
 ## @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## organize the gene co-interaction matrix
 ## @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-dfO <- bed2overlap(df, df, minOverlap = 5000)
+if(is.null(opt$chatGPT)) {
+  dfO <- bed2overlap(df, df, minOverlap = 5000)
+  
+  dl <- mclapply(GENES, function(GENE) {
+    # df[grepl(sprintf("(^|,)%s(,|$)", GENE), df$targetGene),c("targetGene","iScore")] %>% separate_longer_delim(cols=c(targetGene,iScore), delim = ",") %>% mutate(iScore=as.numeric(iScore)) %>% summaryBy(formula = iScore ~ targetGene, FUN = "sum") %>% mutate(gene=GENE) %>% 'colnames<-'(c("sGene", "iScore", "qGene")) %>% dplyr::select(c("qGene", "sGene", "iScore"))
+    dfO[which(dfO$name_q == GENE), ] %>%
+      dplyr::mutate(iScore = log(iScore_q * iScore_s)) %>%
+      dplyr::select(targetGene_s, iScore) %>%
+      summaryBy(formula = iScore ~ targetGene_s, FUN = "sum") %>%
+      mutate(gene = GENE) %>%
+      "colnames<-"(c("sGene", "iScore", "qGene")) %>%
+      dplyr::select(c("qGene", "sGene", "iScore"))
+    # dfO[which(dfO$name_q==GENE),] %>% dplyr::mutate(iScore=log(iScore_s)) %>% dplyr::select(targetGene_s, iScore) %>% summaryBy(formula = iScore ~ targetGene_s, FUN = "sum") %>% mutate(gene=GENE) %>% 'colnames<-'(c("sGene", "iScore", "qGene")) %>% dplyr::select(c("qGene", "sGene", "iScore"))
+  }, mc.cores = opt$processors, mc.set.seed = 5)
+  
+  ## Combine all into one table
+  dt <- rbindlist(dl)
+  
+  ## Get unique genes
+  all_genes <- unique(dt$qGene)
+  
+  # Initialize matrix
+  mat <- matrix(NA, length(all_genes), length(all_genes), dimnames = list(all_genes, all_genes))
+  
+  # Fill
+  mat[cbind(dt$qGene, dt$sGene)] <- dt$iScore
+  
+  mat <- mat[GENE_SORTED, GENE_SORTED]
+  mat.norm <- sweep(mat, 1, diag(as.matrix(mat)), "/") ## IMP STEP
+} else {
+  ## @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+  ## chat-GPT suggested code
+  ## @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
+  # Create unique region ID
+  df[, region_id := paste(chr, start, end, sep = "_")]
 
-dl <- mclapply(GENES, function(GENE) {
-  # df[grepl(sprintf("(^|,)%s(,|$)", GENE), df$targetGene),c("targetGene","iScore")] %>% separate_longer_delim(cols=c(targetGene,iScore), delim = ",") %>% mutate(iScore=as.numeric(iScore)) %>% summaryBy(formula = iScore ~ targetGene, FUN = "sum") %>% mutate(gene=GENE) %>% 'colnames<-'(c("sGene", "iScore", "qGene")) %>% dplyr::select(c("qGene", "sGene", "iScore"))
-  dfO[which(dfO$name_q == GENE), ] %>%
-    dplyr::mutate(iScore = log(iScore_q * iScore_s)) %>%
-    dplyr::select(targetGene_s, iScore) %>%
-    summaryBy(formula = iScore ~ targetGene_s, FUN = "sum") %>%
-    mutate(gene = GENE) %>%
-    "colnames<-"(c("sGene", "iScore", "qGene")) %>%
-    dplyr::select(c("qGene", "sGene", "iScore"))
-  # dfO[which(dfO$name_q==GENE),] %>% dplyr::mutate(iScore=log(iScore_s)) %>% dplyr::select(targetGene_s, iScore) %>% summaryBy(formula = iScore ~ targetGene_s, FUN = "sum") %>% mutate(gene=GENE) %>% 'colnames<-'(c("sGene", "iScore", "qGene")) %>% dplyr::select(c("qGene", "sGene", "iScore"))
-}, mc.cores = opt$processors, mc.set.seed = 5)
+  # --- targetGene pairs (shared regions) ---
+  pairs <- df[, .(targetGenes = list(targetGene), iScore = unique(iScore)), by = region_id]
 
-## Combine all into one table
-dt <- rbindlist(dl)
+  # Expand to all targetGene pairs
+  targetGene_pairs <- pairs[, {
+    g <- targetGenes[[1]]
+    if(length(g) > 1) {
+      comb <- t(combn(g, 2))
+      data.table(targetGene1 = comb[,1], targetGene2 = comb[,2], iScore = iScore)
+    } else NULL
+  }, by = region_id]
 
-## Get unique genes
-all_genes <- unique(dt$qGene)
+  # Sum iScores for shared regions
+  co_reg <- targetGene_pairs[, .(weight = sum(iScore)), by = .(targetGene1,targetGene2)]
 
-# Initialize matrix
-mat <- matrix(NA, length(all_genes), length(all_genes), dimnames = list(all_genes, all_genes))
+  # --- Self-connections (diagonal) ---
+  self_reg <- df[, .(weight = sum(iScore)), by = targetGene]
+  setnames(self_reg, "targetGene", "targetGene1")
+  self_reg[, targetGene2 := targetGene1]
 
-# Fill
-mat[cbind(dt$qGene, dt$sGene)] <- dt$iScore
+  # Combine both
+  all_pairs <- rbind(co_reg, self_reg, fill = TRUE)
 
-mat <- mat[GENE_SORTED, GENE_SORTED]
-mat.norm <- sweep(mat, 1, diag(as.matrix(mat)), "/") ## IMP STEP
+  # --- Build symmetric matrix ---
+  all_targetGenes <- unique(df$targetGene)
+  mat <- matrix(0, nrow = length(all_targetGenes), ncol = length(all_targetGenes),
+                dimnames = list(all_targetGenes, all_targetGenes))
+
+  for(i in seq_len(nrow(all_pairs))){
+    g1 <- all_pairs$targetGene1[i]; g2 <- all_pairs$targetGene2[i]; w <- all_pairs$weight[i]
+    mat[g1,g2] <- log(w+1)
+    mat[g2,g1] <- log(w+1)   # symmetric
+  }
+
+  mat <- mat[GENE_SORTED, GENE_SORTED]
+  mat.norm <- sweep(mat, 1, diag(as.matrix(mat)), "/") ## IMP STEP
+  
+  dfO <- all_pairs
+}
 
 ## @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## write matrix to file
