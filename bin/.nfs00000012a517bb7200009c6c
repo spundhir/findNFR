@@ -5,7 +5,7 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 option_list <- list(
-	make_option(c("-g", "--genome"), help="genome (mm10 or hg38; default=%default)")
+	make_option(c("-g", "--genome"), default="mm10", help="genome (mm10 or hg38; default=%default)")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
