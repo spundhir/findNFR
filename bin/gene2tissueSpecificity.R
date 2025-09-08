@@ -44,7 +44,7 @@ suppressPackageStartupMessages(library(biomaRt))
 #Function require a vector with expression of one gene in different tissues.
 #If expression for one tissue is not known, gene specificity for this gene is NA
 #Minimum 2 tissues
-matrix2tau <- function(x)
+vector2tau <- function(x)
 {
   if(all(!is.na(x)))
   {
@@ -91,7 +91,7 @@ if(opt$genome=="mouse" | opt$genome=="mm10") {
   expr <- expr[which(expr$gene_biotype=="protein_coding"),]
   mat <- expr[,c(8:ncol(expr))]
   # mat <- expr[,c(grep(paste(c("cerebellum", "cerebral_cortex", "heart", "right_kidney", "liver", "lung", "placenta", "intestine", "spleen", "testis", "thymus", "adrenal", "bladder", "colon", "duodenum", "flobe", "gfat", "lgintestine", "mamgland", "ovary", "sfat", "stomach"), collapse = "|"), colnames(expr), value=T))]
-  expr$tau <- apply(log2(mat+1), 1, matrix2tau)
+  expr$tau <- apply(log2(mat+1), 1, vector2tau)
   # hist(expr$tau)
 } else if(opt$genome=="human" | opt$genome=="hg38") {
   bgee <- Bgee$new(species = "Homo_sapiens", dataType = "rna_seq", pathToData = DBDIR)
@@ -108,7 +108,7 @@ if(opt$genome=="mouse" | opt$genome=="mm10") {
   expr <- expr[which(expr$gene_biotype=="protein_coding"),]
   mat <- expr[,c(8:ncol(expr))]
   # mat <- expr[,c(grep(paste(c("cerebellum", "cerebral_cortex", "heart", "right_kidney", "liver", "lung", "placenta", "intestine", "spleen", "testis", "thymus", "adrenal", "bladder", "colon", "duodenum", "flobe", "gfat", "lgintestine", "mamgland", "ovary", "sfat", "stomach"), collapse = "|"), colnames(expr), value=T))]
-  expr$tau <- apply(log2(mat+1), 1, matrix2tau)
+  expr$tau <- apply(log2(mat+1), 1, vector2tau)
   # hist(expr$tau)
 }
 expr[expr == ""] <- NA
