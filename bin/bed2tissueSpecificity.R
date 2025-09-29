@@ -90,7 +90,7 @@ if(length(grep("FALSE", unlist(lapply(df[1,], function(x) is.na(suppressWarnings
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## start analysis based on input bed file
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-if(opt$useMeuleman==F) {
+if(is.null(opt$useMeuleman)) {
     dfE <- cbind((df %>% separate_longer_delim(score, delim = ",") %>% dplyr::select(!tissue)), (df %>% separate_longer_delim(tissue, delim = ",") %>% dplyr::select(tissue)))
     mat <- matrix(0, length(unique(dfE$name)), length(unique(dfE$tissue)), dimnames = list(unique(dfE$name), unique(dfE$tissue)))
     mat[cbind(dfE$name, dfE$tissue)] <- as.numeric(dfE$score)
