@@ -75,7 +75,7 @@ CPG_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -c", opt
 ## closest/target gene information
 # df <- bed2closestCoor(peaks, read.table(pipe(sprintf("grep -w protein_coding %s | cut -f 1-6", TSS_FILE))), strandAware = T)[,c(1:7,11,14)]
 # colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "closest_gene", "dist_to_closest_gene")
-df <- merge(peaks, linkDHS2Genes(bed2window(peaks, win = 250, flank_to_tss = F), genome = opt$genome, useLoops = F)[,c("name", "closest_gene", "dist_to_closest_gene")],
+df <- merge(peaks, linkDHS2Genes(bed2window(peaks, win = 250, flank_to_tss = F), genome = opt$genome, useLoops = F, strandAware = T)[,c("name", "closest_gene", "dist_to_closest_gene")],
             by.x="name", by.y="name")
 df <- df[,c(2:4,1,5:ncol(df))]
 df <- merge(df, linkDHS2Genes(bed2window(peaks, win = 250, flank_to_tss = F), genome = opt$genome, useLoops = T, minoverlap = 100)[,c("name", "target_gene", "cInteraction_score", "dist_to_target_gene")],
