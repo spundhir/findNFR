@@ -85,17 +85,22 @@ if(length(grep("FALSE", unlist(lapply(df[1,], function(x) is.na(suppressWarnings
     df <- df[,c(1:7)]
     colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "tissue")
 }
-#df <- read.table(opt$inFile)[,c(1:7)] %>% 'colnames<-'(c("chr", "start", "end", "name", "score", "strand", "tissue"))
+#df <- read.table(pipe("zcat /home/xfd783/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/chipAtlas/hg38/hg38_atac_tissueSpecificity.bed.gz | head -n 10"), header=T)[,c(1:7)] %>% 'colnames<-'(c("chr", "start", "end", "name", "score", "strand", "tissue"))
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## start analysis based on input bed file
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 if(is.null(opt$useMeuleman)) {
     dfE <- cbind((df %>% separate_longer_delim(score, delim = ",") %>% dplyr::select(!tissue)), (df %>% separate_longer_delim(tissue, delim = ",") %>% dplyr::select(tissue)))
+    dfE <- aggregate(as.numeric(score) ~ chr + start + end + name + strand + tissue, dfE, FUN = mean) %>% 
+              'colnames<-'(c("chr", "start", "end", "name", "strand", "tissue", "score")) %>% 
+              dplyr::select(c("chr", "start", "end", "name", "score", "strand", "tissue")) %>% 
+              dplyr::arrange(chr, start, end, name)
     mat <- matrix(0, length(unique(dfE$name)), length(unique(dfE$tissue)), dimnames = list(unique(dfE$name), unique(dfE$tissue)))
     mat[cbind(dfE$name, dfE$tissue)] <- as.numeric(dfE$score)
     mat <- as.data.frame(mat)
     mat$tau <- apply(log2(mat+1), 1, vector2tau)
+    mat$meanScore <- rowMeans(mat)
     df <- merge(df, mat, by.x="name", by.y="row.names")
     df <- df[,c(2:4,1,5:ncol(df))]
 } else {

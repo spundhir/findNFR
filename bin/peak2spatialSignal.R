@@ -6,7 +6,7 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 option_list <- list(
-  make_option(c("-i", "--inFile"), help="input file containing peak score (macs2 output)"),
+  make_option(c("-i", "--inFile"), help="input file containing peak score (macs2 output) [format: chr start end name score strand signalValue]"),
   make_option(c("-o", "--outFile"), help="output pdf file"),
   make_option(c("-g", "--genome"), default="mm10", help="genome (mm10 or hg38; default=%default)")
 )
@@ -37,63 +37,7 @@ suppressPackageStartupMessages(library("GenomicRanges"))
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## load custom functions
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-## flank bed file coordinates
-bed2window <- function(df_bed, win=500, flank_to_tss=F) {
-  # df_bed: a data frame with genomic coordinates information in bed format
-  if(flank_to_tss==T) {
-    df_bed[,2] <- unlist(lapply(1:nrow(df_bed), function(x) { if(grepl("\\-", df_bed[x,6])) { df_bed[x,3]; } else { df_bed[x,2]; }}))
-    df_bed[,3] <- df_bed[,2] + win
-    df_bed[,2] <- df_bed[,2] - win
-  } else {
-    df_bed[,2] <- unlist(lapply(1:nrow(df_bed), function(x) round((df_bed[x,2]+df_bed[x,3])/2, 0)))
-    df_bed[,3] <- df_bed[,2] + win
-    df_bed[,2] <- df_bed[,2] - win
-  }
-  return(df_bed)
-}
-
-## find closest bed coordinate
-bed2closestCoor <- function(df_q, df_s) {
-  ## query coordinate (format: chr start end name)
-  ## subject coordinate (format: chr start end name score) NOTE: can also be bed file
-  colnames(df_q)[1:3] <- c("chr", "start", "end")
-  colnames(df_q) <- sprintf("%s_q", colnames(df_q))
-
-  query = makeGRangesFromDataFrame(df_q[,c("chr_q", "start_q", "end_q")],
-                                   seqnames.field = "chr_q", start.field = "start_q", end.field = "end_q",
-                                   keep.extra.columns = T, ignore.strand = T)
-
-  if(!is.data.frame(df_s)) {
-    df_s <- read.table(pipe(sprintf("grep -v start %s", df_s)), header=F)
-  }
-
-  colnames(df_s)[1:6] <- c("chr", "start", "end", "name", "score", "strand")
-  colnames(df_s) <- sprintf("%s_s", colnames(df_s))
-
-  subject = makeGRangesFromDataFrame(df_s,
-                                     seqnames.field = "chr_s", start.field = "start_s", end.field = "end_s",
-                                     keep.extra.columns = T, ignore.strand = F)
-
-  df_res <- data.frame(nearest(query, subject))
-  df_res <- df_s[df_res$nearest.query..subject.,]
-
-  df_res <- cbind(df_q, df_res)
-  row.names(df_res) <- row.names(df_q)
-
-  df_res$distance <- unlist(lapply(seq(1:nrow(df_res)), function(i) {
-    if(is.na(df_res[i,]$end_s)) {
-      NA;
-    } else if(df_res[i,]$strand_s=="-") {
-      df_res[i,]$start_s-df_res[i,]$start_q;
-    } else if(df_res[i,]$strand_s=="+") {
-      df_res[i,]$start_q-df_res[i,]$start_s;
-    } else {
-      abs(df_res[i,]$start_q-df_res[i,]$start_s);
-    }
-  }))
-
-  return(df_res)
-}
+suppressPackageStartupMessages(source("~/software/myScripts/rScripts/FUNCTIONS.R"))
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## initialize input files based on genome
@@ -105,11 +49,23 @@ if(identical(opt$inFile, "stdin")==T) {
     peaks <- read.table(opt$inFile)[,c(1:7)]
 }
 # peaks <- read.table("~/data/00_ALL_CHIP-SEQ_RAW/MLL-AF9/six1_on_peaks.bed", header=F)
-peaks <- bed2window(peaks, win = 1, flank_to_tss = F)
+peaks <- bed2window(peaks, win = 0, flank_to_tss = F)
 colnames(peaks) <- c("chr", "start", "end", "name", "score", "strand", "signalValue")
+
+## reformat peak file to ensure correct format of signal values
+if(length(which(!is.na(peaks$signalValue))) > 0 & is.numeric(peak$signalValue)) {
+  peak$signalValue <- log2(peak$signalValue+1)
+} else if(length(which(!is.na(peaks$score))) > 0 & is.numeric(peak$score)) {
+  peak$signalValue <- log2(peak$score+1)
+} else {
+  cat("ERROR: no score column found\n");
+  print_help(parser)
+}
+
 GENOME_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s", opt$genome), intern=T)
 TSS_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -t", opt$genome), intern=T)
 GENEDENSITY_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -M", opt$genome), intern=T)
+TISSUESPECIFICITY_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -S", opt$genome), intern=T)
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## start analysis
@@ -134,12 +90,6 @@ lbl_abs <- (table(cut(df$dist_to_closestGeneTSS,
 lbl_per <- gsub("\\s", "", paste(sprintf("%0.1f", (lbl_abs*100)/nrow(df)), "%"))
 
 ## make the plot
-if(length(which(!is.na(df$signalValue))) > 0) {
-    df$signalValue <- log2(df$signalValue+1)
-} else {
-    df$signalValue <- log2(df$score+1)
-}
-
 MAX_VAL=round(max(df$signalValue),0)
 p1 <- ggplot(df, aes(dist_to_closestGeneTSS, signalValue)) +
             geom_point_rast(aes(color=annot.type), alpha=0.2) +
