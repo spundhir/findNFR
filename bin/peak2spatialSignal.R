@@ -105,10 +105,15 @@ df[which(abs(df$dist_to_closest_gene) > log(50000)),]$annot.type <- "distal"
 df$annot.type <- factor(df$annot.type, levels=c("promoter", "proximal", "distal"), ordered=T)
 # table(df$annot.type)
 
-df %>% separate_longer_delim(dist_to_target_gene, ",") %>% 
-  mutate(dist_to_target_gene = log(as.numeric(dist_to_target_gene)+1)) %>% 
-  mutate(dist_to_closest_gene = (abs(dist_to_closest_gene)+1)) %>% 
-  ggscatter(x="dist_to_target_gene", y="dist_to_closest_gene")
+## class defined based on distance to closest gene
+df$distClass <- cut2(abs(df$dist_to_closest_gene), cuts=log(c(0, 1000, 2500, 5000, 10000, 50000, 100000, 500000, 1000000, 40000000)), levels.mean = T)
+levels(df$distClass) <- sprintf("%s_%s", seq(1,length(levels(df$distClass))), round(as.numeric(gsub("\\s+", "", levels(df$distClass)))))
+# table(df$distClass)
+
+# df %>% separate_longer_delim(dist_to_target_gene, ",") %>% 
+#   mutate(dist_to_target_gene = log(as.numeric(dist_to_target_gene)+1)) %>% 
+#   mutate(dist_to_closest_gene = (abs(dist_to_closest_gene)+1)) %>% 
+#   ggscatter(x="dist_to_target_gene", y="dist_to_closest_gene")
 
 brk <- c(min(df$dist_to_closest_gene), -log(50000), -log(1000), 0, log(1000), log(50000), max(df$dist_to_closest_gene))
 lbl_abs <- (table(cut(df$dist_to_closest_gene, 
