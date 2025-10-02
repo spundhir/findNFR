@@ -70,34 +70,33 @@ TISSUESPECIFICITY_FILE <- system(sprintf("source ~/.bashrc && initialize_genome 
 ## start analysis
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## reorganize values to plot
-# df <- bed2closestCoor(peaks, read.table(pipe(sprintf("grep -w protein_coding %s | cut -f 1-6", TSS_FILE))))[,c(1:7,11,14)]
-# colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "closestGene", "dist_to_closestGeneTSS")
-df <- merge(peaks, linkDHS2Genes(bed2window(peaks, win = 250, flank_to_tss = F), genome = opt$genome, useLoops = T, minoverlap = 100)[,c("name", "target_gene", "cInteraction_score", "dist_to_target_gene")],
+df <- bed2closestCoor(peaks, read.table(pipe(sprintf("grep -w protein_coding %s | cut -f 1-6", TSS_FILE))), strandAware = T)[,c(1:7,11,14)]
+colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "closest_gene", "dist_to_closest_gene")
+df <- merge(df, linkDHS2Genes(bed2window(peaks, win = 250, flank_to_tss = F), genome = opt$genome, useLoops = T, minoverlap = 100)[,c("name", "target_gene", "cInteraction_score", "dist_to_target_gene")],
   by.x="name", by.y="name")
 df <- df[,c(2:4,1,5:ncol(df))]
-df <- merge(df, linkDHS2Genes(peaks, genome = opt$genome, useLoops = F)[,c("name", "closest_gene", "dist_to_closest_gene")],
-               by.x="name", by.y="name")
+
+df <- merge(df, read.table(GENEDENSITY_FILE, header=T)[,c("name", "geneDensityScore", "geneLength", "geneDensityClass")], by.x="closest_gene", by.y="name")
 df <- df[,c(2:4,1,5:ncol(df))]
 
-df <- merge(df, read.table(GENEDENSITY_FILE, header=T)[,c("name", "geneDensityScore", "geneLength", "geneDensityClass")], by.x="closestGene", by.y="name")
-df <- df[,c(2:8,1,9:ncol(df))]
-df$dist_to_closestGeneTSS <- log(abs(df$dist_to_closestGeneTSS)+1) * ifelse(df$dist_to_closestGeneTSS<0, -1, 1)
+
+df$dist_to_closest_gene <- log(abs(df$dist_to_closest_gene)+1) * ifelse(df$dist_to_closest_gene<0, -1, 1)
 df$annot.type <- "promoter"
-df[which(abs(df$dist_to_closestGeneTSS) > log(1000) & abs(df$dist_to_closestGeneTSS) <= log(50000)),]$annot.type <- "proximal"
-df[which(abs(df$dist_to_closestGeneTSS) > log(50000)),]$annot.type <- "distal"
+df[which(abs(df$dist_to_closest_gene) > log(1000) & abs(df$dist_to_closest_gene) <= log(50000)),]$annot.type <- "proximal"
+df[which(abs(df$dist_to_closest_gene) > log(50000)),]$annot.type <- "distal"
 df$annot.type <- factor(df$annot.type, levels=c("promoter", "proximal", "distal"), ordered=T)
 # table(df$annot.type)
 df$geneDensityClass <- factor(df$geneDensityClass)
 
-brk <- c(min(df$dist_to_closestGeneTSS), -log(50000), -log(1000), 0, log(1000), log(50000), max(df$dist_to_closestGeneTSS))
-lbl_abs <- (table(cut(df$dist_to_closestGeneTSS, 
-                      breaks=c(min(df$dist_to_closestGeneTSS), -log(50000), -log(1000), 0, log(1000), log(50000), max(df$dist_to_closestGeneTSS)), 
-                      labels=c(min(df$dist_to_closestGeneTSS), -log(50000), 0, 0, log(50000), max(df$dist_to_closestGeneTSS))))) %>% as.vector
+brk <- c(min(df$dist_to_closest_gene), -log(50000), -log(1000), 0, log(1000), log(50000), max(df$dist_to_closest_gene))
+lbl_abs <- (table(cut(df$dist_to_closest_gene, 
+                      breaks=c(min(df$dist_to_closest_gene), -log(50000), -log(1000), 0, log(1000), log(50000), max(df$dist_to_closest_gene)), 
+                      labels=c(min(df$dist_to_closest_gene), -log(50000), 0, 0, log(50000), max(df$dist_to_closest_gene))))) %>% as.vector
 lbl_per <- gsub("\\s", "", paste(sprintf("%0.1f", (lbl_abs*100)/nrow(df)), "%"))
 
 ## make the plot
 MAX_VAL=round(max(df$signalValue),0)
-p1 <- ggplot(df, aes(dist_to_closestGeneTSS, signalValue)) +
+p1 <- ggplot(df, aes(dist_to_closest_gene, signalValue)) +
             geom_point_rast(aes(color=annot.type), alpha=0.2) +
             stat_density_2d(geom = "polygon", contour = TRUE, aes(fill = after_stat(level)), colour = "black", alpha=0.5, show.legend = F) +
             scale_fill_distiller(palette = "Reds", direction = 1) + 
@@ -119,7 +118,7 @@ p2 <- ggplot(df, aes(geneDensityScore, signalValue)) +
   labs(color = "Peak position") +
   theme(plot.margin = margin(t = 50, r = 5, b = 5, l = 5))
 ## peaks proximal to genes are located in gene dense regions (circular argument)
-# p3 <- ggplot(df, aes(x=abs(dist_to_closestGeneTSS), y=log(geneDensityScore))) + geom_point(aes(color=annot.type)) + theme_bw() +
+# p3 <- ggplot(df, aes(x=abs(dist_to_closest_gene), y=log(geneDensityScore))) + geom_point(aes(color=annot.type)) + theme_bw() +
 #         xlab("Distance b/w peak to closest gene TSS in bp (log)") +
 #         ylab("Gene Density Score (log)")
 # p3 <- ggplot(reshape2::melt(table(df[,c("annot.type", "geneDensityClass")])), aes(x=as.factor(geneDensityClass), y=value, fill=annot.type)) + geom_bar(stat = "identity", position = "fill") +
