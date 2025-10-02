@@ -33,6 +33,8 @@ suppressPackageStartupMessages(library("ggplot2"))
 suppressPackageStartupMessages(library("ggrastr"))
 suppressPackageStartupMessages(library("ggpubr"))
 suppressPackageStartupMessages(library("GenomicRanges"))
+suppressPackageStartupMessages(library("dplyr"))
+suppressPackageStartupMessages(library("tidyr"))
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## load custom functions
@@ -63,22 +65,38 @@ if(length(which(!is.na(peaks$signalValue))) > 0 & is.numeric(peaks$signalValue))
 
 GENOME_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s", opt$genome), intern=T)
 TSS_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -t", opt$genome), intern=T)
-GENEDENSITY_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -M", opt$genome), intern=T)
 TISSUESPECIFICITY_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -S", opt$genome), intern=T)
+GENEDENSITY_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -M", opt$genome), intern=T)
+CPG_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -c", opt$genome), intern=T)
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## start analysis
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-## reorganize values to plot
-df <- bed2closestCoor(peaks, read.table(pipe(sprintf("grep -w protein_coding %s | cut -f 1-6", TSS_FILE))), strandAware = T)[,c(1:7,11,14)]
-colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "closest_gene", "dist_to_closest_gene")
+## closest/target gene information
+# df <- bed2closestCoor(peaks, read.table(pipe(sprintf("grep -w protein_coding %s | cut -f 1-6", TSS_FILE))), strandAware = T)[,c(1:7,11,14)]
+# colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "closest_gene", "dist_to_closest_gene")
+df <- merge(peaks, linkDHS2Genes(bed2window(peaks, win = 250, flank_to_tss = F), genome = opt$genome, useLoops = F)[,c("name", "closest_gene", "dist_to_closest_gene")],
+            by.x="name", by.y="name")
+df <- df[,c(2:4,1,5:ncol(df))]
 df <- merge(df, linkDHS2Genes(bed2window(peaks, win = 250, flank_to_tss = F), genome = opt$genome, useLoops = T, minoverlap = 100)[,c("name", "target_gene", "cInteraction_score", "dist_to_target_gene")],
   by.x="name", by.y="name")
 df <- df[,c(2:4,1,5:ncol(df))]
 
-df <- merge(df, read.table(GENEDENSITY_FILE, header=T)[,c("name", "geneDensityScore", "geneLength", "geneDensityClass")], by.x="closest_gene", by.y="name")
+## closest/target gene tissue specificity information
+tmp <- read.table(TISSUESPECIFICITY_FILE, header=T)[,c("external_gene_name", "tau")] %>% dplyr::filter(!is.na(external_gene_name))
+df$closest_gene_tau <- tmp$tau[match(df$closest_gene, tmp$external_gene_name)]
+t <- df %>% separate_longer_delim(target_gene, ",")
+t$target_gene_tau <- round(tmp$tau[match(t$target_gene, tmp$external_gene_name)],7)
+df <- merge(df, aggregate(target_gene_tau ~ name, t, toString) %>% mutate(target_gene_tau = gsub("\\s+", "", target_gene_tau)), by.x="name", by.y="name", all.x=T)
 df <- df[,c(2:4,1,5:ncol(df))]
 
+## closest gene density information
+df <- merge(df, read.table(GENEDENSITY_FILE, header=T)[,c("name", "geneDensityScore", "geneLength", "geneDensityClass")], by.x="closest_gene", by.y="name")
+df$geneDensityClass <- factor(df$geneDensityClass)
+df <- df[,c(2:8,1,9:ncol(df))]
+
+## CpG island information
+df$cpgOverlap <- ifelse(df$name %in% bed2overlap(df, CPG_FILE)$name_q, "CpG", "nonCpG")
 
 df$dist_to_closest_gene <- log(abs(df$dist_to_closest_gene)+1) * ifelse(df$dist_to_closest_gene<0, -1, 1)
 df$annot.type <- "promoter"
@@ -86,7 +104,11 @@ df[which(abs(df$dist_to_closest_gene) > log(1000) & abs(df$dist_to_closest_gene)
 df[which(abs(df$dist_to_closest_gene) > log(50000)),]$annot.type <- "distal"
 df$annot.type <- factor(df$annot.type, levels=c("promoter", "proximal", "distal"), ordered=T)
 # table(df$annot.type)
-df$geneDensityClass <- factor(df$geneDensityClass)
+
+df %>% separate_longer_delim(dist_to_target_gene, ",") %>% 
+  mutate(dist_to_target_gene = log(as.numeric(dist_to_target_gene)+1)) %>% 
+  mutate(dist_to_closest_gene = (abs(dist_to_closest_gene)+1)) %>% 
+  ggscatter(x="dist_to_target_gene", y="dist_to_closest_gene")
 
 brk <- c(min(df$dist_to_closest_gene), -log(50000), -log(1000), 0, log(1000), log(50000), max(df$dist_to_closest_gene))
 lbl_abs <- (table(cut(df$dist_to_closest_gene, 
