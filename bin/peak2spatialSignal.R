@@ -48,15 +48,14 @@ if(identical(opt$inFile, "stdin")==T) {
 } else {
     peaks <- read.table(opt$inFile)[,c(1:7)]
 }
-# peaks <- read.table("~/data/00_ALL_CHIP-SEQ_RAW/MLL-AF9/six1_on_peaks.bed", header=F)
-peaks <- bed2window(peaks, win = 0, flank_to_tss = F)
+# peaks <- read.table("~/data/00_ALL_CHIP-SEQ_RAW/MLL-AF9/six1_on_peaks.bed", header=F)[,c(1:7)]
 colnames(peaks) <- c("chr", "start", "end", "name", "score", "strand", "signalValue")
 
 ## reformat peak file to ensure correct format of signal values
-if(length(which(!is.na(peaks$signalValue))) > 0 & is.numeric(peak$signalValue)) {
-  peak$signalValue <- log2(peak$signalValue+1)
-} else if(length(which(!is.na(peaks$score))) > 0 & is.numeric(peak$score)) {
-  peak$signalValue <- log2(peak$score+1)
+if(length(which(!is.na(peaks$signalValue))) > 0 & is.numeric(peaks$signalValue)) {
+  peaks$signalValue <- log2(peaks$signalValue+1)
+} else if(length(which(!is.na(peaks$score))) > 0 & is.numeric(peaks$score)) {
+  peaks$signalValue <- log2(peaks$score+1)
 } else {
   cat("ERROR: no score column found\n");
   print_help(parser)
@@ -71,8 +70,15 @@ TISSUESPECIFICITY_FILE <- system(sprintf("source ~/.bashrc && initialize_genome 
 ## start analysis
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## reorganize values to plot
-df <- bed2closestCoor(peaks, read.table(pipe(sprintf("grep -w protein_coding %s | cut -f 1-6", TSS_FILE))))[,c(1:7,11,14)]
-colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "closestGene", "dist_to_closestGeneTSS")
+# df <- bed2closestCoor(peaks, read.table(pipe(sprintf("grep -w protein_coding %s | cut -f 1-6", TSS_FILE))))[,c(1:7,11,14)]
+# colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "closestGene", "dist_to_closestGeneTSS")
+df <- merge(peaks, linkDHS2Genes(bed2window(peaks, win = 250, flank_to_tss = F), genome = opt$genome, useLoops = T, minoverlap = 100)[,c("name", "target_gene", "cInteraction_score", "dist_to_target_gene")],
+  by.x="name", by.y="name")
+df <- df[,c(2:4,1,5:ncol(df))]
+df <- merge(df, linkDHS2Genes(peaks, genome = opt$genome, useLoops = F)[,c("name", "closest_gene", "dist_to_closest_gene")],
+               by.x="name", by.y="name")
+df <- df[,c(2:4,1,5:ncol(df))]
+
 df <- merge(df, read.table(GENEDENSITY_FILE, header=T)[,c("name", "geneDensityScore", "geneLength", "geneDensityClass")], by.x="closestGene", by.y="name")
 df <- df[,c(2:8,1,9:ncol(df))]
 df$dist_to_closestGeneTSS <- log(abs(df$dist_to_closestGeneTSS)+1) * ifelse(df$dist_to_closestGeneTSS<0, -1, 1)
