@@ -65,7 +65,8 @@ if(length(which(!is.na(peaks$signalValue))) > 0 & is.numeric(peaks$signalValue))
 
 GENOME_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s", opt$genome), intern=T)
 TSS_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -t", opt$genome), intern=T)
-TISSUESPECIFICITY_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -S", opt$genome), intern=T)
+GENE_TAU_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -S", opt$genome), intern=T)
+DHS_TAU_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -S", opt$genome), intern=T)
 GENEDENSITY_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -M", opt$genome), intern=T)
 CPG_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -c", opt$genome), intern=T)
 
@@ -83,12 +84,14 @@ df <- merge(df, linkDHS2Genes(bed2window(peaks, win = 250, flank_to_tss = F), ge
 df <- df[,c(2:4,1,5:ncol(df))]
 
 ## closest/target gene tissue specificity information
-tmp <- read.table(TISSUESPECIFICITY_FILE, header=T)[,c("external_gene_name", "tau")] %>% dplyr::filter(!is.na(external_gene_name))
+tmp <- read.table(GENE_TAU_FILE, header=T)[,c("external_gene_name", "tau")] %>% dplyr::filter(!is.na(external_gene_name))
 df$closest_gene_tau <- tmp$tau[match(df$closest_gene, tmp$external_gene_name)]
 t <- df %>% separate_longer_delim(target_gene, ",")
 t$target_gene_tau <- round(tmp$tau[match(t$target_gene, tmp$external_gene_name)],7)
 df <- merge(df, aggregate(target_gene_tau ~ name, t, toString) %>% mutate(target_gene_tau = gsub("\\s+", "", target_gene_tau)), by.x="name", by.y="name", all.x=T)
 df <- df[,c(2:4,1,5:ncol(df))]
+
+## DHS tissue specificity information
 
 ## closest gene density information
 df <- merge(df, read.table(GENEDENSITY_FILE, header=T)[,c("name", "geneDensityScore", "geneLength", "geneDensityClass")], by.x="closest_gene", by.y="name")
