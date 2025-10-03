@@ -66,7 +66,7 @@ if(length(which(!is.na(peaks$signalValue))) > 0 & is.numeric(peaks$signalValue))
 GENOME_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s", opt$genome), intern=T)
 TSS_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -t", opt$genome), intern=T)
 GENE_TAU_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -S", opt$genome), intern=T)
-DHS_TAU_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -S", opt$genome), intern=T)
+DHS_TAU_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -H", opt$genome), intern=T)
 GENEDENSITY_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -M", opt$genome), intern=T)
 CPG_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s -c", opt$genome), intern=T)
 
@@ -92,6 +92,9 @@ df <- merge(df, aggregate(target_gene_tau ~ name, t, toString) %>% mutate(target
 df <- df[,c(2:4,1,5:ncol(df))]
 
 ## DHS tissue specificity information
+df <- merge(df, bed2overlap(df, bed_file = read.table(pipe(sprintf("zcat %s | cut -f 1-6", DHS_TAU_FILE)), header=T), selectFirstOverlap = T)[,c("name_q", "tau_s")],
+            by.x="name", by.y="name_q", all.x=T) %>% rename(dhs_tau=tau_s)
+df <- df[,c(2:4,1,5:ncol(df))]
 
 ## closest gene density information
 df <- merge(df, read.table(GENEDENSITY_FILE, header=T)[,c("name", "geneDensityScore", "geneLength", "geneDensityClass")], by.x="closest_gene", by.y="name")
@@ -109,10 +112,13 @@ df$annot.type <- factor(df$annot.type, levels=c("promoter", "proximal", "distal"
 # table(df$annot.type)
 
 ## class defined based on distance to closest gene
-df$distClass <- cut2(abs(df$dist_to_closest_gene), cuts=log(c(0, 1000, 2500, 5000, 10000, 50000, 100000, 500000, 1000000, 40000000)), levels.mean = T)
+# df$distClass <- cut2(abs(df$dist_to_closest_gene), cuts=log(c(0, 1000, 2500, 5000, 10000, 50000, 100000, 500000, 1000000, 40000000)), levels.mean = T)
+df$distClass <- cut2(abs(df$dist_to_closest_gene), g=10, levels.mean = T)
 levels(df$distClass) <- sprintf("%s_%s", seq(1,length(levels(df$distClass))), round(as.numeric(gsub("\\s+", "", levels(df$distClass)))))
 # table(df$distClass)
 
+# ggboxplot(df, x="geneDensityClass", y="dhs_tau")
+# ggboxplot(df %>% separate_longer_delim(target_gene_tau, ",") %>% mutate(target_gene_tau = as.numeric(target_gene_tau)), x="distClass", y="target_gene_tau")
 # df %>% separate_longer_delim(dist_to_target_gene, ",") %>% 
 #   mutate(dist_to_target_gene = log(as.numeric(dist_to_target_gene)+1)) %>% 
 #   mutate(dist_to_closest_gene = (abs(dist_to_closest_gene)+1)) %>% 

@@ -50,13 +50,14 @@ usage() {
     echo " -L          [file having LOOP positions in BED format]"
     echo " -O          [directory having DNA sequence motifs in LOLA format]"
     echo " -S          [file having gene tissue specificity (tau) score in BED format]"
+    echo " -H          [file having dhs tissue specificity (tau) score in BED format]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts g:i:msetncTRBDFCMALOSh ARG; do
+while getopts g:i:msetncTRBDFCMALOSHh ARG; do
 	case "$ARG" in
         g) GENOME=$OPTARG;;
 		i) FILE=$OPTARG;;
@@ -77,6 +78,7 @@ while getopts g:i:msetncTRBDFCMALOSh ARG; do
         L) LOOPS=1;;
         O) LOLAMOTIFDB=1;;
         S) GENE_TISSUE_SPECIFICITY_BED=1;;
+        H) DHS_TISSUE_SPECIFICITY_BED=1;;
 		h) HELP=1;;
 	esac
 done
@@ -122,6 +124,8 @@ if [ "$(grep -w $GENOME $FILE | wc -l)" -gt 0 ]; then
         grep -w $GENOME $FILE | head -n 17 | tail -n 1 | perl -ane 'print "$F[1]";'
     elif [ ! -z "$GENE_TISSUE_SPECIFICITY_BED" ] ; then
         grep -w $GENOME $FILE | head -n 18 | tail -n 1 | perl -ane 'print "$F[1]";'
+    elif [ ! -z "$DHS_TISSUE_SPECIFICITY_BED" ] ; then
+        grep -w $GENOME $FILE | head -n 19 | tail -n 1 | perl -ane 'print "$F[1]";'
     else
         grep -w $GENOME $FILE | head -n 1 | tail -n 1 | perl -ane 'print "$F[1]";'
     fi
