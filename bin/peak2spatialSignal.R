@@ -132,7 +132,7 @@ lbl_abs <- (table(cut(df$dist_to_closest_gene,
                       labels=c(min(df$dist_to_closest_gene), -log(50000), 0, 0, log(50000), max(df$dist_to_closest_gene))))) %>% as.vector
 lbl_per <- gsub("\\s", "", paste(sprintf("%0.1f", (lbl_abs*100)/nrow(df)), "%"))
 
-## make the plot
+## make the plot (location vs signal value)
 MAX_VAL=round(max(df$signalValue),0)
 p1 <- ggplot(df, aes(dist_to_closest_gene, signalValue)) +
             geom_point_rast(aes(color=annot.type), alpha=0.2) +
@@ -147,28 +147,26 @@ p1 <- ggplot(df, aes(dist_to_closest_gene, signalValue)) +
             theme_classic2() + scale_color_manual(values=c("#440154", "#21908c", "#fde725")) +
             theme(legend.position="top") + xlab("Distance to closest gene TSS in bp (log)") + ylab("Peak signalValue (Macs2; log2)") +
             labs(color = "Peak position")
-p2 <- ggplot(df, aes(geneDensityScore, signalValue)) +
-  geom_point_rast(aes(color=annot.type), alpha=0.2) +
-  stat_density_2d(geom = "polygon", contour = TRUE, aes(fill = after_stat(level)), colour = "black", alpha=0.5, show.legend = F) +
-  scale_fill_distiller(palette = "Reds", direction = 1) + 
-  theme_classic2() + scale_color_manual(values=c("#440154", "#21908c", "#fde725")) +
-  theme(legend.position="none") + xlab("Gene density score") + ylab("Peak signalValue (Macs2; log2)") +
-  labs(color = "Peak position") +
-  theme(plot.margin = margin(t = 50, r = 5, b = 5, l = 5))
+
+# Marginal densities along x axis
+xdens <- axis_canvas(p1, axis = "x") +
+  geom_density(data = df, aes_string(x = "dist_to_closest_gene", fill = "annot.type"),
+               alpha = 0.7, size = 0.2)+
+  scale_fill_manual(values=c("#440154", "#21908c", "#fde725"))
+# Marginal densities along y axis
+# Need to set coord_flip = TRUE, if you plan to use coord_flip()
+ydens <- axis_canvas(p1, axis = "y", coord_flip = TRUE)+
+  geom_density(data = df, aes_string(x = "signalValue", fill = "annot.type"),
+               alpha = 0.7, size = 0.2)+
+  coord_flip()+
+  scale_fill_manual(values=c("#440154", "#21908c", "#fde725"))
+p1 <- insert_yaxis_grob(insert_xaxis_grob(p1, xdens, grid::unit(.2, "null"), position = "top"), ydens, grid::unit(.2, "null"), position = "right")
+P <- annotate_figure(ggdraw(p1), top=title)
+
 ## peaks proximal to genes are located in gene dense regions (circular argument)
-# p3 <- ggplot(df, aes(x=abs(dist_to_closest_gene), y=log(geneDensityScore))) + geom_point(aes(color=annot.type)) + theme_bw() +
-#         xlab("Distance b/w peak to closest gene TSS in bp (log)") +
-#         ylab("Gene Density Score (log)")
-# p3 <- ggplot(reshape2::melt(table(df[,c("annot.type", "geneDensityClass")])), aes(x=as.factor(geneDensityClass), y=value, fill=annot.type)) + geom_bar(stat = "identity", position = "fill") +
-#   scale_y_continuous(labels = scales::percent) + theme_classic() + scale_fill_manual(values=c("#440154", "#21908c", "#fde725")) +
-#   xlab("geneDensityClass") + ylab("Density") + labs(fill = "Peak position") + theme(legend.position="top")
-p3 <- ggbarplot(as.data.frame(table(df$geneDensityClass)), x="Var1", y="Freq", fill="Var1") + xlab("geneDensityClass") + ylab("# peaks") + 
-  scale_fill_manual(values=rev(colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(10))) + theme(legend.position="none") +
-  theme(plot.margin = margin(t = 5, r = 5, b = 5, l = 5))
-# p4 <- ggecdf(df, x="signalValue", color="geneDensityClass") + 
-#   scale_color_manual(values=rev(colorRampPalette(RColorBrewer::brewer.pal(11, "RdYlBu"))(10))) + xlab("Peak signalValue (Macs2; log2)") + ylab("ECDF") +
-#   theme(legend.position="none")
-P <- ggarrange(p1, ggarrange(p2, p3, nrow=2, ncol=1, labels=c("B", "C")), nrow=1, ncol=2, labels=c("A", ""), widths = c(3,1))
+# p2 <- ggscatter_with_contour(df, var_x="dist_to_closest_gene", var_y="geneDensityScore", color_class="annot.type", color_value = c("#440154", "#21908c", "#fde725"), 
+#                        xlab = "Distance to closest gene TSS in bp (log)", ylab = "Gene Density score", addRegLine = F) +
+#   theme(plot.margin = margin(t = 50, r = 5, b = 5, l = 5))
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## save output files
