@@ -118,7 +118,7 @@ df$distClass <- cut2(abs(df$dist_to_closest_gene), g=10, levels.mean = T)
 levels(df$distClass) <- sprintf("%s_%s", seq(1,length(levels(df$distClass))), round(as.numeric(gsub("\\s+", "", levels(df$distClass)))))
 # table(df$distClass)
 
-# ggscatter_with_density(df, var_x="geneDensityScore", var_y="closest_gene_tau", color_class = "distClass")
+# ggscatter_with_contour(df, var_x="dhs_tau", var_y="closest_gene_tau", color_class = "distClass")
 # ggboxplot(df, x="geneDensityClass", y="dhs_tau")
 # ggboxplot(df %>% separate_longer_delim(target_gene_tau, ",") %>% mutate(target_gene_tau = as.numeric(target_gene_tau)), x="distClass", y="target_gene_tau")
 # df %>% separate_longer_delim(dist_to_target_gene, ",") %>% 
