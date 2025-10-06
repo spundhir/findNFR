@@ -42,7 +42,7 @@ usage() {
     echo " -T          [file having genomic coordinates of all TSS (cage) in BED format]"
     echo " -R          [file having genomic coordinates of sequence repeats in BED format]"
     echo " -B          [file having genomic coordinates of blacklisted regions in BED format]"
-    echo " -D          [file having genomic coordinates of DNase regions in BED format]"
+    echo " -D          [file having genomic coordinates of open chromatin regions (DHS+ATAC) regions in BED format]"
     echo " -F          [file having chromosome sequences in FASTA format]"
     echo " -C          [file having TF binding CRMs in the genome (UNIBIND)]"
     echo " -M          [file having gene density score in BED format]"
