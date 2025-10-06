@@ -51,12 +51,14 @@ if(identical(opt$inFile, "stdin")==T) {
 } else {
     peaks <- read.table(opt$inFile)
 }
-# peaks <- read.table("~/data/00_ALL_CHIP-SEQ_RAW/MLL-AF9/six1_on_peaks.bed", header=F)
+# peaks <- read.table(pipe("zcat ~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/dhsCatalog/mm10_ocr.bed.gz | head -n 1000"), header=F)
 
 ## check if file has header (all elements in the first row are non-numeric)
 if(length(grep("FALSE", unlist(lapply(peaks[1,], function(x) is.na(suppressWarnings(as.numeric(x)))))))==0) {
   colnames(peaks) <- peaks[1,]
   peaks <- peaks[-1,];
+} else {
+  colnames(peaks) <- unlist(lapply(seq(1,ncol(peaks)), function(x) sprintf("description_%d",x)))
 }
 colnames(peaks)[c(1:6)] <- c("chr", "start", "end", "name", "score", "strand")
 
