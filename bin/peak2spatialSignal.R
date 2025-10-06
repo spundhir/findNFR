@@ -36,6 +36,7 @@ suppressPackageStartupMessages(library("GenomicRanges"))
 suppressPackageStartupMessages(library("dplyr"))
 suppressPackageStartupMessages(library("tidyr"))
 suppressPackageStartupMessages(library("Hmisc"))
+suppressPackageStartupMessages(library("cowplot"))
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## load custom functions
@@ -52,6 +53,12 @@ if(identical(opt$inFile, "stdin")==T) {
     peaks <- read.table(opt$inFile)[,c(1:7)]
 }
 # peaks <- read.table("~/data/00_ALL_CHIP-SEQ_RAW/MLL-AF9/six1_on_peaks.bed", header=F)[,c(1:7)]
+
+## check if file has header (all elements in the first row are non-numeric)
+if(length(grep("FALSE", unlist(lapply(peaks[1,], function(x) is.na(suppressWarnings(as.numeric(x)))))))==0) {
+  colnames(peaks) <- unlist(peaks[1,]); 
+  peaks <- peaks[-1,];
+}
 colnames(peaks) <- c("chr", "start", "end", "name", "score", "strand", "signalValue")
 
 ## reformat peak file to ensure correct format of signal values
@@ -150,14 +157,14 @@ p1 <- ggplot(df, aes(dist_to_closest_gene, signalValue)) +
 
 # Marginal densities along x axis
 xdens <- axis_canvas(p1, axis = "x") +
-  geom_density(data = df, aes_string(x = "dist_to_closest_gene", fill = "annot.type"),
-               alpha = 0.7, size = 0.2)+
+  geom_density(data = df, aes(x = dist_to_closest_gene, fill = annot.type),
+               alpha = 0.7)+
   scale_fill_manual(values=c("#440154", "#21908c", "#fde725"))
 # Marginal densities along y axis
 # Need to set coord_flip = TRUE, if you plan to use coord_flip()
 ydens <- axis_canvas(p1, axis = "y", coord_flip = TRUE)+
-  geom_density(data = df, aes_string(x = "signalValue", fill = "annot.type"),
-               alpha = 0.7, size = 0.2)+
+  geom_density(data = df, aes(x = signalValue, fill = annot.type),
+               alpha = 0.7)+
   coord_flip()+
   scale_fill_manual(values=c("#440154", "#21908c", "#fde725"))
 p1 <- insert_yaxis_grob(insert_xaxis_grob(p1, xdens, grid::unit(.2, "null"), position = "top"), ydens, grid::unit(.2, "null"), position = "right")
