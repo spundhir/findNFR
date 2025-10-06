@@ -53,7 +53,6 @@ if(identical(opt$inFile, "stdin")==T) {
     peaks <- read.table(opt$inFile)[,c(1:7)]
 }
 # peaks <- read.table("~/data/00_ALL_CHIP-SEQ_RAW/MLL-AF9/six1_on_peaks.bed", header=F)[,c(1:7)]
-peaks <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/t.bed", header=F)[,c(1:7)]
 
 ## check if file has header (all elements in the first row are non-numeric)
 if(length(grep("FALSE", unlist(lapply(peaks[1,], function(x) is.na(suppressWarnings(as.numeric(x)))))))==0) {
