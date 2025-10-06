@@ -16,7 +16,7 @@ opt <- parse_args(parser)
 ## check, if all required arguments are given
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 if(is.null(opt$inFile)) {
-	cat("\nProgram: bed2tissueSpecificity.R (R script to compute tissue specificity using score and tissue information)\n")
+	cat("\nProgram: peaks2tissueSpecificity.R (R script to compute tissue specificity using score and tissue information)\n")
 	cat("Author: BRIC, University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
 	cat("Contact: pundhir@binf.ku.dk\n");
@@ -100,9 +100,9 @@ if(is.null(opt$useMeuleman)) {
     mat[cbind(dfE$name, dfE$tissue)] <- as.numeric(dfE$score)
     mat <- as.data.frame(mat)
     mat$tau <- apply(log2(mat+1), 1, vector2tau)
-    #mat$meanScore <- rowMeans(mat)
+    mat$meanSignal <- rowMeans(mat)
     df <- merge(df, mat, by.x="name", by.y="row.names")
-    df <- df[,c(2:4,1,5:ncol(df))] %>% relocate(scoreRaw=score, .after=strand) %>% relocate(tissueRaw=tissue, .after=scoreRaw) %>% relocate(tau, .before=strand)
+    df <- df[,c(2:4,1,5:ncol(df))] %>% relocate(tau, .before=strand) %>% relocate(meanSignal, .after=strand) %>% relocate(scoreRaw=score, .after=meanSignal) %>% relocate(tissueRaw=tissue, .after=scoreRaw)
 } else {
     counts <- fread("~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/dhsCatalog/hg38/dat_FDR01_hg38.txt.gz", header=F)
     metaData <- fread("~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/dhsCatalog/hg38/DHS_Index_and_Vocabulary_metadata.tsv", header=T)
@@ -114,8 +114,8 @@ if(is.null(opt$useMeuleman)) {
                                 )
                          )
     df$tau <- apply(mat, 1, vector2tau)
-    df <- df %>% relocate(mean_signal, .after=strand) %>% relocate(tau, .before=strand)
-    #mat$meanScore <- rowMeans(mat)
+    df$meanSignal <- rowMeans(mat)
+    df <- df %>% relocate(tau, .before=strand) %>% relocate(meanSignal, .after=strand) %>% relocate(mean_signal, .after=meanSignal)
     #df$gini <- apply(mat, 1, function(x) DescTools::Gini(x, na.rm = T))
     # ggscatter_with_contour(df, var_x="numsamples", var_y="tau")
 }
