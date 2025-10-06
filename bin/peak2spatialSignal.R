@@ -53,22 +53,23 @@ if(identical(opt$inFile, "stdin")==T) {
     peaks <- read.table(opt$inFile)[,c(1:7)]
 }
 # peaks <- read.table("~/data/00_ALL_CHIP-SEQ_RAW/MLL-AF9/six1_on_peaks.bed", header=F)[,c(1:7)]
+peaks <- read.table("~/project/chip-seq-analysis/analysis_test/mouse/t.bed", header=F)[,c(1:7)]
 
 ## check if file has header (all elements in the first row are non-numeric)
 if(length(grep("FALSE", unlist(lapply(peaks[1,], function(x) is.na(suppressWarnings(as.numeric(x)))))))==0) {
-  colnames(peaks) <- unlist(peaks[1,]); 
   peaks <- peaks[-1,];
 }
 colnames(peaks) <- c("chr", "start", "end", "name", "score", "strand", "signalValue")
 
 ## reformat peak file to ensure correct format of signal values
-if(length(which(!is.na(peaks$signalValue))) > 0 & is.numeric(peaks$signalValue)) {
-  peaks$signalValue <- log2(peaks$signalValue+1)
-} else if(length(which(!is.na(peaks$score))) > 0 & is.numeric(peaks$score)) {
-  peaks$signalValue <- log2(peaks$score+1)
+if(length(which(!is.na(peaks$signalValue))) > 0 & length(grep("TRUE", is.na(suppressWarnings(as.numeric(peaks$signalValue)))))==0) {
+  peaks$signalValue <- log2(as.numeric(peaks$signalValue)+1)
+} else if(length(which(!is.na(peaks$score))) > 0 & length(grep("TRUE", is.na(suppressWarnings(as.numeric(peaks$score)))))==0) {
+  peaks$signalValue <- log2(as.numeric(peaks$score)+1)
 } else {
   cat("ERROR: no score column found\n");
   print_help(parser)
+  q()
 }
 
 GENOME_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s", opt$genome), intern=T)
