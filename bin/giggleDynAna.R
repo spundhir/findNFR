@@ -267,9 +267,9 @@ if(nrow(df_sig)>2) {
   p2 <- matrix2Heatmap(mat2plot, 
                        scale="row", clusterRows = opt$clusterRows, clusterCols = opt$clusterCols, bias=opt$colorBias, displayN = T)
 
-  ggarrange(p2, ncol=2)
-  ggsave(opt$outPdfFile, ggarrange(plotlist = list(p1, p2), nrow=1, ncol=2, labels = c("A)", "B)")), height=opt$plotHeight, width=opt$plotWidth, device="pdf")
-  #ggsave(opt$outPdfFile, marrangeGrob(grobs = list(p1, p2), nrow=1, ncol=2, labels=c("A", "B")),  height=opt$plotHeight, width=opt$plotWidth, device="pdf")
+  p2 <- ggarrange(p2, ncol=2)
+  #ggsave(opt$outPdfFile, ggarrange(plotlist = list(p1, p2), nrow=1, ncol=2, labels = c("A)", "B)")), height=opt$plotHeight, width=opt$plotWidth, device="pdf")
+  ggsave(opt$outPdfFile, marrangeGrob(grobs = list(p2, p1), nrow=1, ncol=1, labels=c("A", "B")),  height=opt$plotHeight, width=opt$plotWidth, device="pdf")
   df[["sig"]] <- df_sig
 } else {
   cat("\nNo enrichment is found\n")
