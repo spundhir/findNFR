@@ -79,6 +79,10 @@ df <- df[,c(2:4,1,5:ncol(df))]
 df <- merge(df, linkDHS2Genes(bed2window(peaks, win = 250, flank_to_tss = F), genome = opt$genome, useLoops = T, minoverlap = 100)[,c("name", "target_gene", "cInteraction_score", "dist_to_target_gene")],
   by.x="name", by.y="name")
 df <- df[,c(2:4,1,5:ncol(df))]
+df$dist_to_closest_gene <- log(abs(df$dist_to_closest_gene)+1)
+df <- merge((df %>% dplyr::select(!dist_to_target_gene)), (df %>% separate_longer_delim(dist_to_target_gene, ",") %>% mutate(dist_to_target_gene = log(as.numeric(dist_to_target_gene)+1)) %>%
+                                                       aggregate(dist_to_target_gene ~ name, toString) %>% mutate(dist_to_target_gene = gsub("\\s+", "", dist_to_target_gene))),
+            by.x="name", by.y="name", all.x=T)
 
 ## closest/target gene tissue specificity information
 tmp <- read.table(GENE_TAU_FILE, header=T)[,c("external_gene_name", "tau")] %>% dplyr::filter(!is.na(external_gene_name))
@@ -102,7 +106,6 @@ df <- df[,c(2:8,1,9:ncol(df))]
 df$cpgOverlap <- ifelse(df$name %in% bed2overlap(df, CPG_FILE)$name_q, "CpG", "nonCpG")
 
 ## peak annoatation
-df$dist_to_closest_gene <- log(abs(df$dist_to_closest_gene)+1) * ifelse(df$dist_to_closest_gene<0, -1, 1)
 df$annot.type <- "promoter"
 df[which(abs(df$dist_to_closest_gene) > log(1000) & abs(df$dist_to_closest_gene) <= log(50000)),]$annot.type <- "proximal"
 df[which(abs(df$dist_to_closest_gene) > log(50000)),]$annot.type <- "distal"
@@ -112,7 +115,7 @@ df$annot.type <- factor(df$annot.type, levels=c("promoter", "proximal", "distal"
 ## class defined based on distance to closest gene
 # df$distClass <- cut2(abs(df$dist_to_closest_gene), cuts=log(c(0, 1000, 2500, 5000, 10000, 50000, 100000, 500000, 1000000, 40000000)), levels.mean = T)
 df$distClass <- cut2(abs(df$dist_to_closest_gene), g=10, levels.mean = T)
-levels(df$distClass) <- sprintf("%s_%s", seq(1,length(levels(df$distClass))), round(as.numeric(gsub("\\s+", "", levels(df$distClass)))))
+levels(df$distClass) <- sprintf("%s_%s", seq(1,length(levels(df$distClass))), round(as.numeric(gsub("\\s+", "", levels(df$distClass))),2))
 # table(df$distClass)
 
 # ggscatter_with_contour(df, var_x="dhs_tau", var_y="closest_gene_tau", color_class = "distClass")
@@ -120,7 +123,7 @@ levels(df$distClass) <- sprintf("%s_%s", seq(1,length(levels(df$distClass))), ro
 # ggboxplot(df %>% separate_longer_delim(target_gene_tau, ",") %>% mutate(target_gene_tau = as.numeric(target_gene_tau)), x="distClass", y="target_gene_tau")
 # df %>% separate_longer_delim(dist_to_target_gene, ",") %>% 
 #   mutate(dist_to_target_gene = log(as.numeric(dist_to_target_gene)+1)) %>% 
-#   mutate(dist_to_closest_gene = (abs(dist_to_closest_gene)+1)) %>% 
+#   mutate(dist_to_closest_gene = (abs(dist_to_closest_gene))) %>% 
 #   ggscatter(x="dist_to_target_gene", y="dist_to_closest_gene")
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
