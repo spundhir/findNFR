@@ -18,5 +18,5 @@ def main():
 if __name__ == "__main__":
     main()
 
-# index not working
+# index not working (ulimit -Sn 16384)
 # https://github.com/ryanlayer/giggle/issues/21
