@@ -5,7 +5,7 @@ mm9 2620345972
 mm9 /home/xfd783/genomes/annotations/BED/mm9_ensembl_gene.bed
 mm9 /home/xfd783/genomes/annotations/BED/mm9_ensembl_tss.bed
 mm9 /home/xfd783/genomes/annotations/GTF/mm9_ensembl.gtf
-mm9 /home/xfd783/genomes/annotations/MISC/CpG_mm9.bed
+mm9 /home/xfd783/data/09_ALL_PUBLIC/database/00_misc/cpgIslands/CpG_mm9.bed
 mm9 /home/xfd783/genomes/annotations/BED/mm9_cage_tss.bed
 mm9 /home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/mouse.mm9.simpleRepeat.gz
 mm9 /home/xfd783/genomes/annotations/BLACKLIST/mm9_blacklist.bed.gz
@@ -24,7 +24,7 @@ mm10 2652783500
 mm10    /home/xfd783/genomes/annotations/BED/mm10_ensembl_gene.bed
 mm10    /home/xfd783/genomes/annotations/BED/mm10_ensembl_tss.bed
 mm10    /home/xfd783/genomes/annotations/GTF/mm10_ensembl.gtf
-mm10    /home/xfd783/genomes/annotations/MISC/CpG_mm10.bed
+mm10    /home/xfd783/data/09_ALL_PUBLIC/database/00_misc/cpgIslands/CpG_mm10.bed
 mm10    /home/xfd783/genomes/annotations/BED/mm10_cage_tss.bed
 mm10    /home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/mouse.mm10.simpleRepeat.gz
 mm10    /home/xfd783/genomes/annotations/BLACKLIST/mm10_blacklist.bed.gz
@@ -43,7 +43,7 @@ hg19    2864785220
 hg19    /home/xfd783/genomes/annotations/BED/hg19_ensembl_gene.bed
 hg19    /home/xfd783/genomes/annotations/BED/hg19_ensembl_tss.bed
 hg19    /home/xfd783/genomes/annotations/GTF/hg19_ensembl.gtf
-hg19    /home/xfd783/genomes/annotations/MISC/CpG_hg19.bed
+hg19    /home/xfd783/data/09_ALL_PUBLIC/database/00_misc/cpgIslands/CpG_hg19.bed
 hg19    /home/xfd783/genomes/annotations/BED/hg19_cage_tss.bed
 hg19    /home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/human.hg19.simpleRepeat.gz
 hg19    /home/xfd783/genomes/annotations/BLACKLIST/hg19_blacklist.bed.gz
@@ -62,7 +62,7 @@ hg38    2913022398
 hg38    /home/xfd783/genomes/annotations/BED/hg38_ensembl_gene.bed
 hg38    /home/xfd783/genomes/annotations/BED/hg38_ensembl_tss.bed
 hg38    /home/xfd783/genomes/annotations/GTF/hg38_ensembl.gtf
-hg38    /home/xfd783/genomes/annotations/MISC/CpG_hg38.bed
+hg38    /home/xfd783/data/09_ALL_PUBLIC/database/00_misc/cpgIslands/CpG_hg38.bed
 hg38    /home/xfd783/genomes/annotations/BED/hg38_cage_tss.bed
 hg38    /home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/human.hg38.simpleRepeat.gz
 hg38    /home/xfd783/genomes/annotations/BLACKLIST/hg38_blacklist.bed.gz

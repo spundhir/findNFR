@@ -46,16 +46,16 @@ fi
 ## populating files based on input genome
 if [ "$GENOME" == "mm9" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm9.genome"
-    PHASTCONS_DIR="/home/xfd783/genomes/annotations/MISC/phastCons/mm9/phastCons30way/vertebrate"
+    PHASTCONS_DIR="~/data/09_ALL_PUBLIC/database/08_conservationCatalog/phastCons/mm9/phastCons30way/vertebrate"
 elif [ "$GENOME" == "mm10" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm10.genome"
-    PHASTCONS_DIR="/home/xfd783/genomes/annotations/MISC/phastCons/mm10/phastCons60way/mm10.60way.phastCons"
+    PHASTCONS_DIR="~/data/09_ALL_PUBLIC/database/08_conservationCatalog/phastCons/mm10/phastCons60way/mm10.60way.phastCons"
 elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg19.genome"
-    PHASTCONS_DIR="/home/xfd783/genomes/annotations/MISC/phastCons/hg19/phastCons46way/vertebrate"
+    PHASTCONS_DIR="~/data/09_ALL_PUBLIC/database/08_conservationCatalog/phastCons/hg19/phastCons46way/vertebrate"
 elif [ "$GENOME" == "hg38" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg38.genome"
-    PHASTCONS_DIR="/home/xfd783/genomes/annotations/MISC/phastCons/hg38/phastCons30way/hg38.30way.phastCons/"
+    PHASTCONS_DIR="~/data/09_ALL_PUBLIC/database/08_conservationCatalog/phastCons/hg38/phastCons30way/hg38.30way.phastCons/"
 else
     echo "Presently the program only support analysis for mm9, mm10, hg19 or hg38"
     echo
