@@ -31,16 +31,16 @@ if(identical(opt$bedFile, "stdin")==T) {
 if(grepl("chr.*start.*end", paste(data[1,], collapse = " ")) == T) { header <- data[1,]; data <- data[-1,]; colnames(data) <- header; }
 
 if(!is.null(opt$list)){
-    cat(sprintf("Median=%0.0f\n", median(as.numeric(data[,1]))))
-    cat(sprintf("Mean=%0.0f\n", mean(as.numeric(data[,1]))))
-    cat(sprintf("Sum=%0.0f\n", sum(as.numeric(data[,1]))))
-    cat(sprintf("Max=%0.0f\n", max(as.numeric(data[,1]))))
-    cat(sprintf("Min=%0.0f\n", min(as.numeric(data[,1]))))
-    cat(sprintf("Count=%0.0f\n", length(as.numeric(data[,1]))))
+    cat(sprintf("Median=%0.4f\n", median(as.numeric(data[,1]))))
+    cat(sprintf("Mean=%0.4f\n", mean(as.numeric(data[,1]))))
+    cat(sprintf("Sum=%0.4f\n", sum(as.numeric(data[,1]))))
+    cat(sprintf("Max=%0.4f\n", max(as.numeric(data[,1]))))
+    cat(sprintf("Min=%0.4f\n", min(as.numeric(data[,1]))))
+    cat(sprintf("Count=%0.4f\n", length(as.numeric(data[,1]))))
 }else{
-    cat(sprintf("Median=%0.0f\n", median(as.numeric(data[,3])-as.numeric(data[,2]))))
-    cat(sprintf("Mean=%0.0f\n", mean(as.numeric(data[,3])-as.numeric(data[,2]))))
-    cat(sprintf("Max=%0.0f\n", max(as.numeric(data[,3])-as.numeric(data[,2]))))
-    cat(sprintf("Min=%0.0f\n", min(as.numeric(data[,3])-as.numeric(data[,2]))))
-    cat(sprintf("Count=%0.0f\n", length(as.numeric(data[,3])-as.numeric(data[,2]))))
+    cat(sprintf("Median=%0.4f\n", median(as.numeric(data[,3])-(data[,2]))))
+    cat(sprintf("Mean=%0.4f\n", mean(as.numeric(data[,3])-(data[,2]))))
+    cat(sprintf("Max=%0.4f\n", max(as.numeric(data[,3])-(data[,2]))))
+    cat(sprintf("Min=%0.4f\n", min(as.numeric(data[,3])-(data[,2]))))
+    cat(sprintf("Count=%0.4f\n", length(as.numeric(data[,3])-(data[,2]))))
 }

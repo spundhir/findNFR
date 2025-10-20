@@ -49,15 +49,15 @@ function wait_for_jobs_to_finish {
 
 if [ "$GENOME" == "mm9" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm9.genome"
-    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/mouse.mm9.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/mouse.mm9.simpleRepeat.gz"
     GENOME_MOTIF="mm9r"
 elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg19.genome"
-    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/human.hg19.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
 elif [ "$GENOME" == "danRer7" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/zebrafish.danRer7.genome"
-    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/zebrafish.danRer7.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/zebrafish.danRer7.simpleRepeat.gz"
     GENOME_MOTIF="danRer7r"
 else
     echo "Presently the program only support analysis for mm9, hg19 or danRer7"

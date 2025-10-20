@@ -129,7 +129,7 @@ echo "done"
 echo -n "Populating files based on input genome, $GENOME (`date`).. "
 if [ "$GENOME" == "mm9" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm9.genome"
-    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/mouse.mm9.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/mouse.mm9.simpleRepeat.gz"
     GENOME_MOTIF="mm9r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homerDB/2024_version/2024_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
@@ -138,7 +138,7 @@ if [ "$GENOME" == "mm9" ]; then
     UNIBIND_DIR=""
 elif [ "$GENOME" == "hg19" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg19.genome"
-    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/human.hg19.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/human.hg19.simpleRepeat.gz"
     GENOME_MOTIF="hg19r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homerDB/2024_version/2024_tf_jaspar_hocomocoHuman_eukaryote.homer"
@@ -147,7 +147,7 @@ elif [ "$GENOME" == "hg19" ]; then
     UNIBIND_DIR=""
 elif [ "$GENOME" == "mm10" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm10.genome"
-    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/mouse.mm10.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/mouse.mm10.simpleRepeat.gz"
     GENOME_MOTIF="mm10r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homerDB/2024_version/2024_tf_jaspar_hocomocoMouse_chen2008_uniprobe_eukaryote.homer"
@@ -156,7 +156,7 @@ elif [ "$GENOME" == "mm10" ]; then
     UNIBIND_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/unibind/v2022/mm10/giggle/"
 elif [ "$GENOME" == "hg38" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg38.genome"
-    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/human.hg38.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/human.hg38.simpleRepeat.gz"
     GENOME_MOTIF="hg38r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homerDB/2024_version/2024_tf_jaspar_hocomocoHuman_eukaryote.homer"
@@ -165,7 +165,7 @@ elif [ "$GENOME" == "hg38" ]; then
     UNIBIND_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/unibind/v2022/hg38/giggle/"
 elif [ "$GENOME" == "danRer7" ]; then
     GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/zebrafish.danRer7.genome"
-    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/zebrafish.danRer7.simpleRepeat.gz"
+    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/zebrafish.danRer7.simpleRepeat.gz"
     GENOME_MOTIF="danRer7r"
     if [ -z "$TFBS_FILE" ]; then
         TFBS_FILE="NA"
