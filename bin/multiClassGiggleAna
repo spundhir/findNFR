@@ -23,7 +23,7 @@ echo Program: "multiClassGiggleAna (perform giggle analysis on genomic regions f
     echo " -o <dir>    [output directory]"
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
-    echo " -d <string> [database to query (atac, jaspar, gtrd, unibind, homer, repeat; default: unibind)]"
+    echo " -d <string> [database to query (atac, jaspar, gtrd, unibind, homer, repeat, cpgHypoMethyl; default: unibind)]"
     echo " -f          [also filter based on -x, -y and -z (default=only -c)]"
     echo " -x <float>  [p-value (default: 1e-15)]"
     echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
@@ -90,6 +90,7 @@ if [ "$GENOME" == "mm10" ]; then
     JASPAR_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/jaspar/mm10/giggle/"
     HOMER_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homer/mm10/giggle"
     REPEAT_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/mm10/giggle"
+    METHYL_DIR=""
 elif [ "$GENOME" == "hg38" ]; then
     ATAC_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/chipAtlas/hg38/giggle/"
     GTRD_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/03_bindingCatalog/gtrd/v21.12/hg38/giggle/"
@@ -97,6 +98,7 @@ elif [ "$GENOME" == "hg38" ]; then
     JASPAR_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/jaspar/hg38/giggle/"
     HOMER_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homer/hg38/giggle"
     REPEAT_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/hg38/giggle"
+    METHYL_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/09_ALL_PUBLIC/database/09_methylationCatalog/paper/hg38/bed/giggle/"
 elif [ "$GENOME" == "danRer7" ]; then
     ATAC_DIR=""
     JASPAR_DIR=""
@@ -104,6 +106,7 @@ elif [ "$GENOME" == "danRer7" ]; then
     UNIBIND_DIR=""
     HOMER_DIR=""
     REPEAT_DIR=""
+    METHYL_DIR=""
 else
     echo "Presently the program only support analysis for mm10, hg38 or danRer7"
     echo

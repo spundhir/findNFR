@@ -15,7 +15,7 @@ usage() {
 	echo " -i <file>   [input file having genomic regions in BED format (or stdin)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
-    echo " -d <string> [database to query (atac, jaspar, gtrd, unibind, homer, repeat; default: unibind)]"
+    echo " -d <string> [database to query (atac, jaspar, gtrd, unibind, homer, repeat, cpgHypoMethyl; default: unibind)]"
 	echo " -h          [help]"
 	echo
 	exit 0
@@ -58,6 +58,7 @@ if [ "$GENOME" == "mm10" ]; then
     JASPAR_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/jaspar/mm10/giggle/"
     HOMER_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homer/mm10/giggle"
     REPEAT_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/mm10/giggle"
+    METHYL_DIR=""
 elif [ "$GENOME" == "hg38" ]; then
     ATAC_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/chipAtlas/hg38/giggle/"
     GTRD_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/03_bindingCatalog/gtrd/v21.12/hg38/giggle/"
@@ -65,6 +66,7 @@ elif [ "$GENOME" == "hg38" ]; then
     JASPAR_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/jaspar/hg38/giggle/"
     HOMER_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homer/hg38/giggle"
     REPEAT_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/hg38/giggle"
+    METHYL_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/09_ALL_PUBLIC/database/09_methylationCatalog/paper/hg38/bed/giggle/"
 elif [ "$GENOME" == "danRer7" ]; then
     ATAC_DIR=""
     JASPAR_DIR=""
@@ -72,6 +74,7 @@ elif [ "$GENOME" == "danRer7" ]; then
     UNIBIND_DIR=""
     HOMER_DIR=""
     REPEAT_DIR=""
+    METHYL_DIR=""
 else
     echo "Presently the program only support analysis for mm10 or hg38"
     echo
@@ -117,6 +120,8 @@ elif [ -d "$HOMER_DIR" -a "$DATABASE" == "homer" ]; then
     giggle search -i $HOMER_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 elif [ -d "$REPEAT_DIR" -a "$DATABASE" == "repeat" ]; then
     giggle search -i $REPEAT_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
+elif [ -d "$METHYL_DIR" -a "$DATABASE" == "cpgHypoMethyl" ]; then
+    giggle search -i $METHYL_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 else
     echo
     usage
