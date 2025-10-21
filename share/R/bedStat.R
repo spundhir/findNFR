@@ -33,9 +33,11 @@ if(grepl("chr.*start.*end", paste(data[1,], collapse = " ")) == T) { header <- d
 if(!is.null(opt$list)){
     cat(sprintf("Median=%0.4f\n", median(as.numeric(data[,1]))))
     cat(sprintf("Mean=%0.4f\n", mean(as.numeric(data[,1]))))
-    cat(sprintf("Sum=%0.4f\n", sum(as.numeric(data[,1]))))
     cat(sprintf("Max=%0.4f\n", max(as.numeric(data[,1]))))
     cat(sprintf("Min=%0.4f\n", min(as.numeric(data[,1]))))
+    cat(sprintf("Quantile (25)=%0.4f\n", as.numeric(quantile(data[,1],na.rm = T,probs = c(0.25)))))
+    cat(sprintf("Quantile (75)=%0.4f\n", as.numeric(quantile(data[,1],na.rm = T,probs = c(0.75)))))
+    cat(sprintf("Sum=%0.4f\n", sum(as.numeric(data[,1]))))
     cat(sprintf("Count=%0.4f\n", length(as.numeric(data[,1]))))
 }else{
     cat(sprintf("Median=%0.4f\n", median(as.numeric(data[,3])-(data[,2]))))
