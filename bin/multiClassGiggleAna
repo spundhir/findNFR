@@ -98,7 +98,7 @@ elif [ "$GENOME" == "hg38" ]; then
     JASPAR_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/jaspar/hg38/giggle/"
     HOMER_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homer/hg38/giggle"
     REPEAT_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/hg38/giggle"
-    METHYL_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/09_ALL_PUBLIC/database/09_methylationCatalog/paper/hg38/bed/giggle/"
+    METHYL_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/09_methylationCatalog/paper/hg38/bed/giggle/"
 elif [ "$GENOME" == "danRer7" ]; then
     ATAC_DIR=""
     JASPAR_DIR=""
