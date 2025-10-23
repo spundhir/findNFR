@@ -15,7 +15,15 @@ usage() {
 	echo " -i <file>   [input file having genomic regions in BED format (or stdin)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
-    echo " -d <string> [database to query (atac, jaspar, gtrd, unibind, homer, repeat, cpgHypoMethyl; default: unibind)]"
+    echo " -d <string> [database to query (default: unibind)]"
+    echo "             [atac: DNA accessibility across various cell types (~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/chipAtlas)]"
+    echo "             [unibind: TF binding peaks from UNIBIND (~/data/09_ALL_PUBLIC/database/03_bindingCatalog/unibind/v2022/)]"
+    echo "             [jaspar: TF binding motifs from JASPAR (~/data/09_ALL_PUBLIC/database/04_motifCatalog/jaspar/)]"
+    echo "             [gtrd: TF binding peaks from GTRD (~/data/09_ALL_PUBLIC/database/03_bindingCatalog/gtrd/v21.12/)]"
+    echo "             [homer: TF binding motifs from HOMER (~/data/09_ALL_PUBLIC/database/04_motifCatalog/homer)]"
+    echo "             [repeat: Repeat regions from repeatMasker (~/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker)]"
+    echo "             [cpgHypoMethyl: CpG hypo-methylated regions across various cell types (~/data/09_ALL_PUBLIC/database/09_methylationCatalog/paper)]"
+    echo "             [chromHMMSegments: chromHMM genome segments (~/data/09_ALL_PUBLIC/database/00_misc/chromHMMSegments)]"
 	echo " -h          [help]"
 	echo
 	exit 0

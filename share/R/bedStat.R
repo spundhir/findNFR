@@ -31,18 +31,20 @@ if(identical(opt$bedFile, "stdin")==T) {
 if(grepl("chr.*start.*end", paste(data[1,], collapse = " ")) == T) { header <- data[1,]; data <- data[-1,]; colnames(data) <- header; }
 
 if(!is.null(opt$list)){
-    cat(sprintf("Median=%0.4f\n", median(as.numeric(data[,1]))))
-    cat(sprintf("Mean=%0.4f\n", mean(as.numeric(data[,1]))))
-    cat(sprintf("Max=%0.4f\n", max(as.numeric(data[,1]))))
-    cat(sprintf("Min=%0.4f\n", min(as.numeric(data[,1]))))
-    cat(sprintf("Quantile (25)=%0.4f\n", as.numeric(quantile(data[,1],na.rm = T,probs = c(0.25)))))
-    cat(sprintf("Quantile (75)=%0.4f\n", as.numeric(quantile(data[,1],na.rm = T,probs = c(0.75)))))
-    cat(sprintf("Sum=%0.4f\n", sum(as.numeric(data[,1]))))
-    cat(sprintf("Count=%0.4f\n", length(as.numeric(data[,1]))))
+    cat(sprintf("Median=%0.4f\n", median((data[,1]))))
+    cat(sprintf("Mean=%0.4f\n", mean((data[,1]))))
+    cat(sprintf("Max=%0.4f\n", max((data[,1]))))
+    cat(sprintf("Min=%0.4f\n", min((data[,1]))))
+    cat(sprintf("Quantile (25)=%0.4f\n", (quantile(data[,1],na.rm = T,probs = c(0.25)))))
+    cat(sprintf("Quantile (75)=%0.4f\n", (quantile(data[,1],na.rm = T,probs = c(0.75)))))
+    cat(sprintf("Count=%0.4f\n", length((data[,1]))))
+    cat(sprintf("Sum=%0.4f\n", sum((data[,1]))))
 }else{
-    cat(sprintf("Median=%0.4f\n", median(as.numeric(data[,3])-(data[,2]))))
-    cat(sprintf("Mean=%0.4f\n", mean(as.numeric(data[,3])-(data[,2]))))
-    cat(sprintf("Max=%0.4f\n", max(as.numeric(data[,3])-(data[,2]))))
-    cat(sprintf("Min=%0.4f\n", min(as.numeric(data[,3])-(data[,2]))))
-    cat(sprintf("Count=%0.4f\n", length(as.numeric(data[,3])-(data[,2]))))
+    cat(sprintf("Median=%0.4f\n", median((data[,3])-(data[,2]))))
+    cat(sprintf("Mean=%0.4f\n", mean((data[,3])-(data[,2]))))
+    cat(sprintf("Max=%0.4f\n", max((data[,3])-(data[,2]))))
+    cat(sprintf("Min=%0.4f\n", min((data[,3])-(data[,2]))))
+    cat(sprintf("Quantile (25)=%0.4f\n", (quantile(data[,3]-data[,2],na.rm = T,probs = c(0.25)))))
+    cat(sprintf("Quantile (75)=%0.4f\n", (quantile(data[,3]-data[,2],na.rm = T,probs = c(0.75)))))
+    cat(sprintf("Count=%0.4f\n", length((data[,3])-(data[,2]))))
 }
