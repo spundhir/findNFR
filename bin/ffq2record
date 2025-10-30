@@ -71,3 +71,4 @@ if [ ! -s "${ID}.ffq" ]; then
 fi
 
 #cat GSE110900.ffq | cut -f 3 | sort | uniq | grep -v name | cut -f 1 | parallel -j 1 'fastq-dump {} --split-files -O fastq'
+#cat GSE110900.ffq | cut -f 3 | sort | uniq | while read -a line; do ffq --ftp ${line} | grep --color=auto -E "url\":" | sed -E 's/^\s+.*\:\/\///g' | sed -E 's/\"//g' | parallel -j 1 'wget {} -P fastq'; done
