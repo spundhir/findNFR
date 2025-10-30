@@ -58,6 +58,7 @@ if [ ! -s "${ID}.ffq" ]; then
         done
     else
         if [ ! -s "${ID}_series_matrix.txt.gz" ]; then
+            #echo "https://ftp.ncbi.nlm.nih.gov/geo/series/$(echo $ID | sed 's/...$/nnn/')/${ID}/matrix/${ID}_series_matrix.txt.gz"
             wget https://ftp.ncbi.nlm.nih.gov/geo/series/$(echo $ID | sed 's/...$/nnn/')/${ID}/matrix/${ID}_series_matrix.txt.gz
         fi
      
