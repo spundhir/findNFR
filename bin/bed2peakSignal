@@ -146,7 +146,7 @@ ARG=""
 if [ -f "$INPUTBAMCONTROL" ]; then ARG="$ARG -c $INPUTBAMCONTROL"; fi
 if [ -z "$REMOVE_DUPLICATE" ]; then ARG="$ARG --keep-dup"; fi 
 
-echo "macs2 callpeak -t $INPUTBAMFILES -g $GENOME_MACS2 $ARG"
+echo "macs3 callpeak -t $INPUTBAMFILES -g $GENOME_MACS2 $ARG"
 
 ## remove temporary files
 if [ "$FILTER_FILES" -eq 1 ]; then

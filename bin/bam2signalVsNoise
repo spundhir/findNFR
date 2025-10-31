@@ -57,16 +57,16 @@ if [ "$CONTROLBAMFILE" ]; then
 fi
 
 if [ "$PE" ]; then
-    macs2 callpeak -t $INPUTBAMFILE -f BAMPE -g $GENOME_MACS2 --outdir $TMP -n macs2 $ARG 2>/dev/null
+    macs3 callpeak -t $INPUTBAMFILE -f BAMPE -g $GENOME_MACS2 --outdir $TMP -n macs3 $ARG 2>/dev/null
 
     ## compute signal in peaks
-    READS_IN_PEAKS=$(zless $TMP/macs2_peaks.xls | grep -v '#' | grep -v start | perl -ane '$sum+=$F[5]; END { print "$sum\n"; }')
+    READS_IN_PEAKS=$(zless $TMP/macs3_peaks.xls | grep -v '#' | grep -v start | perl -ane '$sum+=$F[5]; END { print "$sum\n"; }')
     READS_TOTAL=$(samtools idxstats $INPUTBAMFILE | perl -ane '$sum+=$F[2]; END { printf("%d", $sum/2); }')
 else
-    macs2 callpeak -t $INPUTBAMFILE -f BAM -g $GENOME_MACS2 --outdir $TMP -n macs2 $ARG 2>/dev/null
+    macs3 callpeak -t $INPUTBAMFILE -f BAM -g $GENOME_MACS2 --outdir $TMP -n macs3 $ARG 2>/dev/null
 
     ## compute signal in peaks
-    READS_IN_PEAKS=$(zless $TMP/macs2_peaks.xls | grep -v '#' | grep -v start | perl -ane '$sum+=$F[5]; END { print "$sum\n"; }')
+    READS_IN_PEAKS=$(zless $TMP/macs3_peaks.xls | grep -v '#' | grep -v start | perl -ane '$sum+=$F[5]; END { print "$sum\n"; }')
     READS_TOTAL=$(samtools idxstats $INPUTBAMFILE | perl -ane '$sum+=$F[2]; END { printf("%d", $sum); }')
 fi
 
@@ -75,7 +75,7 @@ echo -e "$READS_IN_PEAKS\t$READS_TOTAL" | perl -ane '$snr=($F[0]*100)/$F[1]; pri
 
 ## print peaks to output file
 if [ "$OUTFILE" ]; then
-    zless $TMP/macs2_peaks.xls > $OUTFILE
+    zless $TMP/macs3_peaks.xls > $OUTFILE
 fi
 
 ## remove temporary output directory

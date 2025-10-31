@@ -188,11 +188,11 @@ echo -n "Determine number of bases by which to extend the 3' end of reads (`date
 if [ ! -s "$OUTDIR/extendReads" ]; then
     if [ ! -z "$GENOME_MACS2" ]; then
         for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
-            macs2 predictd -i ${BAMFILEa[$i]} -g $GENOME_MACS2 --outdir $OUTDIR/logs/ 2>$OUTDIR/logs/predictd.rep$i &
+            macs3 predictd -i ${BAMFILEa[$i]} -g $GENOME_MACS2 --outdir $OUTDIR/logs/ 2>$OUTDIR/logs/predictd.rep$i &
         done
     else
         for(( i=0; i<${#BAMFILEa[@]}; i++ )); do
-            macs2 predictd -i ${BAMFILEa[$i]} --outdir $OUTDIR/logs/ 2>$OUTDIR/logs/predictd.rep$i &
+            macs3 predictd -i ${BAMFILEa[$i]} --outdir $OUTDIR/logs/ 2>$OUTDIR/logs/predictd.rep$i &
         done
     fi
 

@@ -110,36 +110,36 @@ echo -n "Compute peak regions (`date`).. "
 TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 mkdir $TMP
 
-## reformat input BAM files into macs2 input format
+## reformat input BAM files into macs3 input format
 BAMFILEx=$(echo $BAMFILEs | perl -ane '$_=~s/\,/ /g; print $_;')
 
 <<"COMMENT"
 COMMENT
 ## compute region peak file
 if [ ! -z "$GENOME_MACS2" ]; then
-    macs2 predictd -i $BAMFILEx -g $GENOME_MACS2 --outdir $TMP 2>$TMP/predictd.rep0
+    macs3 predictd -i $BAMFILEx -g $GENOME_MACS2 --outdir $TMP 2>$TMP/predictd.rep0
 else
-    macs2 predictd -i $BAMFILEx --outdir $TMP 2>$TMPpredictd.rep0
+    macs3 predictd -i $BAMFILEx --outdir $TMP 2>$TMPpredictd.rep0
 fi
 wait
 
 FRAGMENTLENGTH=$(cat $TMP/predictd.rep0 | grep "predicted fragment length" | perl -ane 'print $F[scalar(@F)-2];')
 
 if [ ! -z "$GENOME_MACS2" ]; then
-    if echo $(macs2 --version 2>&1) | grep -qE "2\.0"; then
+    if echo $(macs3 --version 2>&1) | grep -qE "2\.0"; then
         EXTEND=`echo $FRAGMENTLENGTH | perl -ane 'printf("%0.0f", $_/2);'`
-        macs2 callpeak -t $BAMFILEx --outdir $TMP -n MACS2 -g $GENOME_MACS2 -p 1e-3 --nomodel --shiftsize $EXTEND 2>$TMP/MACS2.log
+        macs3 callpeak -t $BAMFILEx --outdir $TMP -n MACS2 -g $GENOME_MACS2 -p 1e-3 --nomodel --shiftsize $EXTEND 2>$TMP/MACS2.log
     else
         EXTEND=`echo $FRAGMENTLENGTH | perl -ane 'printf("%0.0f", $_);'`
-        macs2 callpeak -t $BAMFILEx --outdir $TMP -n MACS2 -g $GENOME_MACS2 -p 1e-3 --nomodel --extsize $EXTEND 2>$TMP/MACS2.log
+        macs3 callpeak -t $BAMFILEx --outdir $TMP -n MACS2 -g $GENOME_MACS2 -p 1e-3 --nomodel --extsize $EXTEND 2>$TMP/MACS2.log
     fi
 else
-    if echo $(macs2 --version 2>&1) | grep -qE "2\.0"; then
+    if echo $(macs3 --version 2>&1) | grep -qE "2\.0"; then
         EXTEND=`echo $FRAGMENTLENGTH | perl -ane 'printf("%0.0f", $_/2);'`
-        macs2 callpeak -t $BAMFILEx --outdir $TMP -n MACS2 -p 1e-3 --nomodel --shiftsize $EXTEND 2>$TMP/MACS2.log
+        macs3 callpeak -t $BAMFILEx --outdir $TMP -n MACS2 -p 1e-3 --nomodel --shiftsize $EXTEND 2>$TMP/MACS2.log
     else
         EXTEND=`echo $FRAGMENTLENGTH | perl -ane 'printf("%0.0f", $_);'`
-        macs2 callpeak -t $BAMFILEx --outdir $TMP -n MACS2 -p 1e-3 --nomodel --extsize $EXTEND 2>$TMP/MACS2.log
+        macs3 callpeak -t $BAMFILEx --outdir $TMP -n MACS2 -p 1e-3 --nomodel --extsize $EXTEND 2>$TMP/MACS2.log
     fi
 fi
 

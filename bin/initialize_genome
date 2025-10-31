@@ -33,7 +33,7 @@ usage() {
     echo "[OPTIONS]"
 	echo " -i <file>   [input file containing genome information]"
     echo "             [default: $FILE]"
-    echo " -m          [macs2 genome parameter, -g]"
+    echo " -m          [macs3 genome parameter, -g]"
     echo " -s          [effective genome size]"
     echo " -e          [file having genomic coordinates of genes in BED format]"
     echo " -t          [file having genomic coordinates of genes TSS (ensembl) in BED format]"

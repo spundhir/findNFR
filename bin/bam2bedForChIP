@@ -89,7 +89,7 @@ fi
 ## determine read extension parameter, if required
 if [ ! -z "$EXTEND" ]; then
     #TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-    EXTEND_VALUE=$(macs2 predictd -i $BAMFILE -g $GENOME_MACS2 2>&1 | grep "predicted fragment length" | perl -ane 'print $F[scalar(@F)-2];')
+    EXTEND_VALUE=$(macs3 predictd -i $BAMFILE -g $GENOME_MACS2 2>&1 | grep "predicted fragment length" | perl -ane 'print $F[scalar(@F)-2];')
 
     if [ -z "$EXTEND_VALUE" ]; then
         >&2 echo

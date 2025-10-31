@@ -6,7 +6,7 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 option_list <- list(
-  make_option(c("-i", "--inFile"), help="input file containing peak score (macs2 output) [format: chr start end name score strand signalValue]"),
+  make_option(c("-i", "--inFile"), help="input file containing peak score (macs3 output) [format: chr start end name score strand signalValue]"),
   make_option(c("-o", "--outFile"), help="output pdf file"),
   make_option(c("-g", "--genome"), default="mm10", help="genome (mm10 or hg38; default=%default)")
 )
