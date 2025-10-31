@@ -390,6 +390,7 @@ else
             scp $BWFILE .
         fi
         BWFILE=$BWFILE_NEW
+        chmod 644 ${BWFILE_NEW}
         echo "done" >&2
     fi
 
