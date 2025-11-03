@@ -2,7 +2,8 @@
 #PBS -l nodes=1:ppn=4
 
 GENOME="mm10"
-DATABASE="unibind"
+DATABASE="custom"
+DATABASE_DIR=""
 NHITS=10
 PVALUE="1e-15"
 MIN_OVERLAP=50
@@ -23,7 +24,8 @@ echo Program: "multiClassGiggleAna (perform giggle analysis on genomic regions f
     echo " -o <dir>    [output directory]"
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
-    echo " -d <string> [database to query (default: unibind)]"
+    echo " -d <string> [database to query (default: custom)]"
+    echo "             [custom: path to giggle index directory using -D]"
     echo "             [atac: DNA accessibility across various cell types (~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/chipAtlas)]"
     echo "             [unibind: TF binding peaks from UNIBIND (~/data/09_ALL_PUBLIC/database/03_bindingCatalog/unibind/v2022/)]"
     echo "             [jaspar: TF binding motifs from JASPAR (~/data/09_ALL_PUBLIC/database/04_motifCatalog/jaspar/)]"
@@ -32,11 +34,13 @@ echo Program: "multiClassGiggleAna (perform giggle analysis on genomic regions f
     echo "             [repeat: Repeat regions from repeatMasker (~/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker)]"
     echo "             [cpgHypoMethyl: CpG hypo-methylated regions across various cell types (~/data/09_ALL_PUBLIC/database/09_methylationCatalog/paper)]"
     echo "             [chromHMMSegments: chromHMM genome segments (~/data/09_ALL_PUBLIC/database/00_misc/chromHMMSegments)]"
+    echo " -D <dir>    [path to giggle index directory]"
+    echo " -c <int>    [number of top hits to plot from each sample (default: 10)]"
     echo " -f          [also filter based on -x, -y and -z (default=only -c)]"
     echo " -x <float>  [p-value (default: 1e-15)]"
     echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
     echo " -z <float>  [minimum odds ratio (default: 2)]"
-    echo " -c <int>    [number of top hits to plot from each sample (default: 10)]"
+    echo " -F          [no filter, output all hits]"
     echo " -l <string> [name of overlaps(s) that must be included in the final output]"
     echo "             [if multiple, separate them by a comma]"
     echo " -q          [plot quantile normalized data (default=raw)]"
@@ -47,17 +51,19 @@ echo Program: "multiClassGiggleAna (perform giggle analysis on genomic regions f
 }
 
 #### parse options ####
-while getopts i:o:g:d:fx:y:z:c:l:qn:h ARG; do
+while getopts i:o:g:d:D:c:fx:y:z:Fl:qn:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         g) GENOME=$OPTARG;;
         d) DATABASE=$OPTARG;;
+        D) DATABASE_DIR=$OPTARG;;
+        c) NHITS=$OPTARG;;
         f) FILTER_PVAL=1;;
         x) PVALUE=$OPTARG;;  
         y) MIN_OVERLAP=$OPTARG;;
         z) ODDS_RATIO=$OPTARG;;
-        c) NHITS=$OPTARG;;
+        F) NOFILTER=1;;
         l) MUST_INCLUDE=$OPTARG;;
         q) QNORM=1;;
         n) MIN_N_CLASS=$OPTARG;;
@@ -91,31 +97,7 @@ fi
 echo "done"
 
 echo -n "Populating files based on input genome, $GENOME (`date`).. "
-if [ "$GENOME" == "mm10" ]; then
-    ATAC_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/chipAtlas/mm10/giggle/"
-    GTRD_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/03_bindingCatalog/gtrd/v21.12/mm10/giggle/"
-    UNIBIND_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/03_bindingCatalog/unibind/v2022/mm10/giggle/"
-    JASPAR_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/jaspar/mm10/giggle/"
-    HOMER_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homer/mm10/giggle"
-    REPEAT_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/mm10/giggle"
-    METHYL_DIR=""
-elif [ "$GENOME" == "hg38" ]; then
-    ATAC_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/chipAtlas/hg38/giggle/"
-    GTRD_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/03_bindingCatalog/gtrd/v21.12/hg38/giggle/"
-    UNIBIND_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/03_bindingCatalog/unibind/v2022/hg38/giggle/"
-    JASPAR_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/jaspar/hg38/giggle/"
-    HOMER_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homer/hg38/giggle"
-    REPEAT_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/hg38/giggle"
-    METHYL_DIR="/home/xfd783/data/09_ALL_PUBLIC/database/09_methylationCatalog/paper/hg38/bed/giggle/"
-elif [ "$GENOME" == "danRer7" ]; then
-    ATAC_DIR=""
-    JASPAR_DIR=""
-    GTRD_DIR=""
-    UNIBIND_DIR=""
-    HOMER_DIR=""
-    REPEAT_DIR=""
-    METHYL_DIR=""
-else
+if [ "${GENOME}" != "mm10" -a "${GENOME}" != "hg38" -a "${GENOME}" != "danRer7"  ]; then
     echo "Presently the program only support analysis for mm10, hg38 or danRer7"
     echo
     usage
@@ -151,7 +133,7 @@ for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$
 
 <<"COMMENT"
 COMMENT
-    giggleAna -i $OUTDIR/enhancer_$ID.bed -g $GENOME -d ${DATABASE} > ${GIGGLEDIR}/giggleResults${DATABASE^^}.txt 2>$GIGGLEDIR/$ID.log &
+    giggleAna -i $OUTDIR/enhancer_$ID.bed -g $GENOME -d ${DATABASE} -D ${DATABASE_DIR} > ${GIGGLEDIR}/giggleResults${DATABASE^^}.txt 2>$GIGGLEDIR/$ID.log &
 
     CLASS_COUNT=$((CLASS_COUNT+1))
     GIGGLEDIR_ALL="$GIGGLEDIR_ALL,$GIGGLEDIR"
@@ -167,6 +149,9 @@ if [ ! -z "${MUST_INCLUDE}" ]; then
 fi
 if [ ! -z "${QNORM}" ]; then
     ADDITIONAL_ARGUMENT="${ADDITIONAL_ARGUMENT} -q"
+fi
+if [ ! -z "${NOFILTER}" ]; then
+    ADDITIONAL_ARGUMENT="${ADDITIONAL_ARGUMENT} -F"
 fi
 
 if [ "$CLASS_COUNT" -gt 1 ]; then

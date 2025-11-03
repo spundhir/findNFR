@@ -3,6 +3,7 @@
 
 GENOME="mm10"
 DATABASE="unibind"
+DATABASE_DIR=""
 NHITS=10
 PVALUE="1e-15"
 MIN_OVERLAP=50
@@ -22,11 +23,12 @@ usage() {
 	echo "[OPTIONS]"
 	echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
 	echo " -d <string> [database to query (atac, jaspar, gtrd, unibind; default: unibind)]"
+	echo " -c <int>    [number of top hits to plot from each sample (default: 10)]"
 	echo " -f          [also filter based on -x, -y and -z (default=only variation)]"
 	echo " -x <float>  [p-value cutoff (default: 1e-15)]"
 	echo " -y <float>  [remove hits with overlap less than # (default: 50)]"
 	echo " -z <float>  [minimum odds ratio (default: 2)]"
-	echo " -c <int>    [number of top hits to plot from each sample (default: 10)]"
+    echo " -F          [no filter, output all hits]"
 	echo " -l <string> [name of overlaps(s) that must be included in the final output]"
 	echo "             [if multiple, separate them by a comma]"
 	echo " -q          [plot quantile normalized data (default=raw)]"
@@ -36,17 +38,19 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:g:d:fx:y:z:c:l:qh ARG; do
+while getopts i:o:g:d:D:c:fx:y:z:Fl:qh ARG; do
 	case "$ARG" in
 	i) INDIR=$OPTARG;;
         o) OUTDIR=$OPTARG;;
         g) GENOME=$OPTARG;;
         d) DATABASE=$OPTARG;;
+        D) DATABASE_DIR=$OPTARG;;
+        c) NHITS=$OPTARG;;
         f) FILTER_PVAL=1;;
         x) PVALUE=$OPTARG;;
         y) MIN_OVERLAP=$OPTARG;;
         z) ODDS_RATIO=$OPTARG;;
-        c) NHITS=$OPTARG;;
+        F) NOFILTER=1;;
         l) MUST_INCLUDE=$OPTARG;;
         q) QNORM=1;;
         h) HELP=1;;
@@ -80,19 +84,7 @@ fi
 echo "done"
 
 echo -n "Populating files based on input genome, $GENOME (`date`).. "
-if [ "$GENOME" == "mm10" ]; then
-    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/mouse.mm10.genome"
-    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/mouse.mm10.simpleRepeat.gz"
-    GENOME_MOTIF="mm10r"
-elif [ "$GENOME" == "hg38" ]; then
-    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/human.hg38.genome"
-    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/human.hg38.simpleRepeat.gz"
-    GENOME_MOTIF="hg38r"
-elif [ "$GENOME" == "danRer7" ]; then
-    GENOME_FILE="/home/xfd783/genomes/annotations/SIZE/zebrafish.danRer7.genome"
-    REPEAT_FILE="/home/xfd783/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker/zebrafish.danRer7.simpleRepeat.gz"
-    GENOME_MOTIF="danRer7r"
-else
+if [ "${GENOME}" != "mm10" -a "${GENOME}" != "hg38" -a "${GENOME}" != "danRer7"  ]; then
     echo "Presently the program only support analysis for mm9, hg19 or danRer7"
     echo
     usage
@@ -126,6 +118,9 @@ if [ ! -z "${MUST_INCLUDE}" ]; then
 fi
 if [ ! -z "${QNORM}" ]; then
     ADDITIONAL_ARGUMENT="${ADDITIONAL_ARGUMENT} -q"
+fi
+if [ ! -z "${NOFILTER}" ]; then
+    ADDITIONAL_ARGUMENT="${ADDITIONAL_ARGUMENT} -F"
 fi
 
 if [ "${DATABASE}" == "atac" ]; then

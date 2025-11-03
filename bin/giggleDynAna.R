@@ -7,11 +7,12 @@ suppressPackageStartupMessages(library("optparse"))
 option_list <- list(
   make_option(c("-i", "--inFile"), help="input file containing tf enrichment dynamics (can be stdin)"),
   make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
-  make_option(c("-f", "--filterPval"), action="store_true", help="filter based on -x, -y and -z (default=%default)"),
+  make_option(c("-c", "--topN"), default=10, help="number of top hits to plot from each sample (default=%default)"),
+  make_option(c("-f", "--filterPval"), action="store_true", help="filter based on -x, -y and -z"),
   make_option(c("-x", "--pVal"), default=1e-15, help="p-value cutoff (default=%default)"),
   make_option(c("-y", "--minOverlap"), default=50, help="minimum frequency of overlaps in each class (default=%default)"),
   make_option(c("-z", "--minOddsRatio"), default=2, help="minimum odds ratio of at least one class (default=%default)"),
-  make_option(c("-c", "--topN"), default=10, help="number of top hits to plot from each sample (default=%default)"),
+  make_option(c("-F", "--noFilter"), action="store_true", help="no filter, output all hits"),
   make_option(c("-l", "--mustInclude"), help="name of overlap(s) that must be included in the final output (if multiple, separate them by a comma)"),
   make_option(c("-q", "--quaNorm"), action="store_true", help="plot quantile normalized data (default=%default)"),
   make_option(c("-b", "--colorBias"), default=1, help="bias in color (default=%default)"),
@@ -188,15 +189,19 @@ names(df) <- c("overlaps", "odds_ratio", "combo_score", "fishers_two_tail")
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## select hits that have enough variation in combo_score & odds_ratio across conditions
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-sig_names <- intersect(row.names(df$combo_score)[which(rowSds(normalize.quantiles(as.matrix(df$combo_score))) > summary(rowSds(normalize.quantiles(as.matrix(df$combo_score))))[3])],
-                       row.names(df$odds_ratio)[which(rowSds(normalize.quantiles(as.matrix(df$odds_ratio))) > summary(rowSds(normalize.quantiles(as.matrix(df$odds_ratio))))[3])])
-cat(sprintf("%d out of %d hits passed filter criteria (>median sd of combo_score + odds_ratio)..", length(sig_names), nrow(df$overlaps)))
-cat("\n")
+if(is.null(opt$noFilter)) {
+    sig_names <- intersect(row.names(df$combo_score)[which(rowSds(normalize.quantiles(as.matrix(df$combo_score))) > summary(rowSds(normalize.quantiles(as.matrix(df$combo_score))))[3])],
+                           row.names(df$odds_ratio)[which(rowSds(normalize.quantiles(as.matrix(df$odds_ratio))) > summary(rowSds(normalize.quantiles(as.matrix(df$odds_ratio))))[3])])
+    cat(sprintf("%d out of %d hits passed filter criteria (>median sd of combo_score + odds_ratio)..", length(sig_names), nrow(df$overlaps)))
+    cat("\n")
+} else {
+    sig_names <- row.names(df$combo_score)
+}
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## select hits that have significant pVal + minOverlap + minOddsRatio
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-if(!is.null(opt$filterPval)) {
+if(!is.null(opt$filterPval) & is.null(opt$noFilter)) {
   ## identify significant overlaps
   TMP <- length(sig_names)
   sig_names <- sig_names[sig_names %in% row.names(df$combo_score[which(rowMin(as.matrix(df[["fishers_two_tail"]])) < opt$pVal &
