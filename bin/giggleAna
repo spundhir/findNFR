@@ -2,7 +2,7 @@
 #PBS -l nodes=1:ppn=4
 
 GENOME="mm10";
-DATABASE="unibind"
+DATABASE="custom"
 
 #### usage ####
 usage() {
@@ -15,7 +15,8 @@ usage() {
 	echo " -i <file>   [input file having genomic regions in BED format (or stdin)]"
     echo "[OPTIONS]"
     echo " -g <string> [genome for which to perform the analysis (mm10, hg38, danRer7; default: mm10)]"
-    echo " -d <string> [database to query (default: unibind)]"
+    echo " -d <string> [database to query (default: custom)]"
+    echo "             [custom: path to giggle index directory using -D]"
     echo "             [atac: DNA accessibility across various cell types (~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/chipAtlas)]"
     echo "             [unibind: TF binding peaks from UNIBIND (~/data/09_ALL_PUBLIC/database/03_bindingCatalog/unibind/v2022/)]"
     echo "             [jaspar: TF binding motifs from JASPAR (~/data/09_ALL_PUBLIC/database/04_motifCatalog/jaspar/)]"
@@ -24,17 +25,19 @@ usage() {
     echo "             [repeat: Repeat regions from repeatMasker (~/data/09_ALL_PUBLIC/database/07_repeatCatalog/repeatMasker)]"
     echo "             [cpgHypoMethyl: CpG hypo-methylated regions across various cell types (~/data/09_ALL_PUBLIC/database/09_methylationCatalog/paper)]"
     echo "             [chromHMMSegments: chromHMM genome segments (~/data/09_ALL_PUBLIC/database/00_misc/chromHMMSegments)]"
+    echo " -D <dir>    [path to giggle index directory]"
 	echo " -h          [help]"
 	echo
 	exit 0
 }
 
 #### parse options ####
-while getopts i:g:d:h ARG; do
+while getopts i:g:d:D:h ARG; do
 	case "$ARG" in
 		i) BEDFILE=$OPTARG;;
         g) GENOME=$OPTARG;;
         d) DATABASE=$OPTARG;;
+        D) DATABASE_DIR=$OPTARG;;
 		h) HELP=1;;
 	esac
 done
@@ -116,7 +119,9 @@ zless ${TMP}.bed | perl -ane 'BEGIN { $counter=1; } if($F[5]!~/^\+$/ && $F[5]!~/
 
 ## perform giggle enrichment analysis
 TARGET_TOTAL=$(zcat ${TMP}.bed.gz | wc -l)
-if [ -d "$ATAC_DIR" -a "$DATABASE" == "atac" ]; then
+if [ -d "$DATABASE_DIR" -a "$DATABASE" == "custom" ]; then
+    giggle search -i $DATABASE_DIR -q ${TMP}.bed.gz -s -f 05 | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
+elif [ -d "$ATAC_DIR" -a "$DATABASE" == "atac" ]; then
     giggle search -i $ATAC_DIR -q ${TMP}.bed.gz -s -f 05 | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
 elif [ -d "$JASPAR_DIR" -a "$DATABASE" == "jaspar" ]; then
     giggle search -i $JASPAR_DIR -q ${TMP}.bed.gz -s | perl -ane 'chomp($_); if($_=~/odds_ratio/) { print "$_\ttotal_regions\n"; } else { print "$_\t'${TARGET_TOTAL}'\n"; }'
