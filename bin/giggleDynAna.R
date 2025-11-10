@@ -7,7 +7,7 @@ suppressPackageStartupMessages(library("optparse"))
 option_list <- list(
   make_option(c("-i", "--inFile"), help="input file containing tf enrichment dynamics (can be stdin)"),
   make_option(c("-o", "--outPdfFile"), help="output pdf image file"),
-  make_option(c("-c", "--topN"), default=10, help="number of top hits to plot from each sample (default=%default)"),
+  make_option(c("-c", "--topN"), help="number of top hits to plot from each sample (default=%default)"),
   make_option(c("-f", "--filterPval"), action="store_true", help="filter based on -x, -y and -z"),
   make_option(c("-x", "--pVal"), default=1e-15, help="p-value cutoff (default=%default)"),
   make_option(c("-y", "--minOverlap"), default=50, help="minimum frequency of overlaps in each class (default=%default)"),
@@ -239,7 +239,7 @@ if(!is.null(opt$quaNorm)) {
 }
 
 colnames(df_sig) <- c("name", "class", "overlaps", "odds_ratio", "pvalue", "combo_score")
-df_sig$odds_ratio <- log(df_sig$odds_ratio)
+#df_sig$odds_ratio <- log(df_sig$odds_ratio)
 df_sig$pvalue <- -log10(df_sig$pvalue)
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
@@ -267,8 +267,15 @@ if(nrow(df_sig)>2) {
     theme(text=element_text(size=10), axis.text.x=element_text(angle=90, vjust = 0.5, hjust=1), legend.position = "bottom")
   
   mat2plot <- matrix(df_sig[,"odds_ratio"], nrow=length(unique(df_sig$name))) %>% as.data.frame() %>% `colnames<-` (unique(df_sig$class)) %>% `rownames<-` (unique(df_sig$name)) %>% round(2)
-  # topN <- intersect(rowSds(as.matrix(mat2plot)) %>% sort(decreasing = T) %>% head(opt$topN) %>% names,
-  #           unique(unlist(lapply(colnames(mat2plot), function(x) mat2plot[order(-mat2plot[,x]),] %>% head(opt$topN) %>% row.names))))
+  if(!is.null(opt$topN)) {
+      # topN <- intersect(rowSds(as.matrix(mat2plot)) %>% sort(decreasing = T) %>% head(as.numeric(opt$topN)) %>% names,
+      #           unique(unlist(lapply(colnames(mat2plot), function(x) mat2plot[order(-mat2plot[,x]),] %>% head(as.numeric(opt$topN)) %>% row.names))))
+      topN <- unique(unlist(lapply(colnames(mat2plot), function(x) mat2plot[order(-mat2plot[,x]),] %>% head(as.numeric(opt$topN)) %>% row.names)))
+      #topN <- rowSds(as.matrix(mat2plot)) %>% sort(decreasing = T) %>% head(as.numeric(opt$topN)) %>% names
+      cat(sprintf("%d out of %d hits passed filter criteria (topN)..", length(topN), nrow(mat2plot)))
+      cat("\n")
+      mat2plot <- mat2plot[which(row.names(mat2plot) %in% topN),]
+  }
   p2 <- matrix2Heatmap(mat2plot, 
                        scale="row", clusterRows = opt$clusterRows, clusterCols = opt$clusterCols, bias=opt$colorBias, displayN = T)
 
@@ -284,7 +291,7 @@ if(nrow(df_sig)>2) {
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## write output file
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-write.table(mat2plot, sprintf("%s.txt", opt$outPdfFile), sep="\t", quote = F, row.names = F, col.names = T)
+write.table(mat2plot, sprintf("%s.txt", opt$outPdfFile), sep="\t", quote = F, row.names = T, col.names = T)
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## save objects to .RDS file
