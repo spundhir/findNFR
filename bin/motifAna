@@ -247,11 +247,17 @@ COMMENT
     ## debug: REGIONS_INTEREST_COUNT=100; PVALUE="1e-15"; MIN_P_T=3; B=100;
     if [ -f "$OUTDIR/homerResults.html" ]; then
         grep png $OUTDIR/homerResults.html | grep -vE ">\*<" | perl -ane '$_=~s/<tr><td>//gi; $_=~s/<\/td><td>/\t/gi; $_=~s/<\/td><\/tr>//gi; $_=~s/^[0-9]*\s+//g; print $_;' | perl -an -F'/\t/' -e '$F[0]=~s/^.*\=\"//g; $F[0]=~s/\".*//g; $F[0]=~s/\.logo.*//g; $F[6]=~s/\<BR.*//g; print "$F[6]\t$F[1]\t$F[3]\t$F[4]\t'$OUTDIR/'$F[0].motif\t'$REGIONS_INTEREST_COUNT'\n";' | perl -ane '$pval=sprintf("%0.20f", $F[1]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[2]=~s/\%//g; $F[3]=~s/\%//g; if($pval < $my_pval && $F[2]>='$MIN_P_T' && $F[3]<='$B') { print "$_"; }' > $OUTDIR/DENOVO_MOTIFS.TXT
+        if [ ! -s "$OUTDIR/DENOVO_MOTIFS.TXT" ]; then
+            grep "_blank" $OUTDIR/homerResults.html | grep -vE ">\*<" | perl -ane '$_=~s/<tr><td>//gi; $_=~s/<\/td><td>/\t/gi; $_=~s/<\/td><\/tr>//gi; $_=~s/^[0-9]*\s+//g; print $_;' | sed -E 's/<BR.*HREF="/\t/g' | sed -E 's/\".*//g' | perl -an -F'/\t/' -e 'chomp($F[6]); print "$F[5]\t$F[0]\t$F[2]\t$F[3]\t'$OUTDIR/'$F[6]\t'$REGIONS_INTEREST_COUNT'\n";' > $OUTDIR/DENOVO_MOTIFS.TXT
+        fi
     else
         touch $OUTDIR/DENOVO_MOTIFS.TXT
     fi
     if [ -f "$OUTDIR/knownResults.html" ]; then
         grep png $OUTDIR/knownResults.html | grep -vE ">\*<" | perl -ane '$_=~s/<tr><td>//gi; $_=~s/<\/td><td>/\t/gi; $_=~s/<\/td><\/tr>//gi; $_=~s/^[0-9]*\s+//g; print $_;' | perl -an -F'/\t/' -e '$F[0]=~s/^.*\=\"//g; $F[0]=~s/\".*//g; $F[0]=~s/\.logo.*//g; print "$F[1]\t$F[2]\t$F[6]\t$F[8]\t'$OUTDIR/'$F[0].motif\t'$REGIONS_INTEREST_COUNT'\n";' | perl -ane '$pval=sprintf("%0.20f", $F[1]); $my_pval=sprintf("%0.20f", '$PVALUE'); $F[2]=~s/\%//g; $F[3]=~s/\%//g; if($pval < $my_pval && $F[2]>='$MIN_P_T' && $F[3]<='$B') { print "$_"; }' > $OUTDIR/KNOWN_MOTIFS.TXT
+        if [ ! -s "$OUTDIR/KNOWN_MOTIFS.TXT" ]; then
+            grep "_blank" $OUTDIR/knownResults.html | grep -vE ">\*<" | perl -ane '$_=~s/<tr><td>//gi; $_=~s/<\/td><td>/\t/gi; $_=~s/<\/td><\/tr>//gi; $_=~s/^[0-9]*\s+//g; print $_;' | sed -E 's/<A.*HREF="/\t/g' | sed -E 's/\".*//g' | perl -an -F'/\t/' -e 'chomp($F[9]); print "$F[0]\t$F[1]\t$F[5]\t$F[7]\t'$OUTDIR/'$F[9]\t'$REGIONS_INTEREST_COUNT'\n";' > $OUTDIR/KNOWN_MOTIFS.TXT
+        fi
     else
         touch $OUTDIR/KNOWN_MOTIFS.TXT
     fi
