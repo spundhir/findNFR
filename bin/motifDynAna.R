@@ -42,7 +42,7 @@ suppressPackageStartupMessages(library(reshape))
 suppressPackageStartupMessages(library(reshape2))
 suppressPackageStartupMessages(library(RColorBrewer))
 suppressPackageStartupMessages(library(gplots))
-suppressPackageStartupMessages(library(session))
+#suppressPackageStartupMessages(library(session))
 suppressPackageStartupMessages(library(pheatmap))
 
 ## header of DENOVO- or KNOWN-MOTIF_ENRICHMENT_DYNAMICS.TXT
