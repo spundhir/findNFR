@@ -201,7 +201,7 @@ if(is.null(opt$noFilter)) {
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## select hits that have significant pVal + minOverlap + minOddsRatio
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-if(!is.null(opt$filterPval) & is.null(opt$noFilter)) {
+if(is.null(opt$noFilter) & !is.null(opt$filterPval)) {
   ## identify significant overlaps
   TMP <- length(sig_names)
   sig_names <- sig_names[sig_names %in% row.names(df$combo_score[which(rowMin(as.matrix(df[["fishers_two_tail"]])) < opt$pVal &
