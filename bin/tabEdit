@@ -56,22 +56,22 @@ if [ "$INFILE" == "stdin" ]; then
     while read LINE; do
         echo -e "${LINE}"
     done > $TMP 
-    #perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";' > $TMP
+    #perl -an -F'\t' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";' > $TMP
     INFILE=$TMP
 fi
 
 ## perform operations on the input file
 if [ ! -z "$COL_NAME" ]; then
-    zless $INFILE | head -n 1 | perl -ane 'for($i=0; $i<scalar(@F); $i++) { if($F[$i]=~/^'$COL_NAME'$/) { print $i+1; } }'
+    zless $INFILE | head -n 1 | perl -an -F'\t' -e 'for($i=0; $i<scalar(@F); $i++) { if($F[$i]=~/^'$COL_NAME'$/) { print $i+1; } }'
 elif [ ! -z "$TAB" ]; then
-    zless $INFILE | perl -ane 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
+    zless $INFILE | perl -an -F'\s' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
 elif [ ! -z "$COMMA" ]; then
     zless $INFILE | perl -an -F'/\,/' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
 elif [ ! -z "$NCOL" ]; then
-    zless $INFILE | perl -ane 'print $F[0]; if(scalar(@F)<'$NCOL') { foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } $i='$NCOL'-scalar(@F); while($i>0) { print "\tNA"; $i--; } print "\n"; } else { foreach(@F[1..'$((NCOL-1))']) { print "\t$_"; } print "\n"; }'
+    zless $INFILE | perl -an -F'\t' -e 'print $F[0]; if(scalar(@F)<'$NCOL') { foreach(@F[1..scalar(@F)-1]) { print "\t$_"; } $i='$NCOL'-scalar(@F); while($i>0) { print "\tNA"; $i--; } print "\n"; } else { foreach(@F[1..'$((NCOL-1))']) { print "\t$_"; } print "\n"; }'
 elif [ ! -z "$REMOVE" ]; then
     #tr -s '\t' < $INFILE
-    zless $INFILE | perl -ane '$_=~s/\s+$//g; print "$_\n";'
+    zless $INFILE | perl -an -F'\t' -e '$_=~s/\s+$//g; print "$_\n";'
 elif [ ! -z "$FILTER_COL" ]; then
     if [ "$FILTER_COL" == "all" ]; then
         zless $INFILE
@@ -79,24 +79,24 @@ elif [ ! -z "$FILTER_COL" ]; then
         COLS=($(echo $FILTER_COL | tr ',' ' '));
         if [ ! -z "$KEEP_ORDER" ]; then
             FILTER_COL=$(for COL in "${COLS[@]}"; do
-                if [ "$(echo $COL | perl -ane 'if($_=~/[a-zA-Z]+/) { print 1; } else { print 0;}')" -eq 1 ]; then
-                    zless $INFILE | head -n 1 | perl -ane 'foreach(@F) { $i++; if($_=~/^'${COL}'$/) { print "$i,"; } }';
+                if [ "$(echo $COL | perl -an -F'\t' -e 'if($_=~/[a-zA-Z]+/) { print 1; } else { print 0;}')" -eq 1 ]; then
+                    zless $INFILE | head -n 1 | perl -an -F'\t' -e 'foreach(@F) { $i++; if($_=~/^'${COL}'$/) { print "$i,"; } }';
                 else
                     echo -ne "$COL,"
                 fi
             done)
-            FILTER_COL=$(echo $FILTER_COL | perl -ane '$_=~s/\,$//g; print $_;')
-            zless $INFILE | tabEdit -i stdin -t | tabEdit.R -i stdin -f $FILTER_COL
+            FILTER_COL=$(echo $FILTER_COL | perl -an -F'\t' -e '$_=~s/\,$//g; print $_;')
+            zless $INFILE | tabEdit.R -i stdin -f $FILTER_COL
         else
             FILTER_COL=$(for COL in "${COLS[@]}"; do
-                if [ "$(echo $COL | perl -ane 'if($_=~/[a-zA-Z]+/) { print 1; } else { print 0;}')" -eq 1 ]; then
-                    zless $INFILE | head -n 1 | perl -ane 'foreach(@F) { $i++; if($_=~/^'${COL}'/) { print "$i,"; } }';
+                if [ "$(echo $COL | perl -an -F'\t' -e 'if($_=~/[a-zA-Z]+/) { print 1; } else { print 0;}')" -eq 1 ]; then
+                    zless $INFILE | head -n 1 | perl -an -F'\t' -e 'foreach(@F) { $i++; if($_=~/^'${COL}'/) { print "$i,"; } }';
                 else
                     echo -ne "$COL,"
                 fi
             done)
-            FILTER_COL=$(echo $FILTER_COL | perl -ane '$_=~s/\,$//g; print $_;')
-            zless $INFILE | tabEdit -i stdin -t | cut -f $FILTER_COL
+            FILTER_COL=$(echo $FILTER_COL | perl -an -F'\t' -e '$_=~s/\,$//g; print $_;')
+            zless $INFILE | cut -f $FILTER_COL
         fi
     fi
 elif [ ! -z "$FILTER_ROW" ]; then
@@ -105,13 +105,13 @@ elif [ ! -z "$FILTER_ROW" ]; then
     else
         ROWS=($(echo $FILTER_ROW | tr ',' ' '));
         FILTER_ROW=$(for ROW in "${ROWS[@]}"; do
-            if [ "$(echo $ROW | perl -ane 'if($_=~/[a-zA-Z]+/) { print 1; } else { print 0;}')" -eq 1 ]; then
-                echo -ne "$(zless $INFILE | perl -ane '$i++; if($_=~/'${ROW}'/) { print "$i"."p;"; }')"
+            if [ "$(echo $ROW | perl -an -F'\t' -e 'if($_=~/[a-zA-Z]+/) { print 1; } else { print 0;}')" -eq 1 ]; then
+                echo -ne "$(zless $INFILE | perl -an -F'\t' -e '$i++; if($_=~/'${ROW}'/) { print "$i"."p;"; }')"
             else
                 echo -ne "${ROW}p;"
             fi
         done)
-        FILTER_ROW=$(echo $FILTER_ROW | perl -ane '$_=~s/\;$//g; print $_;')
+        FILTER_ROW=$(echo $FILTER_ROW | perl -an -F'\t' -e '$_=~s/\;$//g; print $_;')
         zless $INFILE | sed -ne ${FILTER_ROW}
     fi
 elif [ ! -z "$HEADER" ]; then
