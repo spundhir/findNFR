@@ -53,6 +53,7 @@ usage() {
 	echo "                          [if multiple separate them by a comma]"
 	echo "                          [if motif name has ',', replace it with '&']"
 	echo "                          [If not provided analysis will be done using all motifs]"
+    echo "              -F          [full match of name (-j), meaning everything before a '/']"
 	echo "              -f          [output histogram file only (default: histogram + annotation)]"
 	echo "              -D <int>    [bin size of region for histogram (default: 10 bp)]"
 	echo " -g <string> [genome for which to perform the analysis (mm9, hg19, mm10, hg38, danRer7; default: mm9)]"
@@ -74,7 +75,7 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fD:g:p:d:Gh ARG; do
+while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:FfD:g:p:d:Gh ARG; do
 	case "$ARG" in
 	i) BEDFILE=$OPTARG;;
         o) OUTDIR=$OPTARG;;
@@ -91,6 +92,7 @@ while getopts i:o:m:s:t:u:v:w:x:y:z:n:b:l:j:fD:g:p:d:Gh ARG; do
         b) BKG_FILE=$OPTARG;;
         l) LIST=$OPTARG;;
         j) MOTIF_NAME=$OPTARG;;
+        F) FULLMATCH=1;;
         f) FORMAT_HIST=1;;
         D) BIN_SIZE_HIST=$OPTARG;;
         g) GENOME=$OPTARG;;
@@ -280,8 +282,12 @@ elif [ ! -z "$LIST" ]; then
     then
         echo -n "Create motif file depending upon input motifs of interest.. "
         TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
-        #zless $PWM | extractMotifs -i stdin -j $MOTIF_NAME > $TMP
-        COMMAND="zless $PWM | extractMotifs -i stdin -j \"$MOTIF_NAME\" > $TMP"
+        if [ ! -z "${FULLMATCH}" ]; then
+            COMMAND="zless $PWM | extractMotifs -i stdin -j \"$MOTIF_NAME\" -F > $TMP"
+        else
+            #zless $PWM | extractMotifs -i stdin -j $MOTIF_NAME > $TMP
+            COMMAND="zless $PWM | extractMotifs -i stdin -j \"$MOTIF_NAME\" > $TMP"
+        fi
         eval ${COMMAND}
         echo "done"
         PWM=$TMP
