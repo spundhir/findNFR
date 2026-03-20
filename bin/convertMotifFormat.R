@@ -70,8 +70,9 @@ if(opt$outFormat=="homer") {
 }
 
 if(!is.null(opt$reduceScore)) {
-    cat(readLines(pipe(sprintf("cat %s | awk -v OFS='\t' '{ if($0 ~ /^>/) { print $1,$2,$3-4; } else { print $0; }}'", tmpOutFile))), sep="\n")
+    cat(readLines(pipe(sprintf("cat %s | awk -v OFS='\t' '{ if($0 ~ /^>/) { print $1,$2\"/\"$(gsub(\">\", \"\", $1)),$3-4; } else { print $0; }}'", tmpOutFile))), sep="\n")
 } else {
-    cat(readLines(tmpOutFile), sep="\n")
+    cat(readLines(pipe(sprintf("cat %s | awk -v OFS='\t' '{ if($0 ~ /^>/) { print $1,$2\"/\"$(gsub(\">\", \"\", $1)),$3; } else { print $0; }}'", tmpOutFile))), sep="\n")
+    #cat(readLines(tmpOutFile), sep="\n")
 }
 q()
