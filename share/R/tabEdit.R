@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 suppressPackageStartupMessages(library("optparse"))
-suppressPackageStartupMessages(library("session"))
+#suppressPackageStartupMessages(library("session"))
 
 ## parse command line arguments
 option_list <- list(
