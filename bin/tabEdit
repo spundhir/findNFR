@@ -90,7 +90,7 @@ elif [ ! -z "$FILTER_COL" ]; then
         else
             FILTER_COL=$(for COL in "${COLS[@]}"; do
                 if [ "$(echo $COL | perl -an -F'\t' -e 'if($_=~/[a-zA-Z]+/) { print 1; } else { print 0;}')" -eq 1 ]; then
-                    zless $INFILE | head -n 1 | perl -an -F'\t' -e 'foreach(@F) { $i++; if($_=~/^'${COL}'/) { print "$i,"; } }';
+                    zless $INFILE | head -n 1 | perl -an -F'\t' -e 'foreach(@F) { $i++; if($_=~/^'${COL}'$/) { print "$i,"; } }';
                 else
                     echo -ne "$COL,"
                 fi
