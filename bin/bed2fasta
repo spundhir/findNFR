@@ -14,8 +14,8 @@ usage() {
 	echo "Usage: bed2fasta -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
     echo " -i <coor>   [input genomic coordinate file in BED format (can be stdin)]"
-    echo " -g <genome> [genome (mm10 or hg38; default: mm10)]"
     echo "[OPTIONS]"
+    echo " -g <genome> [genome (mm10 or hg38; default: mm10)]"
     echo " -k <int>    [the coordinate is 0-based or 1-based (default: 0)]"
     echo "             [0: BED and BAM]"
     echo "             [1: GFF, GTF, SAM and VCF]"
@@ -64,7 +64,6 @@ if [ ! -f "$FASTAFILE" ]; then
     echo
     usage
 fi
->&2 echo "done"
 
 ## create temporary BED file if input is from stdin
 if [ "$COORFILE" == "stdin" ]; then

@@ -1,0 +1,86 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+GENOME="mm10"
+BASED=0
+PVALUE=0.0001
+PROCESSOR=1
+
+#### usage ####
+usage() {
+    echo
+	echo Program: "bed2motifScan (scan sequence motif in input genomic coordinate(s))"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: bed2motifScan -i <file> -j <file> [OPTIONS]"
+	echo "Options:"
+    echo " -i <file>   [input genomic coordinate file in BED format (can be stdin)]"
+    echo " -j <file>   [input sequence motifs file in meme format]"
+    echo "[OPTIONS]"
+    echo " -g <genome> [genome (mm10 or hg38; default: ${GENOME})]"
+    echo " -p <float>  [pvalue for TOBIAS (default: ${PVALUE})]"
+    echo " -P <nt>     [number of processors to use (default: ${PROCESSOR})]"
+	echo " -h          [help]"
+	echo
+	exit 0
+}
+
+#### parse options ####
+while getopts i:j:g:p:P:h ARG; do
+	case "$ARG" in
+        i) COORFILE=$OPTARG;;
+        j) MOTIFFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
+        p) PVALUE=1;;
+        P) PROCESSOR=1;;
+		h) HELP=1;;
+	esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$COORFILE" -o "$HELP" ]; then
+	usage
+fi
+
+###################
+#helperfunction
+function wait_for_jobs_to_finish {
+    for job in `jobs -p`
+    do
+        echo $job
+        wait $job
+    done
+    echo $1
+}
+###############
+
+## initialize genome sequence file
+FASTAFILE=$(initialize_genome -g ${GENOME} -F)
+if [ ! -f "$FASTAFILE" ]; then
+    echo
+    echo "computation for $GENOME is not available yet"
+    echo "please add the chromosome size file for $FASTAFILE at $FINDNFRPATH/data/annotations"
+    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    echo
+    usage
+fi
+
+## create temporary BED file if input is from stdin
+TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+if [ "$COORFILE" == "stdin" ]; then
+    while read LINE; do
+        echo -e "${LINE}"
+    done > $TMP
+    COORFILE=$TMP
+fi
+
+## scan motifs
+TOBIAS TFBScan --motifs ${MOTIFFILE} --fasta ${FASTAFILE} --cores ${PROCESSOR} --regions ${COORFILE} --add-region-columns --pvalue ${PVALUE} --outfile ${TMP}.motifScan --verbosity 0
+cat ${TMP}.motifScan
+
+## remove temporary file if exists
+if [ "$COORFILE" == "stdin" ]; then
+    rm $TMP
+fi
+rm ${TMP}.motifScan
