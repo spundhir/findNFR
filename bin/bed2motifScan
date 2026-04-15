@@ -80,7 +80,7 @@ TOBIAS TFBScan --motifs ${MOTIFFILE} --fasta ${FASTAFILE} --cores ${PROCESSOR} -
 cat ${TMP}.motifScan
 
 ## remove temporary file if exists
-if [ "$COORFILE" == "stdin" ]; then
+if [ -f "${TMP}" ]; then
     rm $TMP
 fi
 rm ${TMP}.motifScan

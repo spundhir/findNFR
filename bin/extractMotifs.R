@@ -9,7 +9,8 @@ option_list <- list(
     make_option(c("-F", "--outFormat"), default="homer", help="format of motifs in output file (homer, jaspar, meme, transfac, uniprobe, cisbp, matrix; default=%default)"),
 	make_option(c("-P", "--motifPlotFile"), help="pdf file to plot the motif(s) as sequence logo"),
 	make_option(c("-W", "--motifPlotWidth"), default=6, help="plot width (default=%default)"),
-	make_option(c("-H", "--motifPlotHeight"), default=10, help="plot height (default=%default)")
+	make_option(c("-H", "--motifPlotHeight"), default=10, help="plot height (default=%default)"),
+	make_option(c("-M", "--fullMatch"), action="store_true", help="full match of name")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -61,8 +62,11 @@ tmpOutFile <- tempfile(fileext = ".txt")
 
 ## extract motifs of interest
 #df <- df[which(grepl("^Msx3$", sapply(df, slot, "name")))]
-df <- df[grepl(paste0("^", gsub(",", "|^", opt$motifName)), sapply(df, slot, "name"))]
-#df <- df[grepl(paste0(paste0("^", gsub(",", "|^", opt$motifName)), "$"), sapply(df, slot, "name"))]
+if(!is.null(opt$fullMatch)) { 
+    df <- df[grepl(paste0(paste0("^", gsub(",", "|^", opt$motifName)), "$"), sapply(df, slot, "name"))]
+} else {
+    df <- df[grepl(paste0("^", gsub(",", "|^", opt$motifName)), sapply(df, slot, "name"))]
+}
 
 ## plot extracted motifs as sequence logo
 if(!is.null(opt$motifPlotFile)) {
