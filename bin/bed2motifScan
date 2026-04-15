@@ -16,7 +16,7 @@ usage() {
 	echo "Usage: bed2motifScan -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
     echo " -i <file>   [input genomic coordinate file in BED format (can be stdin)]"
-    echo " -j <file>   [input sequence motifs file in meme format]"
+    echo " -j <file>   [input sequence motifs file in MEME format]"
     echo "[OPTIONS]"
     echo " -g <genome> [genome (mm10 or hg38; default: ${GENOME})]"
     echo " -p <float>  [pvalue for TOBIAS (default: ${PVALUE})]"
