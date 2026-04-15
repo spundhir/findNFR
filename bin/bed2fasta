@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -l nodes=1:ppn=4
 
-GENOME="mm9"
+GENOME="mm10"
 BASED=0
 
 #### usage ####
@@ -14,7 +14,7 @@ usage() {
 	echo "Usage: bed2fasta -i <file> -j <file> [OPTIONS]"
 	echo "Options:"
     echo " -i <coor>   [input genomic coordinate file in BED format (can be stdin)]"
-    echo " -j <file>   [reference genome sequence as fasta file]"
+    echo " -g <genome> [genome (mm10 or hg38; default: mm10)]"
     echo "[OPTIONS]"
     echo " -k <int>    [the coordinate is 0-based or 1-based (default: 0)]"
     echo "             [0: BED and BAM]"
@@ -27,10 +27,10 @@ usage() {
 }
 
 #### parse options ####
-while getopts i:j:k:sh ARG; do
+while getopts i:g:k:sh ARG; do
 	case "$ARG" in
         i) COORFILE=$OPTARG;;
-        j) FASTAFILE=$OPTARG;;
+        g) GENOME=$OPTARG;;
         k) BASED=$OPTARG;;
         s) STRAND=1;;
 		h) HELP=1;;
@@ -38,7 +38,7 @@ while getopts i:j:k:sh ARG; do
 done
 
 ## usage, if necessary file and directories are given/exist
-if [ ! -f "$FASTAFILE" -o -z "$COORFILE" -o "$HELP" ]; then
+if [ -z "$COORFILE" -o "$HELP" ]; then
 	usage
 fi
 
@@ -53,6 +53,18 @@ function wait_for_jobs_to_finish {
     echo $1
 }
 ###############
+
+## initialize genome sequence file
+FASTAFILE=$(initialize_genome -g ${GENOME} -F)
+if [ ! -f "$FASTAFILE" ]; then
+    echo
+    echo "computation for $GENOME is not available yet"
+    echo "please add the chromosome size file for $FASTAFILE at $FINDNFRPATH/data/annotations"
+    echo "also update the $FINDNFRPATH/data/annotations/GENOME_FILE"
+    echo
+    usage
+fi
+>&2 echo "done"
 
 ## create temporary BED file if input is from stdin
 if [ "$COORFILE" == "stdin" ]; then
