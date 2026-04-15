@@ -79,7 +79,6 @@ names(seqs) <- paste0(
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## save output files
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-#writeXStringSet(seqs, filepath = "t.fasta")
-#writeLines(as.vector(rbind(names(seqs), seqs)), "")
-writeLines(seqs, "")
+#Biostrings::writeXStringSet(seqs, filepath = "t.fasta")
+cat(paste0(">", names(seqs), "\n", as.character(seqs)), sep = "\n")
 q()
