@@ -38,7 +38,7 @@ if(identical(opt$inFile, "stdin")==T) {
     opt$inFile <- tmpInFile
 
     ## remove temporary files
-    invisible(file.remove(c(tmpInFile)))
+    #invisible(file.remove(c(tmpInFile)))
 }
 
 if(opt$inFormat=="homer") {
