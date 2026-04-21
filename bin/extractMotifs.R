@@ -5,7 +5,7 @@ suppressPackageStartupMessages(library("optparse"))
 option_list <- list(
 	make_option(c("-i", "--inFile"), help="input file containing motifs (can be stdin)"),
 	make_option(c("-j", "--motifName"), help="name of motifs needs to be extracted. if multiple, separate them by a comma"),
-    make_option(c("-f", "--inFormat"), default="matrix", help="format of motifs in input file (homer, jaspar, meme, transfac, uniprobe, cisbp, matrix; default=%default)"),
+    make_option(c("-f", "--inFormat"), default="homer", help="format of motifs in input file (homer, jaspar, meme, transfac, uniprobe, cisbp, matrix; default=%default)"),
     make_option(c("-F", "--outFormat"), default="homer", help="format of motifs in output file (homer, jaspar, meme, transfac, uniprobe, cisbp, matrix; default=%default)"),
 	make_option(c("-P", "--motifPlotFile"), help="pdf file to plot the motif(s) as sequence logo"),
 	make_option(c("-W", "--motifPlotWidth"), default=6, help="plot width (default=%default)"),
@@ -33,7 +33,7 @@ suppressPackageStartupMessages(library(universalmotif))
 ## read input motif file
 if(identical(opt$inFile, "stdin")==T) {
     tmpInFile <- tempfile(fileext = ".txt")
-    #tmpInFile <- "/localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2025_version/t.txt"
+    #tmpInFile <- "t.txt"
     writeLines(readLines(file("stdin")), tmpInFile)
     opt$inFile <- tmpInFile
 
