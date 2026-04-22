@@ -199,6 +199,9 @@ STRAND_NOTGIVEN=$(cat $OUTDIR/BEDFILE_INTEREST.TXT | cut -f 6 | sort | uniq | gr
 #echo $STRAND_NOTGIVEN; exit
 echo -e "$(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { if('$STRAND_NOTGIVEN') { print "$F[5]\n"; } else { print "$F[6]\n"; } }' | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1] "; }';) (`date`)"
 
+## IMPORTANT NOTE (check if <homer dir>/data/genomes/mm10/preparsed/ contains file for your input region size. If not running multiple instances of motifAna will create duplicate sequences and error in findMotifs.log
+#echo $(bed2pos.pl -i $OUTDIR/BEDFILE_INTEREST.TXT -check 2>/dev/null | awk -v OFS="\t" '{ sum += $4-$3; n++; } END {print sum/n}');
+
 for CLASS in $(cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if($F[1]=~/^[0-9]+$/) { if('$STRAND_NOTGIVEN') { print "$F[5]\n"; } else { print "$F[6]\n"; } }' | sort | uniq -c | sed -E 's/^\s+//g' | perl -ane 'if($F[0]>='$MIN_N_CLASS') { print "$F[1]\n"; }'); do
     ID=$(echo $CLASS | perl -ane 'if($_=~/^\.$/) { print "other"; } else { $_=~s/\,/\_/g; print $_; }')
     cat $OUTDIR/BEDFILE_INTEREST.TXT | perl -ane 'if('$STRAND_NOTGIVEN') { if($F[5]=~/^'$CLASS'$/) { print $_; } } else { if($F[6]=~/^'$CLASS'$/) { print $_; } }' > $OUTDIR/enhancer_$ID.bed
