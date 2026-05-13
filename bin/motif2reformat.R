@@ -78,5 +78,7 @@ if(!is.null(opt$reduceScore)) {
 }
 
 ## remove temporary files
-file.remove(c(tmpInFile, tmpOutFile))
+if(exists("tmpInFile")) { file.remove(c(tmpInFile)); }
+file.remove(c(tmpOutFile))
+
 q()
