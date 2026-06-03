@@ -4,7 +4,7 @@ suppressPackageStartupMessages(library(seqPattern))
 
 ## parse command line arguments
 option_list <- list(
-	make_option(c("-i", "--bedFile"), help="input BED file, can be stdin\n\t\tformat: chr strand end name score strand promoter_class"),
+	make_option(c("-i", "--bedFile"), help="input BED file, can be stdin\n\t\tformat: chr strand end name score strand class"),
     #make_option(c("-m", "--motifFile"), help="input PWM file"),
     make_option(c("-g", "--genome"), default="mm10", help="genome (default: %default)"),
     make_option(c("-o", "--outPDF"), help="output pdf file")
@@ -53,7 +53,7 @@ coor <- GRanges(seqnames = data[,1],
                 ranges = IRanges(start = data[,2],
                                  end = data[,2]),
                 strand = data[,6],
-                promoter_class = data[,7],
+                class = data[,7],
                 seqlengths = GENOME)
 
 ## define windows
@@ -70,9 +70,9 @@ if(opt$genome=="mm9" | opt$genome=="mm10") {
 }
 
 ## identify row index of narrow, medium and broad promoters
-sIdx <- coor$promoter_class=="1_narrow"
-mIdx <- coor$promoter_class=="2_medium"
-bIdx <- coor$promoter_class=="3_broad"
+sIdx <- coor$class=="1_narrow"
+mIdx <- coor$class=="2_medium"
+bIdx <- coor$class=="3_broad"
 
 ## create output pdf file
 pdf(opt$outPDF)
@@ -92,7 +92,7 @@ pdf(opt$outPDF)
     NAME="BREd,BREu,CCAAT,DCE_S_I,DCE_S_II,DCE_S_III,DPE,GC,INR,MED,MTE,TATA,XCPE1";
     lapply(unlist(strsplit(NAME, ",")), function(x) {
         x <- gsub("-.*", "", x)
-        PWM <- as.matrix(read.table(pipe(sprintf("less /localhome/bric/xfd783/software/homer/data/knownTFs/vertebrates/2021_version/jaspar/JASPAR2020_POLII_pfms_jaspar.txt | sed -E 's/^.*\\[\\s+//g' | sed -E 's/\\]//g' | grep -w %s -A 4 | grep -v '>'", as.character(x)))))
+        PWM <- as.matrix(read.table(pipe(sprintf("less /home/xfd783/data/09_ALL_PUBLIC/database/04_motifCatalog/homerDB/2021_version/jaspar/JASPAR2020_POLII_pfms_jaspar.txt | sed -E 's/^.*\\[\\s+//g' | sed -E 's/\\]//g' | grep -w %s -A 4 | grep -v '>'", as.character(x)))))
         row.names(PWM) <- c("A", "C", "G", "T")
 
         ## plot motif frequency plots
