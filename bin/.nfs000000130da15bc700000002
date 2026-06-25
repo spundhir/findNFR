@@ -102,7 +102,6 @@ echo done
 if [ ! -z "$COPYDIR" ]; then
     echo -n "Copying ${BAMFILE} file to ${COPYDIR} for faster processing (`date`).. "
     scp ${BAMFILE} ${BAMFILE}.bai $COPYDIR
-    chmod 644 $COPYDIR
     ID=`echo $BAMFILE | perl -ane '$_=~s/^.+\///g; print $_;'`;
     BAMFILE="$COPYDIR/$ID"
     OUTDIR=${COPYDIR}
