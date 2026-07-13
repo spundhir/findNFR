@@ -73,3 +73,4 @@ fi
 #module load sratoolkit/3.0.0
 #cat GSE110900.ffq | cut -f 3 | sort | uniq | grep -v name | cut -f 1 | parallel -j 1 'fasterq-dump {} --split-files -O fastq -e 8'
 #cat GSE110900.ffq | cut -f 3 | sort | uniq | while read -a line; do ffq --ftp ${line} | grep --color=auto -E "url\":" | sed -E 's/^\s+.*\:\/\///g' | sed -E 's/\"//g' | parallel -j 1 'wget {} -P fastq'; done
+#less GSE249199.ffq | grep HOXA9 | cut -f 2,3 | while read -a line; do ID=$(echo ${line[0],,} | sed -E 's/[\/\,\&\+]//g'); echo mapPEReads.sh -i fastq/${line[1]}_1.fastq.gz -j fastq/${line[1]}_2.fastq.gz -g mm10 -p 10 -y ~/project/misc/copy_and_analyze/ -u -c -e -d ${ID}; done
