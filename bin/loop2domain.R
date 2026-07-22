@@ -135,11 +135,11 @@ if (opt$genome == "mm10") {
   #                            dplyr::filter(group_name %in% entrez_ids$entrez_id),
   #                        entrez_ids, by.x="group_name", by.y="entrez_id") %>%
   #                    dplyr::arrange(seqnames, start, end) %>% dplyr::select(gene_name) %>% unlist
-  GENE_COOR <- read.table("/home/xfd783/genomes/annotations/BED/mm10_ensembl_gene.bed")[, c(1:6)] %>%
+  GENE_COOR <- read.table("/home/xfd783/data/13_ALL_ANNOTATIONS/annotations/BED/mm10_ensembl_gene.bed")[, c(1:6)] %>%
     "colnames<-"(c("chr", "start", "end", "name", "score", "strand")) %>%
     arrange(name) %>%
     distinct(name, .keep_all = T)
-  GENE_SORTED <- read.table("/home/xfd783/genomes/annotations/BED/mm10_ensembl_tss.bed") %>%
+  GENE_SORTED <- read.table("/home/xfd783/data/13_ALL_ANNOTATIONS/annotations/BED/mm10_ensembl_tss.bed") %>%
     dplyr::arrange(V1, V2, V3) %>%
     dplyr::select(V4) %>%
     unique() %>%
@@ -159,11 +159,11 @@ if (opt$genome == "mm10") {
   #                            dplyr::filter(group_name %in% entrez_ids$entrez_id),
   #                        entrez_ids, by.x="group_name", by.y="entrez_id") %>%
   #                    dplyr::arrange(seqnames, start, end) %>% dplyr::select(gene_name) %>% unlist
-  GENE_COOR <- read.table("/home/xfd783/genomes/annotations/BED/hg38_ensembl_gene.bed")[, c(1:6)] %>%
+  GENE_COOR <- read.table("/home/xfd783/data/13_ALL_ANNOTATIONS/annotations/BED/hg38_ensembl_gene.bed")[, c(1:6)] %>%
     "colnames<-"(c("chr", "start", "end", "name", "score", "strand")) %>%
     arrange(name) %>%
     distinct(name, .keep_all = T)
-  GENE_SORTED <- read.table("/home/xfd783/genomes/annotations/BED/hg38_ensembl_tss.bed") %>%
+  GENE_SORTED <- read.table("/home/xfd783/data/13_ALL_ANNOTATIONS/annotations/BED/hg38_ensembl_tss.bed") %>%
     dplyr::arrange(V1, V2, V3) %>%
     dplyr::select(V4) %>%
     unique() %>%

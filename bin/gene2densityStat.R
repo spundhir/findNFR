@@ -68,7 +68,7 @@ GENOME_FILE <- system(sprintf("source ~/.bashrc && initialize_genome -g %s", opt
 TMP_FILE <- paste0("/tmp/file_", format(Sys.time(), "%Y%m%d_%H%M%S"), ".txt")
 write.table(bed2window(genes, win = 1, flank_to_tss = T) %>% arrange(chr, start, end), 
                 TMP_FILE, sep = "\t", quote = F, row.names = F, col.names = F) ## IMP PARAM
-## -k parameter (grep -w protein_coding /home/xfd783/genomes/annotations/BED/mm10_ensembl_gene.bed | cut -f 1 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1)
+## -k parameter (grep -w protein_coding /home/xfd783/data/13_ALL_ANNOTATIONS/annotations/BED/mm10_ensembl_gene.bed | cut -f 1 | sort | uniq -c | sed -E 's/^\s+//g' | sort -k 1rn,1)
 ## -k parameter can also be sort(table(genes$chr), decreasing = T)[1]
 CMD <- sprintf("source ~/.bashrc && closestBed -a %s -b %s -d -k 2500 -N -g %s", TMP_FILE, TMP_FILE, GENOME_FILE)
 df <- read.delim(text=system(CMD, intern = T), sep="\t", header = F)
