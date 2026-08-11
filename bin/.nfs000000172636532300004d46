@@ -104,7 +104,7 @@ if [ ! -z "$COPYDIR" ]; then
     scp ${BAMFILE} ${BAMFILE}.bai $COPYDIR
     ID=`echo $BAMFILE | perl -ane '$_=~s/^.+\///g; print $_;'`;
     BAMFILE="$COPYDIR/$ID"
-    chmod 644 $COPYDIR/$ID $COPYDIR/$ID.bai
+    chmod 644 $COPYDIR/$ID
     OUTDIR=${COPYDIR}
     echo "done"
 fi
