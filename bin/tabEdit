@@ -64,7 +64,7 @@ fi
 if [ ! -z "$COL_NAME" ]; then
     zless $INFILE | head -n 1 | perl -an -F'\t' -e 'for($i=0; $i<scalar(@F); $i++) { if($F[$i]=~/^'$COL_NAME'$/) { print $i+1; } }'
 elif [ ! -z "$TAB" ]; then
-    zless $INFILE | perl -an -F'\s' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
+    zless $INFILE | perl -an -F'\s+' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
 elif [ ! -z "$COMMA" ]; then
     zless $INFILE | perl -an -F'/\,/' -e 'if($_=~/^#/) { print $_; next; } $line=""; foreach(@F) { $line.="$_\t"; } $line=~s/\t+$//g; $line=~s/\s+$//g; print "$line\n";'
 elif [ ! -z "$NCOL" ]; then
