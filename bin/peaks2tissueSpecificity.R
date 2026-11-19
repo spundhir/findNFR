@@ -83,8 +83,8 @@ if(length(grep("FALSE", unlist(lapply(df[1,], function(x) is.na(suppressWarnings
     df <- df[-1,];
 } else {
     df <- df[,c(1:7)]
-    colnames(df) <- c("chr", "start", "end", "name", "score", "strand", "tissue")
 }
+colnames(df)[c(1:7)] <- c("chr", "start", "end", "name", "score", "strand", "tissue")
 #df <- read.table(pipe("zcat /home/xfd783/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/chipAtlas/hg38/hg38_atac_tissueSpecificity.bed.gz | head -n 10"), header=T)[,c(1:7)] %>% 'colnames<-'(c("chr", "start", "end", "name", "score", "strand", "tissue"))
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
@@ -102,22 +102,31 @@ if(is.null(opt$useMeuleman)) {
     mat$tau <- apply(log2(mat+1), 1, vector2tau)
     mat$meanSignal <- rowMeans(mat)
     df <- merge(df, mat, by.x="name", by.y="row.names")
-    df <- df[,c(2:4,1,5:ncol(df))] %>% relocate(tau, .before=strand) %>% relocate(meanSignal, .after=strand) %>% relocate(scoreRaw=score, .after=meanSignal) %>% relocate(tissueRaw=tissue, .after=scoreRaw)
+    df <- df[,c(2:4,1,5:ncol(df))] %>% relocate(tau, .before=strand) %>% 
+      relocate(meanSignal, .after=strand) %>% 
+      relocate(scoreRaw=score, .after=meanSignal) %>% 
+      relocate(tissueRaw=tissue, .after=scoreRaw)
 } else {
     counts <- fread("~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/dhsCatalog/hg38/dat_FDR01_hg38.txt.gz", header=F)
     metaData <- fread("~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/dhsCatalog/hg38/DHS_Index_and_Vocabulary_metadata.tsv", header=T)
     
-    mat <- as.data.frame(lapply(unique(metaData[which(metaData$Organ!=""),]$Organ), function(x) {
-                                                                          i <- which(metaData$Organ==x)
-                                                                          rowMeans(counts[,..i])
-                                                                        }
-                                )
-                         )
-    df$tau <- apply(mat, 1, vector2tau)
-    df$meanSignal <- rowMeans(mat)
-    df <- df %>% relocate(tau, .before=strand) %>% relocate(meanSignal, .after=strand) %>% relocate(mean_signal, .after=meanSignal)
+    #mat <- as.data.frame(lapply(unique(metaData[which(metaData$Organ!=""),]$Organ), function(x) {
+    #                                                                      i <- which(metaData$Organ==x)
+    #                                                                      rowMeans(counts[,..i])
+    #                                                                    }
+    #                            )
+    #                     )
+    #df$tau <- apply(mat, 1, vector2tau)
+    #df$meanSignal <- rowMeans(mat)
+
+    df$tau <- apply(counts, 1, vector2tau)
+    df$meanSignal <- rowMeans(counts)
+    df <- df %>% relocate(tau, .before=strand) %>% 
+      relocate(meanSignal, .after=strand) %>% 
+      relocate(scoreRaw=score, .after=meanSignal) %>% 
+      relocate(tissueRaw=tissue, .after=scoreRaw)
     #df$gini <- apply(mat, 1, function(x) DescTools::Gini(x, na.rm = T))
-    # ggscatter_with_contour(df, var_x="numsamples", var_y="tau")
+    #ggscatter_with_contour(df, var_x="numsamples", var_y="tau")
 }
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
