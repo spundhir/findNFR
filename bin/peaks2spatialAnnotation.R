@@ -51,7 +51,7 @@ if(identical(opt$inFile, "stdin")==T) {
 } else {
     peaks <- read.table(opt$inFile)
 }
-# peaks <- read.table(pipe("zcat ~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/dhsCatalog/mm10_ocr.bed.gz | head -n 1000"), header=F)
+# peaks <- read.table(pipe("zcat ~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/paper/mm10_ocr.bed.gz | head -n 1000"), header=F)
 
 ## check if file has header (all elements in the first row are non-numeric)
 if(length(grep("FALSE", unlist(lapply(peaks[1,], function(x) is.na(suppressWarnings(as.numeric(x)))))))==0) {

@@ -107,8 +107,8 @@ if(is.null(opt$useMeuleman)) {
       relocate(scoreRaw=score, .after=meanSignal) %>% 
       relocate(tissueRaw=tissue, .after=scoreRaw)
 } else {
-    counts <- fread("~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/dhsCatalog/hg38/dat_FDR01_hg38.txt.gz", header=F)
-    metaData <- fread("~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/dhsCatalog/hg38/DHS_Index_and_Vocabulary_metadata.tsv", header=T)
+    counts <- fread("~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/paper/hg38/dat_FDR01_hg38.txt.gz", header=F)
+    metaData <- fread("~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/paper/hg38/DHS_Index_and_Vocabulary_metadata.tsv", header=T)
     
     #mat <- as.data.frame(lapply(unique(metaData[which(metaData$Organ!=""),]$Organ), function(x) {
     #                                                                      i <- which(metaData$Organ==x)
