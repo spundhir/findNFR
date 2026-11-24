@@ -81,7 +81,7 @@ if [ ! -z "${REFORMAT}" ]; then
         zless ${INFILE} | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | awk -v OFS="\t" '{ i++; print $0,"."; }'
     elif [ "${NCOL}" -ge 6 ]; then
         if [ "${FORMAT_COL4}" == "numeric" ]; then
-            zless $INFILE | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | awk -v OFS="\t" '{ i++; for (j=NF+3; j>=4; j--) { $j=$(j-3); } $4="ocr"i; $5=0; $6="."; print }'
+            zless $INFILE | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | awk -v OFS="\t" '{ i++; for (j=NF+3; j>=4; j--) { $j=$(j-3); } $4="ocr_"i; $5=0; $6="."; print }'
         fi
     fi
 else

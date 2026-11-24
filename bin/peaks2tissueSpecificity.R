@@ -135,7 +135,9 @@ if(!is.null(opt$useMeuleman)) {
       relocate(scoreRaw=score, .after=meanSignal) %>% 
       relocate(tissueRaw=tissue, .after=scoreRaw)
 } else {
-    df[,c(7:ncol(df))] <- df[,c(7:ncol(df))] %>% dplyr::mutate(across(everything(), as.numeric))
+    df[,c(7:ncol(df))] <- df[,c(7:ncol(df))] %>%
+                            dplyr::mutate(across(everything(), as.numeric)) %>%
+                            dplyr::mutate(across(where(is.numeric), ~ pmax(.x, 0)))
     df$tau <- apply(df[,c(7:ncol(df))], 1, vector2tau)
     df$meanSignal <- rowMeans(df[,c(7:ncol(df))])
     df$tissue = NA
