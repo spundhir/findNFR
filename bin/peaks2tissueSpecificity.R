@@ -5,7 +5,10 @@ suppressPackageStartupMessages(library("optparse"))
 ## parse command line arguments
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 option_list <- list(
-	make_option(c("-i", "--inFile"), help="bed file (can be stdin) [format: chr start end name score (comma sep.) strand tissue (comma sep.)]"),
+	make_option(c("-i", "--inFile"), help="bed file (can be stdin)
+                [format: chr start end name score (comma sep.) strand tissue (comma sep.)]
+                             OR
+                [format: chr start end name score strand score (tab sep.; one per sample)"),
 	make_option(c("-M", "--useMeuleman"), action="store_true", help="compute using data from Meuleman et al. 2020")
 )
 
@@ -81,32 +84,20 @@ if (identical(opt$inFile, "stdin") == T) {
 if(length(grep("FALSE", unlist(lapply(df[1,], function(x) is.na(suppressWarnings(as.numeric(x)))))))==0) {
     colnames(df) <- unlist(df[1,]); 
     df <- df[-1,];
-} else {
+} 
+
+## format column names
+colnames(df)[c(1:6)] <- c("chr", "start", "end", "name", "score", "strand")
+if(length(which(grepl(",", df[,5])==T))>0) {
     df <- df[,c(1:7)]
+    colnames(df)[c(7)] <- c("tissue")
 }
-colnames(df)[c(1:7)] <- c("chr", "start", "end", "name", "score", "strand", "tissue")
 #df <- read.table(pipe("zcat /home/xfd783/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/chipAtlas/hg38/hg38_atac_tissueSpecificity.bed.gz | head -n 10"), header=T)[,c(1:7)] %>% 'colnames<-'(c("chr", "start", "end", "name", "score", "strand", "tissue"))
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
 ## start analysis based on input bed file
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##
-if(is.null(opt$useMeuleman)) {
-    dfE <- cbind((df %>% separate_longer_delim(score, delim = ",") %>% dplyr::select(!tissue)), (df %>% separate_longer_delim(tissue, delim = ",") %>% dplyr::select(tissue)))
-    dfE <- aggregate(as.numeric(score) ~ chr + start + end + name + strand + tissue, dfE, FUN = mean) %>% 
-              'colnames<-'(c("chr", "start", "end", "name", "strand", "tissue", "score")) %>% 
-              dplyr::select(c("chr", "start", "end", "name", "score", "strand", "tissue")) %>% 
-              dplyr::arrange(chr, start, end, name)
-    mat <- matrix(0, length(unique(dfE$name)), length(unique(dfE$tissue)), dimnames = list(unique(dfE$name), unique(dfE$tissue)))
-    mat[cbind(dfE$name, dfE$tissue)] <- as.numeric(dfE$score)
-    mat <- as.data.frame(mat)
-    mat$tau <- apply(log2(mat+1), 1, vector2tau)
-    mat$meanSignal <- rowMeans(mat)
-    df <- merge(df, mat, by.x="name", by.y="row.names")
-    df <- df[,c(2:4,1,5:ncol(df))] %>% relocate(tau, .before=strand) %>% 
-      relocate(meanSignal, .after=strand) %>% 
-      relocate(scoreRaw=score, .after=meanSignal) %>% 
-      relocate(tissueRaw=tissue, .after=scoreRaw)
-} else {
+if(!is.null(opt$useMeuleman)) {
     counts <- fread("~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/paper/hg38/dat_FDR01_hg38.txt.gz", header=F)
     metaData <- fread("~/data/09_ALL_PUBLIC/database/02_accessibilityCatalog/paper/hg38/DHS_Index_and_Vocabulary_metadata.tsv", header=T)
     
@@ -125,8 +116,33 @@ if(is.null(opt$useMeuleman)) {
       relocate(meanSignal, .after=strand) %>% 
       relocate(scoreRaw=score, .after=meanSignal) %>% 
       relocate(tissueRaw=tissue, .after=scoreRaw)
-    #df$gini <- apply(mat, 1, function(x) DescTools::Gini(x, na.rm = T))
+    #df$gini <- apply(counts, 1, function(x) DescTools::Gini(x, na.rm = T))
     #ggscatter_with_contour(df, var_x="numsamples", var_y="tau")
+} else if(length(which(grepl(",", df$score)==T))>0) {
+    dfE <- cbind((df %>% separate_longer_delim(score, delim = ",") %>% dplyr::select(!tissue)), (df %>% separate_longer_delim(tissue, delim = ",") %>% dplyr::select(tissue)))
+    dfE <- aggregate(as.numeric(score) ~ chr + start + end + name + strand + tissue, dfE, FUN = mean) %>% 
+              'colnames<-'(c("chr", "start", "end", "name", "strand", "tissue", "score")) %>% 
+              dplyr::select(c("chr", "start", "end", "name", "score", "strand", "tissue")) %>% 
+              dplyr::arrange(chr, start, end, name)
+    mat <- matrix(0, length(unique(dfE$name)), length(unique(dfE$tissue)), dimnames = list(unique(dfE$name), unique(dfE$tissue)))
+    mat[cbind(dfE$name, dfE$tissue)] <- as.numeric(dfE$score)
+    mat <- as.data.frame(mat)
+    mat$tau <- apply(log2(mat+1), 1, vector2tau)
+    mat$meanSignal <- rowMeans(mat)
+    df <- merge(df, mat, by.x="name", by.y="row.names")
+    df <- df[,c(2:4,1,5:ncol(df))] %>% relocate(tau, .before=strand) %>% 
+      relocate(meanSignal, .after=strand) %>% 
+      relocate(scoreRaw=score, .after=meanSignal) %>% 
+      relocate(tissueRaw=tissue, .after=scoreRaw)
+} else {
+    df$tau <- apply(df[,c(7:ncol(df))], 1, vector2tau)
+    df$meanSignal <- rowMeans(df[,c(7:ncol(df))])
+    df$scoreRaw = NA
+    df$tissueRaw = NA
+    df <- df %>% relocate(tau, .before=strand) %>% 
+      relocate(meanSignal, .after=strand) %>% 
+      relocate(scoreRaw=score, .after=meanSignal) %>% 
+      relocate(tissueRaw=tissue, .after=scoreRaw)
 }
 
 ##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@##

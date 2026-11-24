@@ -109,6 +109,7 @@ if(opt$genome=="mouse" | opt$genome=="mm10") {
   mat <- expr[,c(8:ncol(expr))]
   # mat <- expr[,c(grep(paste(c("cerebellum", "cerebral_cortex", "heart", "right_kidney", "liver", "lung", "placenta", "intestine", "spleen", "testis", "thymus", "adrenal", "bladder", "colon", "duodenum", "flobe", "gfat", "lgintestine", "mamgland", "ovary", "sfat", "stomach"), collapse = "|"), colnames(expr), value=T))]
   expr$tau <- apply(log2(mat+1), 1, vector2tau)
+  #expr$gini <- apply(log2(mat+1), 1, function(x) DescTools::Gini(x, na.rm = T))
   # hist(expr$tau)
 }
 expr[expr == ""] <- NA
