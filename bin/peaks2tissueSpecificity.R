@@ -9,7 +9,8 @@ option_list <- list(
                 [format: chr start end name score (comma sep.) strand tissue (comma sep.)]
                              OR
                 [format: chr start end name score strand score (tab sep.; one per sample)"),
-	make_option(c("-M", "--useMeuleman"), action="store_true", help="compute using data from Meuleman et al. 2020")
+	make_option(c("-M", "--useMeuleman"), action="store_true", help="compute using data from Meuleman et al. 2020"),
+	make_option(c("-R", "--rawCounts"), action="store_true", help="input score values are raw counts. Will be normalized to cpm before tau calculation")
 )
 
 parser <- OptionParser(usage = "%prog [options]", option_list=option_list)
@@ -22,7 +23,7 @@ if(is.null(opt$inFile)) {
 	cat("\nProgram: peaks2tissueSpecificity.R (R script to compute tissue specificity using score and tissue information)\n")
 	cat("Author: BRIC, University of Copenhagen, Denmark\n")
 	cat("Version: 1.0\n")
-	cat("Contact: pundhir@binf.ku.dk\n");
+	cat("Contact: sachin.pundhir@finsenlab.dk\n");
 	print_help(parser)
 	q()
 }
@@ -138,7 +139,10 @@ if(!is.null(opt$useMeuleman)) {
     df[,c(7:ncol(df))] <- df[,c(7:ncol(df))] %>%
                             dplyr::mutate(across(everything(), as.numeric)) %>%
                             dplyr::mutate(across(where(is.numeric), ~ pmax(.x, 0)))
-    df$tau <- apply(df[,c(7:ncol(df))], 1, vector2tau)
+    if(!is.null(opt$rawCounts)) {
+        df[,c(7:ncol(df))] <- edgeR::cpm(df[,c(7:ncol(df))], log = FALSE)
+    }
+    df$tau <- apply(log2(df[,c(7:ncol(df))]+1), 1, vector2tau)
     df$meanSignal <- rowMeans(df[,c(7:ncol(df))])
     df$tissue = NA
     df <- df %>% relocate(tau, .before=strand) %>% 
