@@ -65,6 +65,9 @@ HEADER=$(zless $INFILE | grep -i 'chr.*start.*end\|seqnames.*start.*end')
 if [ ! -z "${REFORMAT}" ]; then
     NCOL="$(zless ${INFILE} | awk -F'\t' 'NR==1 {print NF; exit}')"
     FORMAT_COL4="$(zless $INFILE | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | head -n 1 | awk -v OFS="\t" '{ if($4 ~ /^-?[0-9]+([.][0-9]+)?$/) { print "numeric"; } else { print "string" } }' | uniq)"
+    FORMAT_COL6="$(zless $INFILE | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | head -n 1 | awk -v OFS="\t" '{ if($6 ~ /^-?[0-9]+([.][0-9]+)?$/) { print "numeric"; } else { print "string" } }' | uniq)"
+
+    ## reformat header
     if [ ! -z "${HEADER}" ]; then
         if [ "${NCOL}" -lt 6 ]; then
             echo -e "chr\tstart\tend\tname\tscore\tstrand"
@@ -80,7 +83,7 @@ if [ ! -z "${REFORMAT}" ]; then
     elif [ "${NCOL}" -eq 5 ]; then
         zless ${INFILE} | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | awk -v OFS="\t" '{ i++; print $0,"."; }'
     elif [ "${NCOL}" -ge 6 ]; then
-        if [ "${FORMAT_COL4}" == "numeric" ]; then
+        if [ "${FORMAT_COL4}" == "numeric" || "${FORMAT_COL6}" == "numeric" ]; then
             zless $INFILE | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | awk -v OFS="\t" '{ i++; for (j=NF+3; j>=4; j--) { $j=$(j-3); } $4="ocr_"i; $5=0; $6="."; print }'
         fi
     fi

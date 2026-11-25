@@ -1,0 +1,94 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=4
+
+#### usage ####
+usage() {
+	echo Program: "isBed (check if input file is in BED format)"
+	echo Author: BRIC, University of Copenhagen, Denmark
+	echo Version: 1.0
+	echo Contact: pundhir@binf.ku.dk
+	echo "Usage: isBed -i <file> [OPTIONS]"
+	echo "Options:"
+	echo " -i <file>   [input file (can be stdin)]"
+    echo "[OPTIONS]"
+    echo " -s          [check for six column format (default three column)]"
+    echo "             [chr start end name score strand]"
+    echo " -r          [reformat to BED format (six column)]"
+    echo " -h          [help]"
+    echo "[OUTPUT]"
+	echo "             [0: file is in BED format]"
+    echo "             [1: file is not in BED format]"
+	exit 0
+}
+
+#### parse options ####
+while getopts i:srh ARG; do
+    case "$ARG" in
+    i) INFILE=$OPTARG;;
+    s) SIXCOL=1;;
+    r) REFORMAT=1;;
+    h) HELP=1;;
+    esac
+done
+
+## usage, if necessary file and directories are given/exist
+if [ -z "$INFILE" -o "$HELP" ]; then
+	usage
+fi
+
+## create temporary BED file if input is from stdin
+if [ "$INFILE" == "stdin" ]; then
+    TMP=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+    while read LINE; do
+        echo -e "${LINE}"
+    done > $TMP
+    INFILE=$TMP
+fi
+
+## check if file exists
+if [ ! -s $INFILE ]; then
+    echo 1
+    exit
+fi
+
+## check file format
+if [ -z "$SIXCOL" ]; then
+    STATUS=$(zless $INFILE | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | perl -ane 'BEGIN { $status=0; } if(($F[1]!~/^[0-9]+$/ || $F[2]!~/^[0-9]+$/) && $status==0) { $status=1; last } END { print "$status\n"; }')
+else
+    STATUS=$(zless $INFILE | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | perl -ane 'BEGIN { $status=0; } if(($F[1]!~/^[0-9]+$/ || $F[2]!~/^[0-9]+$/ || $F[5]!~/^[+-.]$/ || scalar(@F)<6) && $status==0) { $status=1; last } END { print "$status\n"; }')
+fi
+
+## check, if header is already present
+HEADER=$(zless $INFILE | grep -i 'chr.*start.*end\|seqnames.*start.*end')
+
+## reformat to six column BED format
+if [ ! -z "${REFORMAT}" ]; then
+    NCOL="$(zless ${INFILE} | awk -F'\t' 'NR==1 {print NF; exit}')"
+    FORMAT_COL4="$(zless $INFILE | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | head -n 1 | awk -v OFS="\t" '{ if($4 ~ /^-?[0-9]+([.][0-9]+)?$/) { print "numeric"; } else { print "string" } }' | uniq)"
+    if [ ! -z "${HEADER}" ]; then
+        if [ "${NCOL}" -lt 6 ]; then
+            echo -e "chr\tstart\tend\tname\tscore\tstrand"
+        else
+            zless $INFILE | grep -i 'chr.*start.*end\|seqnames.*start.*end' | awk -v OFS="\t" '{ i++; $1="chr"; $2="start"; $3="end"; for (j=NF+3; j>=4; j--) { $j=$(j-3); } $4="name"; $5="score"; $6="strand"; print }'
+        fi
+    fi
+    
+    if [ "${NCOL}" -eq 3 ]; then
+        zless ${INFILE} | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | awk -v OFS="\t" '{ i++; print $1,$2,$3,"ocr_"i,0,"."; }'
+    elif [ "${NCOL}" -eq 4 ]; then
+        zless ${INFILE} | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | awk -v OFS="\t" '{ i++; print $0,0,"."; }'
+    elif [ "${NCOL}" -eq 5 ]; then
+        zless ${INFILE} | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | awk -v OFS="\t" '{ i++; print $0,"."; }'
+    elif [ "${NCOL}" -ge 6 ]; then
+        if [ "${FORMAT_COL4}" == "numeric" ]; then
+            zless $INFILE | grep -vi 'chr.*start.*end\|seqnames.*start.*end' | awk -v OFS="\t" '{ i++; for (j=NF+3; j>=4; j--) { $j=$(j-3); } $4="ocr_"i; $5=0; $6="."; print }'
+        fi
+    fi
+else
+    echo ${STATUS}
+fi
+
+## remove temporary file, if exists
+if [ ! -z "$TMP" ]; then
+    rm $TMP
+fi
