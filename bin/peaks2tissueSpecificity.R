@@ -128,6 +128,9 @@ if(!is.null(opt$useMeuleman)) {
     mat <- matrix(0, length(unique(dfE$name)), length(unique(dfE$tissue)), dimnames = list(unique(dfE$name), unique(dfE$tissue)))
     mat[cbind(dfE$name, dfE$tissue)] <- as.numeric(dfE$score)
     mat <- as.data.frame(mat)
+    if(!is.null(opt$rawCounts)) {
+        mat <- edgeR::cpm(mat, log = FALSE)
+    }
     mat$tau <- apply(log2(mat+1), 1, vector2tau)
     mat$meanSignal <- rowMeans(mat)
     df <- merge(df, mat, by.x="name", by.y="row.names")
